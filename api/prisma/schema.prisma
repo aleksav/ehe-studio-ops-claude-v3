@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum BudgetType {
+  NONE
+  CAPPED
+  TRACKED_ONLY
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskType {
+  ARCHITECTURE_ENGINEERING_DIRECTION
+  DESIGN_DELIVERY_RESEARCH
+  DEVELOPMENT_TESTING
+  BUSINESS_SUPPORT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password_hash  String
+  team_member_id String?  @unique
+  team_member    TeamMember? @relation(fields: [team_member_id], references: [id])
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("users")
+}
+
+model TeamMember {
+  id                  String    @id @default(uuid())
+  full_name           String
+  email               String    @unique
+  role_title          String?
+  preferred_task_type TaskType?
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  user             User?
+  task_assignments TaskAssignment[]
+  time_entries     TimeEntry[]
+  audit_logs       AuditLog[]       @relation("AuditActor")
+
+  @@map("team_members")
+}
+
+model Project {
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  status        ProjectStatus @default(PLANNED)
+  start_date    DateTime?     @db.Date
+  end_date      DateTime?     @db.Date
+  budget_type   BudgetType    @default(NONE)
+  budget_amount Decimal?      @db.Decimal(12, 2)
+  currency_code String        @default("GBP") @db.Char(3)
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+
+  milestones   Milestone[]
+  tasks        Task[]
+  time_entries TimeEntry[]
+
+  @@map("projects")
+}
+
+model Milestone {
+  id         String   @id @default(uuid())
+  project_id String
+  project    Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  name       String
+  due_date   DateTime? @db.Date
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tasks Task[]
+
+  @@index([project_id])
+  @@index([due_date])
+  @@map("milestones")
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  project_id   String
+  project      Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  milestone_id String?
+  milestone    Milestone? @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
+  description  String
+  status       TaskStatus @default(TODO)
+  started_at   DateTime?
+  completed_at DateTime?
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+
+  assignments TaskAssignment[]
+
+  @@index([project_id])
+  @@index([milestone_id])
+  @@index([status])
+  @@map("tasks")
+}
+
+model TaskAssignment {
+  id             String     @id @default(uuid())
+  task_id        String
+  task           Task       @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  team_member_id String
+  team_member    TeamMember @relation(fields: [team_member_id], references: [id], onDelete: Cascade)
+  created_at     DateTime   @default(now())
+
+  @@unique([task_id, team_member_id])
+  @@index([task_id])
+  @@index([team_member_id])
+  @@map("task_assignments")
+}
+
+model TimeEntry {
+  id             String     @id @default(uuid())
+  project_id     String
+  project        Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  team_member_id String
+  team_member    TeamMember @relation(fields: [team_member_id], references: [id], onDelete: Cascade)
+  date           DateTime   @db.Date
+  hours_worked   Decimal    @db.Decimal(8, 2)
+  task_type      TaskType
+  notes          String?
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  @@index([project_id])
+  @@index([team_member_id])
+  @@index([date])
+  @@index([team_member_id, date])
+  @@map("time_entries")
+}
+
+model TaskRate {
+  id             String   @id @default(uuid())
+  task_type      TaskType
+  day_rate       Decimal  @db.Decimal(12, 2)
+  currency_code  String   @default("GBP") @db.Char(3)
+  effective_from DateTime @db.Date
+  effective_to   DateTime? @db.Date
+  created_at     DateTime @default(now())
+
+  @@index([task_type])
+  @@index([task_type, effective_from])
+  @@map("task_rates")
+}
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  entity_type    String
+  entity_id      String
+  action         AuditAction
+  actor_id       String?
+  actor          TeamMember? @relation("AuditActor", fields: [actor_id], references: [id], onDelete: SetNull)
+  changed_fields Json?
+  created_at     DateTime    @default(now())
+
+  @@index([entity_type])
+  @@index([entity_id])
+  @@index([actor_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
