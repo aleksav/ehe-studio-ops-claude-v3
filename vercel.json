@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run --workspace=web build",
   "outputDirectory": "web/dist",
-  "installCommand": "npm ci",
+  "installCommand": "mkdir -p api && echo '{\"name\":\"@ehestudio-ops/api\",\"version\":\"0.0.1\",\"private\":true}' > api/package.json && npm ci",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
