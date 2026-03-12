@@ -10,3 +10,5 @@ coverage/
 *.tsbuildinfo
 web/dist/
 api/dist/
+web/test-results/
+web/playwright-report/

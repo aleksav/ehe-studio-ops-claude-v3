@@ -39,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Projects', path: '/projects', icon: <FolderIcon /> },
   { label: 'Team', path: '/team', icon: <GroupIcon /> },
-  { label: 'Time Logging', path: '/time', icon: <AccessTimeIcon /> },
+  { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
   { label: 'Standup', path: '/standup', icon: <ForumIcon /> },
 ];
 
@@ -177,7 +177,7 @@ export default function AppLayout() {
               </IconButton>
             )}
             <Box sx={{ flex: 1 }} />
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
+            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small" data-testid="user-menu-button">
               <Avatar
                 sx={{
                   width: 36,

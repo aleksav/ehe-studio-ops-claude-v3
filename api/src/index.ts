@@ -7,6 +7,7 @@ import milestoneRoutes from './routes/milestone.routes';
 import taskRoutes from './routes/task.routes';
 import taskAssignmentRoutes from './routes/task-assignment.routes';
 import taskRateRoutes from './routes/task-rate.routes';
+import timeEntryRoutes from './routes/time-entry.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +28,7 @@ app.use('/api/projects', milestoneRoutes);
 app.use('/api/projects', taskRoutes);
 app.use('/api/tasks', taskAssignmentRoutes);
 app.use('/api/task-rates', taskRateRoutes);
+app.use('/api/time-entries', timeEntryRoutes);
 
 app.listen(PORT, () => {
   console.log(`EHEStudio Ops API running on port ${PORT}`);
