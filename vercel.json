@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run --workspace=web build",
+  "buildCommand": "cd api && npx prisma generate && cd .. && npm run --workspace=web build",
   "outputDirectory": "web/dist",
   "installCommand": "npm ci",
   "rewrites": [
