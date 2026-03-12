@@ -1,6 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
+import teamMemberRoutes from './routes/team-member.routes';
+import projectRoutes from './routes/project.routes';
+import milestoneRoutes from './routes/milestone.routes';
+import taskRoutes from './routes/task.routes';
+import taskAssignmentRoutes from './routes/task-assignment.routes';
+import taskRateRoutes from './routes/task-rate.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,6 +21,12 @@ app.get('/health', (_req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/team-members', teamMemberRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/projects', milestoneRoutes);
+app.use('/api/projects', taskRoutes);
+app.use('/api/tasks', taskAssignmentRoutes);
+app.use('/api/task-rates', taskRateRoutes);
 
 app.listen(PORT, () => {
   console.log(`EHEStudio Ops API running on port ${PORT}`);
