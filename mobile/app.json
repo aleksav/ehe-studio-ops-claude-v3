@@ -24,6 +24,12 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "16878605-797e-4c4c-8c2e-b2b517f0ed57"
+      }
+    },
+    "owner": "thestartupfactorytech"
   }
 }
