@@ -1,12 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
+const dbUrl =
+  process.env.DATABASE_URL ||
+  'postgresql://aleksav@localhost:5432/ehestudio_ops_dev';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  forbidOnly: isCI,
+  retries: isCI ? 2 : 0,
   workers: 1,
-  reporter: [['html', { open: 'never' }]],
+  reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
@@ -21,14 +27,16 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd ../api && PORT=3001 DATABASE_URL="postgresql://aleksav@localhost:5432/ehestudio_ops_dev" JWT_SECRET="test-secret" npx tsx src/index.ts',
+      command: `cd ../api && PORT=3001 DATABASE_URL="${dbUrl}" JWT_SECRET="test-secret" ALLOWED_EMAIL_DOMAINS="ehe.ai,tsf.tech,thestartupfactory.tech" npx tsx src/index.ts`,
       port: 3001,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
+      timeout: 30000,
     },
     {
       command: 'npx vite --port 3000',
       port: 3000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: !isCI,
+      timeout: 30000,
     },
   ],
 });
