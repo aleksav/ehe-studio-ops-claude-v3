@@ -1,0 +1,30 @@
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true }
+    },
+    "test": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "APP_ENV": "test" }
+    },
+    "production": {
+      "distribution": "store",
+      "env": { "APP_ENV": "production" }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "APPLE_ID_FROM_ENV",
+        "ascAppId": "ASC_APP_ID_FROM_ENV"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-key.json",
+        "track": "internal"
+      }
+    }
+  }
+}
