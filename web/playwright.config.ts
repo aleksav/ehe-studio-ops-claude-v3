@@ -2,9 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
-const dbUrl =
-  process.env.DATABASE_URL ||
-  'postgresql://aleksav@localhost:5432/ehestudio_ops_dev';
+const dbUrl = process.env.DATABASE_URL || 'postgresql://aleksav@localhost:5432/ehestudio_ops_dev';
 
 export default defineConfig({
   testDir: './tests/e2e',

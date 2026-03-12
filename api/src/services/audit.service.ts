@@ -21,9 +21,10 @@ export async function writeAudit(
       entity_id: params.entityId,
       action: params.action,
       actor_id: params.actorId,
-      changed_fields: params.changedFields === null
-        ? Prisma.JsonNull
-        : (params.changedFields as unknown as Prisma.InputJsonValue),
+      changed_fields:
+        params.changedFields === null
+          ? Prisma.JsonNull
+          : (params.changedFields as unknown as Prisma.InputJsonValue),
     },
   });
 }

@@ -61,7 +61,7 @@ Run npm audit on every sweep. Critical/High CVEs block merge.
 Sweep after every slice touching `mobile/`.
 
 - **Secure storage:** verify all auth tokens use expo-secure-store. Flag AsyncStorage for sensitive data.
-- **Bundle secrets:** verify no API keys or secrets embedded in the JS bundle. EXPO_PUBLIC_ vars are visible to the client — only non-secret config is permitted.
+- **Bundle secrets:** verify no API keys or secrets embedded in the JS bundle. EXPO*PUBLIC* vars are visible to the client — only non-secret config is permitted.
 - **Device logs:** verify no tokens, passwords, or PII logged in production. Guard with `__DEV__`.
 - **Deep link validation:** verify the handler validates incoming URLs before acting.
 - **Certificate pinning:** consider for known API endpoints. Flag to Team Lead for sensitive data.

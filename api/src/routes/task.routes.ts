@@ -111,7 +111,8 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
           project_id: projectId,
           milestone_id: parsed.data.milestone_id ?? null,
           status,
-          started_at: status === TaskStatus.IN_PROGRESS || status === TaskStatus.DONE ? now : undefined,
+          started_at:
+            status === TaskStatus.IN_PROGRESS || status === TaskStatus.DONE ? now : undefined,
           completed_at: status === TaskStatus.DONE ? now : undefined,
         },
       });

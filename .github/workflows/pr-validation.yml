@@ -101,6 +101,7 @@ jobs:
           node-version: 18
           cache: npm
       - run: npm ci
+      - run: cd api && npx prisma generate
       - run: cd api && npx prisma migrate deploy
       - run: cd api && npx prisma db seed
       - name: Install Playwright browsers

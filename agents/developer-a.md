@@ -63,12 +63,12 @@ All API code follows a strict four-layer architecture:
 Route  ->  Controller  ->  Service  ->  Repository
 ```
 
-| Layer | Responsibility | Rules |
-|---|---|---|
-| **Route** | HTTP wiring — method, path, middleware chain | No logic. Maps URL to controller method. Applies auth/validation middleware. |
-| **Controller** | Request/response shaping | Reads params/body/query from `req`, calls one or more service methods, returns a consistent response envelope. Never contains business logic. |
-| **Service** | All business logic | Calls repositories. Orchestrates multi-step operations. Never touches `req` or `res`. |
-| **Repository** | All database calls | Thin Prisma wrappers. No business logic. Returns domain data, not Prisma-specific types when possible. |
+| Layer          | Responsibility                               | Rules                                                                                                                                         |
+| -------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Route**      | HTTP wiring — method, path, middleware chain | No logic. Maps URL to controller method. Applies auth/validation middleware.                                                                  |
+| **Controller** | Request/response shaping                     | Reads params/body/query from `req`, calls one or more service methods, returns a consistent response envelope. Never contains business logic. |
+| **Service**    | All business logic                           | Calls repositories. Orchestrates multi-step operations. Never touches `req` or `res`.                                                         |
+| **Repository** | All database calls                           | Thin Prisma wrappers. No business logic. Returns domain data, not Prisma-specific types when possible.                                        |
 
 ### Response Envelope
 
@@ -130,18 +130,18 @@ Route  ->  Controller  ->  Service  ->  Repository
 
 Use the correct status code for every response:
 
-| Code | Usage |
-|---|---|
-| `200` | Successful read or update |
-| `201` | Successful creation |
-| `204` | Successful deletion (no body) |
-| `400` | Malformed request |
-| `401` | Missing or invalid authentication |
-| `403` | Authenticated but not authorized |
-| `404` | Resource not found |
-| `409` | Conflict (duplicate, state violation) |
+| Code  | Usage                                      |
+| ----- | ------------------------------------------ |
+| `200` | Successful read or update                  |
+| `201` | Successful creation                        |
+| `204` | Successful deletion (no body)              |
+| `400` | Malformed request                          |
+| `401` | Missing or invalid authentication          |
+| `403` | Authenticated but not authorized           |
+| `404` | Resource not found                         |
+| `409` | Conflict (duplicate, state violation)      |
 | `422` | Validation error (schema or business rule) |
-| `500` | Unexpected server error |
+| `500` | Unexpected server error                    |
 
 ---
 
@@ -369,9 +369,7 @@ WHERE  status     = 'claimed'
 - Use discriminated unions for state modeling:
 
 ```typescript
-type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 ```
 
 ### ORM Types

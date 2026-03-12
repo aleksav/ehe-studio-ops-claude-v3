@@ -90,10 +90,7 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 
     res.status(201).json(assignment);
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       res.status(409).json({ error: 'Team member is already assigned to this task' });
       return;
     }
@@ -103,56 +100,60 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
 });
 
 // DELETE /api/tasks/:taskId/assignments/:teamMemberId
-router.delete('/:teamMemberId', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { taskId, teamMemberId } = req.params;
-    const actorId = req.user?.teamMemberId ?? null;
+router.delete(
+  '/:teamMemberId',
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { taskId, teamMemberId } = req.params;
+      const actorId = req.user?.teamMemberId ?? null;
 
-    const assignment = await prisma.$transaction(async (tx) => {
-      const existing = await tx.taskAssignment.findUnique({
-        where: {
-          task_id_team_member_id: {
-            task_id: taskId,
-            team_member_id: teamMemberId,
+      const assignment = await prisma.$transaction(async (tx) => {
+        const existing = await tx.taskAssignment.findUnique({
+          where: {
+            task_id_team_member_id: {
+              task_id: taskId,
+              team_member_id: teamMemberId,
+            },
           },
-        },
-      });
-      if (!existing) return null;
+        });
+        if (!existing) return null;
 
-      await tx.taskAssignment.delete({
-        where: {
-          task_id_team_member_id: {
-            task_id: taskId,
-            team_member_id: teamMemberId,
+        await tx.taskAssignment.delete({
+          where: {
+            task_id_team_member_id: {
+              task_id: taskId,
+              team_member_id: teamMemberId,
+            },
           },
-        },
+        });
+
+        await writeAudit(tx, {
+          entityType: 'TaskAssignment',
+          entityId: existing.id,
+          action: AuditAction.DELETE,
+          actorId,
+          changedFields: buildDeleteAuditFields({
+            id: existing.id,
+            task_id: existing.task_id,
+            team_member_id: existing.team_member_id,
+          }),
+        });
+
+        return existing;
       });
 
-      await writeAudit(tx, {
-        entityType: 'TaskAssignment',
-        entityId: existing.id,
-        action: AuditAction.DELETE,
-        actorId,
-        changedFields: buildDeleteAuditFields({
-          id: existing.id,
-          task_id: existing.task_id,
-          team_member_id: existing.team_member_id,
-        }),
-      });
+      if (!assignment) {
+        res.status(404).json({ error: 'Assignment not found' });
+        return;
+      }
 
-      return existing;
-    });
-
-    if (!assignment) {
-      res.status(404).json({ error: 'Assignment not found' });
-      return;
+      res.json({ message: 'Assignment removed' });
+    } catch (error) {
+      console.error('Delete assignment error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    res.json({ message: 'Assignment removed' });
-  } catch (error) {
-    console.error('Delete assignment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  },
+);
 
 export default router;
