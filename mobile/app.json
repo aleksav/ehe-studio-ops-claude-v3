@@ -20,7 +20,7 @@
       "package": "com.ehestudio.ops"
     },
     "updates": {
-      "url": "https://u.expo.dev/YOUR_PROJECT_ID"
+      "url": "https://u.expo.dev/16878605-797e-4c4c-8c2e-b2b517f0ed57"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -30,6 +30,9 @@
         "projectId": "16878605-797e-4c4c-8c2e-b2b517f0ed57"
       }
     },
-    "owner": "thestartupfactorytech"
+    "owner": "thestartupfactorytech",
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }
