@@ -116,6 +116,14 @@ export default function AppLayout() {
           );
         })}
       </List>
+      <Box sx={{ px: 3, py: 1.5 }}>
+        <Typography variant="caption" color="text.disabled" display="block">
+          Build {__APP_VERSION__}
+        </Typography>
+        <Typography variant="caption" color="text.disabled">
+          {new Date(__APP_BUILD_DATE__).toLocaleDateString()}
+        </Typography>
+      </Box>
     </Box>
   );
 
