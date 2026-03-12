@@ -1,0 +1,28 @@
+databases:
+  - name: ehestudio-ops-db
+    plan: free
+    databaseName: ehestudio_ops
+    user: ehestudio_ops
+
+services:
+  - type: web
+    name: ehestudio-ops-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm ci && cd api && npx prisma generate && npx tsc
+    startCommand: cd api && npx prisma migrate deploy && node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ehestudio-ops-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_EMAIL_DOMAINS
+        value: ehe.ai,tsf.tech,thestartupfactory.tech
+      - key: CORS_ORIGIN
+        sync: false
+      - key: NODE_ENV
+        value: production
