@@ -13,12 +13,30 @@ import { AuditAction } from '@prisma/client';
 
 const router = Router();
 
+const ALLOWED_EMAIL_DOMAINS = (
+  process.env.ALLOWED_EMAIL_DOMAINS || 'ehe.ai,tsf.tech,thestartupfactory.tech'
+)
+  .split(',')
+  .map((d) => d.trim().toLowerCase());
+
+function isAllowedEmailDomain(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return !!domain && ALLOWED_EMAIL_DOMAINS.includes(domain);
+}
+
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, password, full_name, role_title } = req.body;
 
     if (!email || !password || !full_name) {
       res.status(400).json({ error: 'email, password, and full_name are required' });
+      return;
+    }
+
+    if (!isAllowedEmailDomain(email)) {
+      res.status(403).json({
+        error: `Registration restricted to ${ALLOWED_EMAIL_DOMAINS.map((d) => '@' + d).join(', ')} email addresses`,
+      });
       return;
     }
 

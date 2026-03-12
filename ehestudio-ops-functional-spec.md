@@ -164,6 +164,8 @@ Call this from all three entry creation/edit endpoints before writing.
 
 Register, login, refresh, logout. All endpoints require authentication. No public endpoints beyond register and login.
 
+**Allowed email domains:** only `@ehe.ai`, `@tsf.tech`, and `@thestartupfactory.tech` may register. Registration with any other domain must be rejected with HTTP 403. Configurable via `ALLOWED_EMAIL_DOMAINS` environment variable (comma-separated, defaults to `ehe.ai,tsf.tech,thestartupfactory.tech`).
+
 ---
 
 ## Core Entity Management
