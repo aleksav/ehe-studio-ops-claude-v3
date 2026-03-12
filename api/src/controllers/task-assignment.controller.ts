@@ -1,11 +1,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { AuthenticatedRequest } from '../middleware/auth';
-import {
-  listAssignments,
-  assignMember,
-  unassignMember,
-} from '../services/task-assignment.service';
+import { listAssignments, assignMember, unassignMember } from '../services/task-assignment.service';
 
 const createAssignmentSchema = z.object({
   team_member_id: z.string().uuid(),

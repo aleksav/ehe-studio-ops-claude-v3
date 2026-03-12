@@ -57,7 +57,11 @@ export async function findTaskByIdAndProject(id: string, projectId: string) {
   });
 }
 
-export async function findTaskByIdAndProjectTx(tx: TransactionClient, id: string, projectId: string) {
+export async function findTaskByIdAndProjectTx(
+  tx: TransactionClient,
+  id: string,
+  projectId: string,
+) {
   return tx.task.findFirst({
     where: { id, project_id: projectId },
   });

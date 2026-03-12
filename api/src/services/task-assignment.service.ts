@@ -1,10 +1,6 @@
 import { AuditAction, Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
-import {
-  writeAudit,
-  buildCreateAuditFields,
-  buildDeleteAuditFields,
-} from './audit.service';
+import { writeAudit, buildCreateAuditFields, buildDeleteAuditFields } from './audit.service';
 import {
   findTaskById,
   findTeamMemberById,
@@ -22,11 +18,7 @@ export async function listAssignments(taskId: string) {
   return { data: assignments };
 }
 
-export async function assignMember(
-  taskId: string,
-  teamMemberId: string,
-  actorId: string | null,
-) {
+export async function assignMember(taskId: string, teamMemberId: string, actorId: string | null) {
   const task = await findTaskById(taskId);
   if (!task) return { error: 'Task not found' as const };
 
@@ -64,11 +56,7 @@ export async function assignMember(
   }
 }
 
-export async function unassignMember(
-  taskId: string,
-  teamMemberId: string,
-  actorId: string | null,
-) {
+export async function unassignMember(taskId: string, teamMemberId: string, actorId: string | null) {
   const result = await prisma.$transaction(async (tx) => {
     const existing = await findAssignmentByComposite(tx, taskId, teamMemberId);
     if (!existing) return null;
