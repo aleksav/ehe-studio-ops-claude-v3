@@ -24,6 +24,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import GroupIcon from '@mui/icons-material/Group';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ForumIcon from '@mui/icons-material/Forum';
+import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Projects', path: '/projects', icon: <FolderIcon /> },
   { label: 'Team', path: '/team', icon: <GroupIcon /> },
   { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
+  { label: 'Weekly Grid', path: '/weekly-grid', icon: <CalendarViewWeekIcon /> },
   { label: 'Standup', path: '/standup', icon: <ForumIcon /> },
 ];
 

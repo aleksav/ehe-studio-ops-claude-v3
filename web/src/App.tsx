@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import TimeLoggingPage from './pages/TimeLoggingPage';
+import WeeklyGridPage from './pages/WeeklyGridPage';
 import { Box, CircularProgress } from '@mui/material';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -112,6 +113,7 @@ export default function App() {
           <Route path="/projects" element={<PlaceholderPage title="Projects" />} />
           <Route path="/team" element={<PlaceholderPage title="Team" />} />
           <Route path="/time-logging" element={<TimeLoggingPage />} />
+          <Route path="/weekly-grid" element={<WeeklyGridPage />} />
           <Route path="/standup" element={<PlaceholderPage title="Standup" />} />
         </Route>
 
