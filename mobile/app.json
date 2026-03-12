@@ -32,8 +32,6 @@
       }
     },
     "owner": "thestartupfactorytech",
-    "plugins": [
-      "expo-secure-store"
-    ]
+    "plugins": ["expo-secure-store"]
   }
 }

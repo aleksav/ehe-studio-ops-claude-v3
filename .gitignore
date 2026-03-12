@@ -10,6 +10,7 @@ coverage/
 *.tsbuildinfo
 web/dist/
 api/dist/
+test-results/
 web/test-results/
 web/playwright-report/
 .claude/
