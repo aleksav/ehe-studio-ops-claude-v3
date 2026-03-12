@@ -4,6 +4,7 @@ import AppLayout from './layouts/AppLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import TimeLoggingPage from './pages/TimeLoggingPage';
 import { Box, CircularProgress } from '@mui/material';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -113,7 +114,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/projects" element={<PlaceholderPage title="Projects" />} />
           <Route path="/team" element={<PlaceholderPage title="Team" />} />
-          <Route path="/time" element={<PlaceholderPage title="Time Logging" />} />
+          <Route path="/time-logging" element={<TimeLoggingPage />} />
           <Route path="/standup" element={<PlaceholderPage title="Standup" />} />
         </Route>
 
