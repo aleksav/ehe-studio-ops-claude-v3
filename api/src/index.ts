@@ -33,8 +33,8 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/projects', projectRoutes);
-app.use('/api/projects', milestoneRoutes);
-app.use('/api/projects', taskRoutes);
+app.use('/api/projects/:projectId/milestones', milestoneRoutes);
+app.use('/api/projects/:projectId/tasks', taskRoutes);
 app.use('/api/tasks', taskAssignmentRoutes);
 app.use('/api/task-rates', taskRateRoutes);
 app.use('/api/time-entries', timeEntryRoutes);
