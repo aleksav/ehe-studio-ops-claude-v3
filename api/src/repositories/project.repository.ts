@@ -24,18 +24,11 @@ export function findProjectByIdWithBudgetSummary(id: string) {
   });
 }
 
-export function createProject(
-  tx: TransactionClient,
-  data: Prisma.ProjectCreateInput,
-) {
+export function createProject(tx: TransactionClient, data: Prisma.ProjectCreateInput) {
   return tx.project.create({ data });
 }
 
-export function updateProject(
-  tx: TransactionClient,
-  id: string,
-  data: Record<string, unknown>,
-) {
+export function updateProject(tx: TransactionClient, id: string, data: Record<string, unknown>) {
   return tx.project.update({ where: { id }, data });
 }
 

@@ -8,29 +8,18 @@ export function findMilestonesByProjectId(projectId: string) {
   });
 }
 
-export function findMilestoneByIdAndProject(
-  id: string,
-  projectId: string,
-  tx?: TransactionClient,
-) {
+export function findMilestoneByIdAndProject(id: string, projectId: string, tx?: TransactionClient) {
   const client = tx ?? prisma;
   return client.milestone.findFirst({
     where: { id, project_id: projectId },
   });
 }
 
-export function createMilestone(
-  tx: TransactionClient,
-  data: Prisma.MilestoneUncheckedCreateInput,
-) {
+export function createMilestone(tx: TransactionClient, data: Prisma.MilestoneUncheckedCreateInput) {
   return tx.milestone.create({ data });
 }
 
-export function updateMilestone(
-  tx: TransactionClient,
-  id: string,
-  data: Record<string, unknown>,
-) {
+export function updateMilestone(tx: TransactionClient, id: string, data: Record<string, unknown>) {
   return tx.milestone.update({ where: { id }, data });
 }
 
