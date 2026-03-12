@@ -9,6 +9,8 @@ jobs:
   deploy-mobile-ota:
     name: Mobile OTA Update (EAS)
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,23 +18,11 @@ jobs:
           node-version: 18
           cache: npm
       - run: npm ci
-      - uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - name: Decode App Store Connect API key
-        run: |
-          echo "$ASC_API_KEY_BASE64" | base64 --decode > /tmp/asc-api-key.p8
-        env:
-          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-        if: ${{ secrets.ASC_API_KEY_BASE64 != '' }}
-      - name: Decode Google Play service account key
-        run: |
-          echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64" | base64 --decode > /tmp/google-play-key.json
-        env:
-          GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 }}
-        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 != '' }}
+      - run: npx expo install --check || true
+        working-directory: mobile
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
       - name: Push OTA update
-        run: |
-          cd mobile && eas update --branch production --message "deploy: ${{ github.sha }}"
-        if: ${{ secrets.EXPO_TOKEN != '' }}
+        run: eas update --branch production --message "deploy: ${{ github.sha }}"
+        working-directory: mobile
+        if: env.EXPO_TOKEN != ''
