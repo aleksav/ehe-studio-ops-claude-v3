@@ -21,7 +21,7 @@ async function main() {
   const alice = await prisma.teamMember.create({
     data: {
       full_name: 'Alice Chen',
-      email: 'alice@ehestudio.com',
+      email: 'alice@ehe.ai',
       role_title: 'Lead Developer',
       preferred_task_type: TaskType.DEVELOPMENT_TESTING,
       is_active: true,
@@ -31,7 +31,7 @@ async function main() {
   const bob = await prisma.teamMember.create({
     data: {
       full_name: 'Bob Martinez',
-      email: 'bob@ehestudio.com',
+      email: 'bob@ehe.ai',
       role_title: 'Designer',
       preferred_task_type: TaskType.DESIGN_DELIVERY_RESEARCH,
       is_active: true,
@@ -41,7 +41,7 @@ async function main() {
   const carol = await prisma.teamMember.create({
     data: {
       full_name: 'Carol Wright',
-      email: 'carol@ehestudio.com',
+      email: 'carol@ehe.ai',
       role_title: 'Project Manager',
       preferred_task_type: TaskType.BUSINESS_SUPPORT,
       is_active: true,
@@ -52,13 +52,13 @@ async function main() {
   const passwordHash = await bcrypt.hash('password123', 10);
 
   await prisma.user.create({
-    data: { email: 'alice@ehestudio.com', password_hash: passwordHash, team_member_id: alice.id },
+    data: { email: 'alice@ehe.ai', password_hash: passwordHash, team_member_id: alice.id },
   });
   await prisma.user.create({
-    data: { email: 'bob@ehestudio.com', password_hash: passwordHash, team_member_id: bob.id },
+    data: { email: 'bob@ehe.ai', password_hash: passwordHash, team_member_id: bob.id },
   });
   await prisma.user.create({
-    data: { email: 'carol@ehestudio.com', password_hash: passwordHash, team_member_id: carol.id },
+    data: { email: 'carol@ehe.ai', password_hash: passwordHash, team_member_id: carol.id },
   });
 
   // Create projects

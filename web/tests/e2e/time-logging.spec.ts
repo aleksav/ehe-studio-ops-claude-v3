@@ -4,7 +4,7 @@ test.describe('Time Logging — Quick Entry', () => {
   const testPassword = 'password123';
 
   test.beforeEach(async ({ page }) => {
-    const testEmail = `e2e-time-${Date.now()}@test.com`;
+    const testEmail = `e2e-time-${Date.now()}@ehe.ai`;
     await page.goto('/register');
     await page.getByLabel('Full Name').fill('Time Logger');
     await page.getByLabel('Email').fill(testEmail);

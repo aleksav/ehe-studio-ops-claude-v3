@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Auth flow', () => {
-  const testEmail = `e2e-${Date.now()}@test.com`;
+  const testEmail = `e2e-${Date.now()}@ehe.ai`;
   const testPassword = 'password123';
   const testName = 'E2E Test User';
 
@@ -22,7 +22,7 @@ test.describe('Auth flow', () => {
   test('logout and login again', async ({ page }) => {
     // Register first
     await page.goto('/register');
-    const email = `e2e-logout-${Date.now()}@test.com`;
+    const email = `e2e-logout-${Date.now()}@ehe.ai`;
     await page.getByLabel('Full Name').fill('Logout Test');
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(testPassword);
