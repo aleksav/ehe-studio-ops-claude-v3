@@ -277,6 +277,7 @@ git commit --author="agent-performance-expert <human@example.com>" -m "perf: ...
 ### Secrets Checklist
 
 **Core:**
+
 - `JWT_SECRET`
 - `RENDER_DEPLOY_HOOK_URL`
 - `RENDER_API_KEY`
@@ -288,10 +289,12 @@ git commit --author="agent-performance-expert <human@example.com>" -m "perf: ...
 - `PRODUCTION_URL`
 
 **Mobile:**
+
 - `EXPO_TOKEN`
 - `MOBILE_APP_BUNDLE_ID`
 
 **Worker:**
+
 - `RENDER_SERVICE_ID_WORKER`
 - `RENDER_DEPLOY_HOOK_URL_WORKER`
 

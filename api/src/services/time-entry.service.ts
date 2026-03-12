@@ -43,7 +43,8 @@ export async function validateDailyHours(
   return {
     currentTotal,
     newTotal,
-    warning: newTotal > 8 && newTotal < 12 ? `Daily total would be ${newTotal}h (exceeds 8h)` : null,
+    warning:
+      newTotal > 8 && newTotal < 12 ? `Daily total would be ${newTotal}h (exceeds 8h)` : null,
     blocked: newTotal >= 12,
   };
 }

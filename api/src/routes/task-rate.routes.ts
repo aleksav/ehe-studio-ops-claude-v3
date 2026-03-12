@@ -49,10 +49,12 @@ async function validateRateTimeline(
     orderBy: { effective_from: 'asc' },
   });
 
-  const rates = [...existingRates.map((r) => ({
-    effective_from: r.effective_from,
-    effective_to: r.effective_to,
-  }))];
+  const rates = [
+    ...existingRates.map((r) => ({
+      effective_from: r.effective_from,
+      effective_to: r.effective_to,
+    })),
+  ];
 
   if (opts?.includeRate) {
     rates.push(opts.includeRate);
@@ -235,16 +237,18 @@ router.put('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Respon
       const data: Record<string, unknown> = {};
       if (parsed.data.day_rate !== undefined) data.day_rate = parsed.data.day_rate;
       if (parsed.data.currency_code !== undefined) data.currency_code = parsed.data.currency_code;
-      if (parsed.data.effective_from !== undefined) data.effective_from = new Date(parsed.data.effective_from);
+      if (parsed.data.effective_from !== undefined)
+        data.effective_from = new Date(parsed.data.effective_from);
       if (parsed.data.effective_to !== undefined) {
         data.effective_to = parsed.data.effective_to ? new Date(parsed.data.effective_to) : null;
       }
 
       // Validate timeline with the updated values
       const newFrom = (data.effective_from as Date) ?? existing.effective_from;
-      const newTo = data.effective_to !== undefined
-        ? (data.effective_to as Date | null)
-        : existing.effective_to;
+      const newTo =
+        data.effective_to !== undefined
+          ? (data.effective_to as Date | null)
+          : existing.effective_to;
 
       const validation = await validateRateTimeline(tx, existing.task_type, {
         excludeId: existing.id,

@@ -74,12 +74,15 @@ Express . Prisma . PostgreSQL . React (TanStack Router + TanStack Query) . Mater
 Every significant system event must produce an audit log entry. Implement a shared `writeActivity` (or `writeAudit`) utility:
 
 ```typescript
-async function writeActivity(tx: PrismaTransaction | PrismaClient, params: {
-  eventType: string           // typed enum of all valid event types for the project
-  eventPayload: Record<string, unknown>
-  actorId?: string
-  // any additional project-specific context fields
-}): Promise<void>
+async function writeActivity(
+  tx: PrismaTransaction | PrismaClient,
+  params: {
+    eventType: string; // typed enum of all valid event types for the project
+    eventPayload: Record<string, unknown>;
+    actorId?: string;
+    // any additional project-specific context fields
+  },
+): Promise<void>;
 ```
 
 - Call from every service mutation and job handler.

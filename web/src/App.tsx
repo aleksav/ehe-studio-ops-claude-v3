@@ -71,10 +71,7 @@ function PlaceholderPage({ title }: { title: string }) {
       >
         {title}
       </Box>
-      <Box
-        component="p"
-        sx={{ color: 'text.secondary', mt: 1 }}
-      >
+      <Box component="p" sx={{ color: 'text.secondary', mt: 1 }}>
         Coming soon.
       </Box>
     </Box>

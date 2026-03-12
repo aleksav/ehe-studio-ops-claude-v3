@@ -4,14 +4,14 @@ A multi-agent development framework for building full-stack applications with Ex
 
 ## Agent Team
 
-| Agent | File | Role |
-|---|---|---|
-| Team Lead / Architect | `AGENTS.md` | Primary orchestrator. Plans, reviews PRs, merges to `main`, manages backlog and CI. Does not write feature code. |
-| Full Stack Developer A | `agents/developer-a.md` | Implements features (API + web + mobile) on feature branches. |
-| Full Stack Developer B | `agents/developer-b.md` | Same as Developer A. Coordinates schema changes with Team Lead. |
-| QA Engineer | `agents/qa-engineer.md` | Writes Playwright (web) and Maestro (mobile) E2E tests. Never modifies app code. |
-| Security Expert | `agents/security-expert.md` | Reviews code for security vulnerabilities. Raises findings as GitHub Issues. |
-| Performance Expert | `agents/performance-expert.md` | Reviews code for performance issues. Raises findings as GitHub Issues. |
+| Agent                  | File                           | Role                                                                                                             |
+| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Team Lead / Architect  | `AGENTS.md`                    | Primary orchestrator. Plans, reviews PRs, merges to `main`, manages backlog and CI. Does not write feature code. |
+| Full Stack Developer A | `agents/developer-a.md`        | Implements features (API + web + mobile) on feature branches.                                                    |
+| Full Stack Developer B | `agents/developer-b.md`        | Same as Developer A. Coordinates schema changes with Team Lead.                                                  |
+| QA Engineer            | `agents/qa-engineer.md`        | Writes Playwright (web) and Maestro (mobile) E2E tests. Never modifies app code.                                 |
+| Security Expert        | `agents/security-expert.md`    | Reviews code for security vulnerabilities. Raises findings as GitHub Issues.                                     |
+| Performance Expert     | `agents/performance-expert.md` | Reviews code for performance issues. Raises findings as GitHub Issues.                                           |
 
 ## How to Spawn Each Agent
 
@@ -54,22 +54,22 @@ The Team Lead pauses after every phase and at the end of every slice to present 
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| API | Node.js + TypeScript + Express |
-| ORM | Prisma |
-| Database | PostgreSQL |
-| Job queue | PostgreSQL-backed (no Redis) |
-| Web | React + TanStack Router + TanStack Query |
-| Web styling | Material UI (MUI v5+) |
-| Mobile | Expo (managed) + React Native + React Navigation |
-| Mobile styling | NativeWind or React Native StyleSheet |
-| Design tokens | `shared/theme/tokens.ts` |
-| Validation | Zod |
-| Web E2E | Playwright |
-| Mobile E2E | Maestro |
-| CI/CD | GitHub Actions |
-| Task tracking | GitHub Issues (`gh` CLI) |
+| Layer          | Technology                                       |
+| -------------- | ------------------------------------------------ |
+| API            | Node.js + TypeScript + Express                   |
+| ORM            | Prisma                                           |
+| Database       | PostgreSQL                                       |
+| Job queue      | PostgreSQL-backed (no Redis)                     |
+| Web            | React + TanStack Router + TanStack Query         |
+| Web styling    | Material UI (MUI v5+)                            |
+| Mobile         | Expo (managed) + React Native + React Navigation |
+| Mobile styling | NativeWind or React Native StyleSheet            |
+| Design tokens  | `shared/theme/tokens.ts`                         |
+| Validation     | Zod                                              |
+| Web E2E        | Playwright                                       |
+| Mobile E2E     | Maestro                                          |
+| CI/CD          | GitHub Actions                                   |
+| Task tracking  | GitHub Issues (`gh` CLI)                         |
 
 ## Monorepo Structure
 

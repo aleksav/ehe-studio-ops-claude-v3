@@ -9,7 +9,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...customHeaders as Record<string, string>,
+    ...(customHeaders as Record<string, string>),
   };
 
   const accessToken = localStorage.getItem('access_token');

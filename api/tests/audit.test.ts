@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildCreateAuditFields, buildUpdateAuditFields, buildDeleteAuditFields } from '../src/services/audit.service';
+import {
+  buildCreateAuditFields,
+  buildUpdateAuditFields,
+  buildDeleteAuditFields,
+} from '../src/services/audit.service';
 
 describe('Audit service', () => {
   it('buildCreateAuditFields stores full entity as after', () => {

@@ -40,10 +40,7 @@ export default function DashboardPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 {card.label}
               </Typography>
-              <Typography
-                variant="h2"
-                sx={{ fontWeight: 700, color: 'primary.main' }}
-              >
+              <Typography variant="h2" sx={{ fontWeight: 700, color: 'primary.main' }}>
                 {card.value}
               </Typography>
             </CardContent>

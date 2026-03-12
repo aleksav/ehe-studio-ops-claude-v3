@@ -19,6 +19,7 @@ EHEStudio Ops is a lightweight operational system for a studio team. It combines
 ### Entities
 
 **TeamMember**
+
 ```
 id                    UUID PK
 full_name             TEXT NOT NULL
@@ -33,6 +34,7 @@ updated_at            TIMESTAMPTZ
 `preferred_task_type` pre-fills all time logging forms for this user. It is overridable per entry. Whenever a user submits an entry with a different task type, update `preferred_task_type` on their record to the new value.
 
 **Project**
+
 ```
 id             UUID PK
 name           TEXT NOT NULL
@@ -48,6 +50,7 @@ updated_at     TIMESTAMPTZ
 ```
 
 **Milestone**
+
 ```
 id          UUID PK
 project_id  → Project
@@ -58,6 +61,7 @@ updated_at  TIMESTAMPTZ
 ```
 
 **Task**
+
 ```
 id           UUID PK
 project_id   → Project
@@ -71,6 +75,7 @@ updated_at   TIMESTAMPTZ
 ```
 
 **TaskAssignment**
+
 ```
 id               UUID PK
 task_id          → Task
@@ -82,6 +87,7 @@ UNIQUE (task_id, team_member_id)
 One task can be assigned to multiple team members. Zero assignees is valid.
 
 **TimeEntry**
+
 ```
 id               UUID PK
 project_id       → Project
@@ -95,6 +101,7 @@ updated_at       TIMESTAMPTZ
 ```
 
 **TaskRate**
+
 ```
 id             UUID PK
 task_type      ENUM: ARCHITECTURE_ENGINEERING_DIRECTION | DESIGN_DELIVERY_RESEARCH |
@@ -107,6 +114,7 @@ created_at     TIMESTAMPTZ
 ```
 
 **AuditLog**
+
 ```
 id             UUID PK
 entity_type    TEXT NOT NULL
@@ -126,15 +134,18 @@ Every mutation writes an AuditLog entry atomically in the same transaction. For 
 ### Business rules
 
 **Daily hours cap** — applies across all projects for a given `(team_member_id, date)`, enforced server-side on all three time entry methods:
+
 - New total > 8 h: return a warning in the response (`meta.warning`). Submission allowed.
 - New total ≥ 12 h: reject with HTTP 422 `DAILY_HOURS_EXCEEDED`. Submission blocked.
 - Multiple entries per `(project_id, team_member_id, date)` are permitted.
 - `date` cannot be in the future.
 
 Implement a shared service function:
+
 ```typescript
 getDailyHoursTotal(teamMemberId: string, date: Date, excludeEntryId?: string): Promise<number>
 ```
+
 Call this from all three entry creation/edit endpoints before writing.
 
 **TaskRate gap validation** — when saving a TaskRate record (create or update), the API must verify that no gap exists in coverage for that `task_type` across all effective date ranges. Specifically:
@@ -187,6 +198,7 @@ All three methods create `TimeEntry` records and share the same daily hours cap 
 **Purpose:** fast daily logging for one project at a time.
 
 **Flow:**
+
 1. User opens the time logging page. All projects listed — no filter.
 2. User selects a project.
 3. Form appears: date (defaults to today), hours, task type (pre-filled from `preferred_task_type`, overridable), optional notes.
@@ -208,6 +220,7 @@ All three methods create `TimeEntry` records and share the same daily hours cap 
 **Trigger:** a "Log Time" icon button on every task card.
 
 **Flow:**
+
 1. Click Log Time on a card. Modal opens pre-populated with the task's project.
 2. Fields: user selector (any active team member), task type (pre-filled from selected user's `preferred_task_type`), date (today), hours, optional notes.
 3. Changing the selected user updates the task type pre-fill to that user's `preferred_task_type`.
@@ -223,6 +236,7 @@ All three methods create `TimeEntry` records and share the same daily hours cap 
 **Purpose:** batch logging across multiple projects for a full week.
 
 **Grid structure:**
+
 - Rows: one per project the user has added to their grid
 - Columns: Mon–Sun of the selected week, plus a row total column
 - Cells: hours input + task type selector per (project × day)
@@ -231,18 +245,21 @@ All three methods create `TimeEntry` records and share the same daily hours cap 
 - Footer: weekly grand total
 
 **Interactions:**
+
 - Add Project button → project selector → new row appended
 - Remove a row
 - Edit hours and task type in cells. Cell saves on blur (optimistic update).
 - Prev/next week navigation. Selected week in URL query string (`?week=2024-W23`) — shareable. The week parser must correctly handle ISO year boundaries: the week containing 1 Jan may belong to the previous ISO year (e.g. `2026-W53` → `2015-W01`). Use an ISO-8601-compliant week library; do not hand-roll week arithmetic.
 
 **Persistence (localStorage — client-side only, never persisted server-side):**
+
 - `weekly_grid_projects` — list of project rows the user has added. Persists across week navigation and browser sessions. No server equivalent exists and none will be added.
 - `weekly_grid_task_types` — per-project task type selection in the grid. Separate from `preferred_task_type`.
 - Hours cells pre-fill from API for the displayed week. Empty if no entry exists.
 - Submitting a cell updates `preferred_task_type` if task type differs.
 
 **Cap behaviour:**
+
 - Column total > 8 h: amber tint on column header, tooltip warning.
 - Column total ≥ 12 h: red tint on cell being edited, saving blocked.
 
@@ -264,17 +281,18 @@ Top of the view. Filters to one active project at a time. Switching is reactive 
 
 ### Kanban board
 
-| Column | Content |
-|---|---|
-| TODO | Tasks with status TODO |
-| IN PROGRESS | Tasks with status IN_PROGRESS |
-| DONE | Tasks with status DONE, where `completed_at` is within the last 7 days |
+| Column      | Content                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| TODO        | Tasks with status TODO                                                 |
+| IN PROGRESS | Tasks with status IN_PROGRESS                                          |
+| DONE        | Tasks with status DONE, where `completed_at` is within the last 7 days |
 
 **Web:** drag-and-drop with `@dnd-kit/core` + `@dnd-kit/sortable`. Any column → any other column. Status updates optimistically, persists via API.
 
 **Mobile:** tap-to-cycle button on each card (TODO → IN_PROGRESS → DONE → TODO).
 
 **Card content:**
+
 - Task description, truncated to 2 lines
 - Milestone name + due date (if assigned)
 - Assignee avatars or name chips
@@ -327,11 +345,11 @@ Team-oriented.
 
 All computed as DB queries — never in-memory filtering.
 
-| Indicator | Condition | Visual |
-|---|---|---|
-| Stale task | Has at least one assignee AND status is TODO or IN_PROGRESS AND no time entry on the project in the last 5 working days by any assigned member | Amber clock icon on card |
-| Overdue milestone | `due_date < today` AND at least one TODO or IN_PROGRESS task exists | Red chip on milestone header (View A); small badge on affected cards (View B) |
-| Stale person row | Person has IN_PROGRESS tasks but no time logged on any project in the last 5 working days | Amber tint on row header (View B only) |
+| Indicator         | Condition                                                                                                                                      | Visual                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Stale task        | Has at least one assignee AND status is TODO or IN_PROGRESS AND no time entry on the project in the last 5 working days by any assigned member | Amber clock icon on card                                                      |
+| Overdue milestone | `due_date < today` AND at least one TODO or IN_PROGRESS task exists                                                                            | Red chip on milestone header (View A); small badge on affected cards (View B) |
+| Stale person row  | Person has IN_PROGRESS tasks but no time logged on any project in the last 5 working days                                                      | Amber tint on row header (View B only)                                        |
 
 **Colour rule: amber = stale. Red = overdue. Never pink or blue for warnings.**
 
@@ -360,6 +378,7 @@ All three views (budget summary, audit log, personal dashboard) are available on
 **Product name:** EHEStudio Ops — consistent everywhere.
 
 **Colour palette:**
+
 - Primary (EHE pink): `#E91E8C`
 - Secondary (EHE blue): `#1E6FE9`
 - Background: `#FFFFFF`
@@ -377,6 +396,7 @@ All three views (budget summary, audit log, personal dashboard) are available on
 ## Delivery Slices
 
 ### Slice 1 — Foundation
+
 - Monorepo scaffold, MUI ThemeProvider with EHEStudio Ops palette and typography
 - Prisma schema, migrations, seed data
 - JWT auth: register, login, refresh, logout
@@ -390,6 +410,7 @@ All three views (budget summary, audit log, personal dashboard) are available on
 - AuditLog model and `writeAudit` utility wired into all mutations from day one
 
 ### Slice 2 — Time Logging
+
 - Method 1: quick entry page — project selector, pre-filled task type form, daily validation, entry list
 - Method 2: log time from standup card — modal with user selector, pre-filled task type, daily validation
 - Method 3: weekly grid — project rows, day columns, hours + task type per cell, add/remove rows, week navigation with URL state, localStorage persistence, daily cap warnings and blocking, mobile daily accordion
@@ -397,6 +418,7 @@ All three views (budget summary, audit log, personal dashboard) are available on
 - Web and mobile implementations
 
 ### Slice 3 — Standup View
+
 - Kanban board: TODO / IN PROGRESS / DONE
 - DONE column: last 7 days only
 - Drag-and-drop on web (`@dnd-kit`), tap-to-cycle on mobile
@@ -408,6 +430,7 @@ All three views (budget summary, audit log, personal dashboard) are available on
 - View toggle, preference in `localStorage`, MUI `Fade` transition
 
 ### Slice 4 — Commercial Visibility, Hardening, Deployment
+
 - Budget and spend summary per project
 - Audit log viewer: filterable, paginated
 - Personal dashboard
@@ -510,12 +533,12 @@ Each journey requires both a Playwright test (web) and a Maestro flow (mobile) u
 
 ### Hosting targets
 
-| Module | Platform |
-|---|---|
-| API | Render |
-| Web | Vercel |
-| Mobile (iOS) | Apple App Store via EAS Build + EAS Submit |
-| Mobile (Android) | Google Play Store via EAS Build + EAS Submit |
+| Module             | Platform                                     |
+| ------------------ | -------------------------------------------- |
+| API                | Render                                       |
+| Web                | Vercel                                       |
+| Mobile (iOS)       | Apple App Store via EAS Build + EAS Submit   |
+| Mobile (Android)   | Google Play Store via EAS Build + EAS Submit |
 | Mobile OTA updates | Expo Updates (`expo-updates`) via EAS Update |
 
 ---
@@ -552,6 +575,7 @@ Configure three EAS build profiles in `mobile/eas.json`:
 ```
 
 `app.json` must define:
+
 - `expo.ios.bundleIdentifier` — e.g. `com.ehestudio.ops`
 - `expo.android.package` — e.g. `com.ehestudio.ops`
 - `expo.updates.url` — EAS Update endpoint for OTA
@@ -564,12 +588,14 @@ Configure three EAS build profiles in `mobile/eas.json`:
 The Engineering Guide defines the standard `pr-validation.yml` and `deploy-main.yml` structure. The following additions apply to this project:
 
 **`pr-validation.yml` — mobile-e2e job:**
+
 - Run `eas build --local --profile test --platform ios` to produce a test build
 - Boot iOS simulator, reset test DB seed, run `maestro test mobile/tests/e2e/flows/`
 - Upload Maestro recordings as artifact `mobile-e2e-recordings`
 - This job is a required check — PRs cannot merge if it fails
 
 **`deploy-main.yml` — on merge to `main`:**
+
 - After API and web deploy, run `eas update --branch production --message "deploy: $COMMIT_SHA"` to push an OTA update to production devices
 - OTA update is only safe for JS-layer changes. If native dependencies changed in this release, skip OTA and trigger a full store build instead: `eas build --platform all --profile production --auto-submit`
 - The Team Lead must judge per-merge whether a full store build is required. Document the decision in the merge commit message.

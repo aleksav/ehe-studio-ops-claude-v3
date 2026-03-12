@@ -72,3 +72,48 @@ jobs:
       - run: npm ci
       - run: cd api && npx prisma migrate deploy
       - run: cd api && npm test
+
+  e2e-web:
+    name: E2E Web Tests (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ehestudio_ops_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ehestudio_ops_e2e
+      JWT_SECRET: test-secret
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - run: npm ci
+      - run: cd api && npx prisma generate
+      - run: cd api && npx prisma migrate deploy
+      - run: cd api && npx prisma db seed
+      - name: Install Playwright browsers
+        run: cd web && npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: cd web && npx playwright test
+      - name: Upload E2E recordings
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-web-recordings
+          path: |
+            web/test-results/
+            web/playwright-report/
+          retention-days: 30

@@ -248,10 +248,7 @@ export default function TimeLoggingPage() {
 
   // ---- Derived: grouped entries ----
   const groupedEntries = groupByDate(entries);
-  const projectTotal = entries.reduce(
-    (sum, e) => sum + parseFloat(String(e.hours_worked)),
-    0,
-  );
+  const projectTotal = entries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
@@ -419,10 +416,7 @@ export default function TimeLoggingPage() {
 
       {/* ---- Entries list ---- */}
       {selectedProjectId && (
-        <Card
-          elevation={0}
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
-        >
+        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
             <Box
               sx={{
@@ -451,7 +445,11 @@ export default function TimeLoggingPage() {
                 <CircularProgress size={28} />
               </Box>
             ) : groupedEntries.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ py: 3, textAlign: 'center' }}
+              >
                 No entries yet for this project.
               </Typography>
             ) : (

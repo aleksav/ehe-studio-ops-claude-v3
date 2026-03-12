@@ -177,7 +177,11 @@ export default function AppLayout() {
               </IconButton>
             )}
             <Box sx={{ flex: 1 }} />
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small" data-testid="user-menu-button">
+            <IconButton
+              onClick={(e) => setAnchorEl(e.currentTarget)}
+              size="small"
+              data-testid="user-menu-button"
+            >
               <Avatar
                 sx={{
                   width: 36,
