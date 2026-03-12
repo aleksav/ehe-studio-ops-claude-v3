@@ -23,6 +23,7 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
       - name: Push OTA update
-        run: eas update --branch production --message "deploy: ${{ github.sha }}"
+        run: |
+          eas update --branch production --message "deploy: ${{ github.sha }}"
         working-directory: mobile
         if: env.EXPO_TOKEN != ''
