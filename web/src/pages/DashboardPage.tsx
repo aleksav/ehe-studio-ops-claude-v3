@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { startOfISOWeek, endOfISOWeek, format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
@@ -34,6 +35,11 @@ interface Task {
   project_id: string;
   description: string;
   status: string;
+}
+
+interface TimeEntry {
+  id: string;
+  hours_worked: string | number;
 }
 
 const TASK_STATUS_COLOR: Record<string, 'default' | 'info' | 'success' | 'warning'> = {
@@ -67,6 +73,12 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
 
+  // Summary card data
+  const [hoursThisWeek, setHoursThisWeek] = useState<string>('--');
+  const [hoursLoading, setHoursLoading] = useState(true);
+  const [openTaskCount, setOpenTaskCount] = useState<string>('--');
+  const [openTasksLoading, setOpenTasksLoading] = useState(true);
+
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [logTimeProjectId, setLogTimeProjectId] = useState('');
@@ -89,6 +101,75 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  // ---- Fetch hours this week for current user ----
+  useEffect(() => {
+    const teamMemberId = user?.team_member?.id;
+    if (!teamMemberId) {
+      setHoursLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const now = new Date();
+        const weekStart = format(startOfISOWeek(now), 'yyyy-MM-dd');
+        const weekEnd = format(endOfISOWeek(now), 'yyyy-MM-dd');
+        const entries = await api.get<TimeEntry[]>(
+          `/api/time-entries?team_member_id=${teamMemberId}&date_from=${weekStart}&date_to=${weekEnd}`,
+        );
+        if (!cancelled) {
+          const total = entries.reduce(
+            (sum, e) => sum + parseFloat(String(e.hours_worked)),
+            0,
+          );
+          setHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
+        }
+      } catch {
+        if (!cancelled) setHoursThisWeek('--');
+      } finally {
+        if (!cancelled) setHoursLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.team_member?.id]);
+
+  // ---- Fetch open tasks across all active projects ----
+  useEffect(() => {
+    if (projectsLoading) return;
+
+    const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
+    if (activeProjects.length === 0) {
+      setOpenTaskCount('0');
+      setOpenTasksLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const allTasks = await Promise.all(
+          activeProjects.map((p) => api.get<Task[]>(`/api/projects/${p.id}/tasks`)),
+        );
+        if (!cancelled) {
+          const count = allTasks.flat().filter(
+            (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS',
+          ).length;
+          setOpenTaskCount(String(count));
+        }
+      } catch {
+        if (!cancelled) setOpenTaskCount('--');
+      } finally {
+        if (!cancelled) setOpenTasksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projects, projectsLoading]);
 
   // ---- Fetch tasks when project selected ----
   useEffect(() => {
@@ -141,9 +222,23 @@ export default function DashboardPage() {
         }}
       >
         {[
-          { label: 'Active Projects', value: '--' },
-          { label: 'Hours This Week', value: '--' },
-          { label: 'Open Tasks', value: '--' },
+          {
+            label: 'Active Projects',
+            value: projectsLoading
+              ? null
+              : String(projects.filter((p) => p.status === 'ACTIVE').length),
+            loading: projectsLoading,
+          },
+          {
+            label: 'Hours This Week',
+            value: hoursThisWeek,
+            loading: hoursLoading,
+          },
+          {
+            label: 'Open Tasks',
+            value: openTaskCount,
+            loading: openTasksLoading,
+          },
         ].map((card) => (
           <Card
             key={card.label}
@@ -158,9 +253,15 @@ export default function DashboardPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 {card.label}
               </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                {card.value}
-              </Typography>
+              {card.loading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', height: '3.5rem' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Typography variant="h2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  {card.value}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         ))}
