@@ -2,7 +2,10 @@ import { ProjectStatus, Prisma } from '@prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
 export function findAllProjects(where: Record<string, unknown>) {
-  return prisma.project.findMany({ where });
+  return prisma.project.findMany({
+    where,
+    include: { client: { select: { id: true, name: true } } },
+  });
 }
 
 export function findProjectById(id: string, tx?: TransactionClient) {

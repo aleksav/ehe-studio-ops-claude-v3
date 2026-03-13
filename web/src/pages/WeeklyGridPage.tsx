@@ -47,6 +47,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
+  client: { id: string; name: string } | null;
 }
 
 interface TimeEntry {
@@ -508,7 +509,7 @@ export default function WeeklyGridPage() {
           >
             {availableProjects.map((p) => (
               <MenuItem key={p.id} value={p.id}>
-                {p.name}
+                {p.client ? `${p.client.name} / ${p.name}` : p.name}
               </MenuItem>
             ))}
           </Select>
@@ -600,7 +601,11 @@ export default function WeeklyGridPage() {
                         zIndex: 1,
                       }}
                     >
-                      {project?.name ?? pid}
+                      {project
+                        ? project.client
+                          ? `${project.client.name} / ${project.name}`
+                          : project.name
+                        : pid}
                     </TableCell>
                     {weekDates.map((d) => {
                       const ds = dateKey(d);

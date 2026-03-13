@@ -72,8 +72,8 @@ test.describe('Weekly Grid', () => {
     // Click Add button
     await page.getByRole('button', { name: /^add$/i }).click();
 
-    // Project name should now appear in the grid table
-    await expect(page.getByText('Brand Refresh Campaign')).toBeVisible({
+    // Project name should now appear in the grid table (with client prefix)
+    await expect(page.getByText(/Brand Refresh Campaign/)).toBeVisible({
       timeout: 10000,
     });
 
@@ -160,8 +160,8 @@ test.describe('Weekly Grid', () => {
     await page.getByRole('option', { name: /brand refresh campaign/i }).click();
     await page.getByRole('button', { name: /^add$/i }).click();
 
-    // Verify the project row is visible
-    await expect(page.getByText('Brand Refresh Campaign')).toBeVisible({
+    // Verify the project row is visible (with client prefix)
+    await expect(page.getByText(/Brand Refresh Campaign/)).toBeVisible({
       timeout: 10000,
     });
 

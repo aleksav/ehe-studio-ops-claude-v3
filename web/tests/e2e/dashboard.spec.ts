@@ -30,7 +30,7 @@ test.describe('Dashboard', () => {
     // Open the project selector
     await page.getByLabel('Select project').click();
 
-    // Seed data has "Brand Refresh Campaign" and "Mobile App MVP"
+    // Seed data has "Acme Corp / Brand Refresh Campaign" and "Globex Industries / Mobile App MVP"
     await expect(page.getByRole('option', { name: /brand refresh campaign/i })).toBeVisible({
       timeout: 10000,
     });
@@ -71,6 +71,7 @@ test.describe('Dashboard', () => {
 
   test('navigation sidebar shows all expected links', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clients' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Projects' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Time Logging' })).toBeVisible();
