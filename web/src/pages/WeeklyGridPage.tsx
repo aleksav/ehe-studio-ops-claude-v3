@@ -271,8 +271,10 @@ export default function WeeklyGridPage() {
   const [blockDialog, setBlockDialog] = useState<{
     open: boolean;
     dateStr: string;
+    projectId: string;
     reason: 'weekend' | 'holiday';
-  }>({ open: false, dateStr: '', reason: 'weekend' });
+  }>({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+  const [pendingFocusCellKey, setPendingFocusCellKey] = useState<string | null>(null);
 
   // ---- Fetch all projects ----
   useEffect(() => {
@@ -470,16 +472,20 @@ export default function WeeklyGridPage() {
 
   // ---- Block dialog handlers ----
   const handleBlockDialogConfirm = useCallback(() => {
+    const { dateStr, projectId } = blockDialog;
     setUnblockedDates((prev) => {
       const next = new Set(prev);
-      next.add(blockDialog.dateStr);
+      next.add(dateStr);
       return next;
     });
-    setBlockDialog({ open: false, dateStr: '', reason: 'weekend' });
-  }, [blockDialog.dateStr]);
+    setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+    if (dateStr && projectId) {
+      setPendingFocusCellKey(cellKey(projectId, dateStr));
+    }
+  }, [blockDialog]);
 
   const handleBlockDialogCancel = useCallback(() => {
-    setBlockDialog({ open: false, dateStr: '', reason: 'weekend' });
+    setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
   }, []);
 
   /**
@@ -487,18 +493,29 @@ export default function WeeklyGridPage() {
    * When true, shows the confirmation dialog instead of allowing editing.
    */
   const interceptBlockedFocus = useCallback(
-    (dateStr: string, e: React.FocusEvent | React.MouseEvent): boolean => {
+    (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
       const blockReason = isBlockedDate(dateStr);
       if (blockReason && !unblockedDates.has(dateStr)) {
         e.preventDefault();
         (e.target as HTMLElement).blur?.();
-        setBlockDialog({ open: true, dateStr, reason: blockReason });
+        setBlockDialog({ open: true, dateStr, projectId, reason: blockReason });
         return true;
       }
       return false;
     },
     [unblockedDates],
   );
+
+  // ---- Auto-focus cell after unblocking ----
+  useEffect(() => {
+    if (!pendingFocusCellKey) return;
+    const key = pendingFocusCellKey;
+    setPendingFocusCellKey(null);
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(`input[data-cell-key="${key}"]`);
+      input?.focus();
+    }, 50);
+  }, [pendingFocusCellKey]);
 
   // ---- Computed totals ----
   const computeRowTotal = useCallback(
@@ -722,8 +739,8 @@ export default function WeeklyGridPage() {
                       const dailyBlocked = dt >= DAILY_BLOCK_THRESHOLD;
                       const blockReason = isBlockedDate(ds);
                       const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
-                      const isDisabled =
-                        dateBlocked || (dailyBlocked && !(parseFloat(cell?.hours ?? '0') > 0));
+                      const hasValue = parseFloat(cell?.hours ?? '0') > 0;
+                      const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
                       return (
                         <TableCell
                           key={ds}
@@ -738,13 +755,18 @@ export default function WeeklyGridPage() {
                             <TextField
                               size="small"
                               type="number"
-                              inputProps={{ min: 0, max: 24, step: 0.25 }}
+                              inputProps={{
+                                min: 0,
+                                max: 24,
+                                step: 0.25,
+                                'data-cell-key': ck,
+                              }}
                               value={cell?.hours ?? ''}
                               onChange={(e) => handleHoursChange(ck, e.target.value)}
                               onBlur={() => void handleCellBlur(pid, ds)}
-                              onFocus={(e) => interceptBlockedFocus(ds, e)}
+                              onFocus={(e) => interceptBlockedFocus(ds, pid, e)}
                               onClick={(e) => {
-                                if (dateBlocked) interceptBlockedFocus(ds, e);
+                                if (dateBlocked) interceptBlockedFocus(ds, pid, e);
                               }}
                               disabled={isDisabled}
                               sx={{
