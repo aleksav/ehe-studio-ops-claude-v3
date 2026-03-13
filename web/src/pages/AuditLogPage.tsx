@@ -16,11 +16,18 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { api } from '../lib/api';
+
+interface AuditLogActor {
+  id: string;
+  full_name: string;
+  email: string;
+}
 
 interface AuditLogEntry {
   id: string;
@@ -28,6 +35,7 @@ interface AuditLogEntry {
   entity_id: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   actor_id: string | null;
+  actor: AuditLogActor | null;
   changed_fields: Record<string, unknown> | null;
   created_at: string;
 }
@@ -184,7 +192,7 @@ export default function AuditLogPage() {
               <TableCell>Action</TableCell>
               <TableCell>Entity Type</TableCell>
               <TableCell>Entity ID</TableCell>
-              <TableCell>Actor ID</TableCell>
+              <TableCell>Actor</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -232,8 +240,14 @@ export default function AuditLogPage() {
                       <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
                         {log.entity_id}
                       </TableCell>
-                      <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                        {log.actor_id ?? '--'}
+                      <TableCell>
+                        {log.actor ? (
+                          <Tooltip title={log.actor.email} arrow>
+                            <span>{log.actor.full_name}</span>
+                          </Tooltip>
+                        ) : (
+                          '--'
+                        )}
                       </TableCell>
                     </TableRow>
                     {log.changed_fields && (
