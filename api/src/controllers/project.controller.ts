@@ -36,8 +36,12 @@ const updateProjectSchema = z.object({
 
 export async function list(req: AuthenticatedRequest, res: Response) {
   try {
-    const { status } = req.query;
-    const projects = await listProjects(status && typeof status === 'string' ? status : undefined);
+    const { status, page, per_page } = req.query;
+    const projects = await listProjects(
+      status && typeof status === 'string' ? status : undefined,
+      page ? parseInt(page as string, 10) : undefined,
+      per_page ? parseInt(per_page as string, 10) : undefined,
+    );
     res.json(projects);
   } catch (error) {
     console.error('List projects error:', error);

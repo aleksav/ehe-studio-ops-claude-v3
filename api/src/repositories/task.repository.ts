@@ -24,6 +24,8 @@ export interface TaskListFilters {
   status?: TaskStatus;
   milestone_id?: string;
   include_cancelled?: boolean;
+  page?: number;
+  per_page?: number;
 }
 
 export async function findProjectById(projectId: string) {
@@ -43,7 +45,34 @@ export async function findTasksByProject(filters: TaskListFilters) {
     where.milestone_id = filters.milestone_id;
   }
 
-  return prisma.task.findMany({ where });
+  const page = Math.max(1, filters.page ?? 1);
+  const perPage = Math.min(100, Math.max(1, filters.per_page ?? 50));
+
+  const [data, total] = await Promise.all([
+    prisma.task.findMany({
+      where,
+      include: {
+        assignments: {
+          include: { team_member: { select: { id: true, full_name: true, email: true } } },
+        },
+        milestone: { select: { id: true, name: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      skip: (page - 1) * perPage,
+      take: perPage,
+    }),
+    prisma.task.count({ where }),
+  ]);
+
+  return {
+    data,
+    pagination: {
+      page,
+      per_page: perPage,
+      total,
+      total_pages: Math.ceil(total / perPage),
+    },
+  };
 }
 
 /**

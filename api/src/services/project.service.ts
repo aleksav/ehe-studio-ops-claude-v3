@@ -15,12 +15,16 @@ import {
   buildDeleteAuditFields,
 } from './audit.service';
 
-export async function listProjects(status?: string) {
+export async function listProjects(status?: string, page?: number, perPage?: number) {
   const where: Record<string, unknown> = {};
   if (status) {
     where.status = status as ProjectStatus;
   }
-  return findAllProjects(where);
+  const pagination = {
+    page: Math.max(1, page ?? 1),
+    perPage: Math.min(100, Math.max(1, perPage ?? 50)),
+  };
+  return findAllProjects(where, pagination);
 }
 
 export async function getProject(id: string) {

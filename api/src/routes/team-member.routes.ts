@@ -30,15 +30,35 @@ const updateTeamMemberSchema = z.object({
 // GET /api/team-members
 router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { is_active } = req.query;
+    const { is_active, page: pageParam, per_page: perPageParam } = req.query;
     const where: Record<string, unknown> = {};
 
     if (is_active !== undefined) {
       where.is_active = is_active === 'true';
     }
 
-    const teamMembers = await prisma.teamMember.findMany({ where });
-    res.json(teamMembers);
+    const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
+    const perPage = Math.min(100, Math.max(1, parseInt(perPageParam as string, 10) || 50));
+
+    const [data, total] = await Promise.all([
+      prisma.teamMember.findMany({
+        where,
+        orderBy: { full_name: 'asc' },
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+      prisma.teamMember.count({ where }),
+    ]);
+
+    res.json({
+      data,
+      pagination: {
+        page,
+        per_page: perPage,
+        total,
+        total_pages: Math.ceil(total / perPage),
+      },
+    });
   } catch (error) {
     console.error('List team members error:', error);
     res.status(500).json({ error: 'Internal server error' });

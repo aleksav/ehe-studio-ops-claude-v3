@@ -41,6 +41,9 @@ export async function list(req: AuthenticatedRequest, res: Response) {
     const [data, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,
+        include: {
+          actor: { select: { id: true, full_name: true, email: true } },
+        },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * perPage,
         take: perPage,

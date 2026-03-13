@@ -25,13 +25,15 @@ const updateTaskSchema = z.object({
 export async function listTasksHandler(req: AuthenticatedRequest, res: Response) {
   try {
     const { projectId } = req.params;
-    const { status, milestone_id, include_cancelled } = req.query;
+    const { status, milestone_id, include_cancelled, page, per_page } = req.query;
 
     const result = await listTasks({
       project_id: projectId,
       status: status && typeof status === 'string' ? (status as TaskStatus) : undefined,
       milestone_id: milestone_id && typeof milestone_id === 'string' ? milestone_id : undefined,
       include_cancelled: include_cancelled === 'true',
+      page: page ? parseInt(page as string, 10) : undefined,
+      per_page: per_page ? parseInt(per_page as string, 10) : undefined,
     });
 
     if (result.error) {
