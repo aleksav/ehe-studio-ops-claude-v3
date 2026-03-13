@@ -62,4 +62,29 @@ test.describe('Time Logging — Quick Entry', () => {
     // Should see warning
     await expect(page.getByText(/exceeds 8h|warning/i)).toBeVisible({ timeout: 5000 });
   });
+
+  test('submission is blocked when daily total reaches 12h', async ({ page }) => {
+    // Select a project
+    await page.getByLabel('Select project').click();
+    await page.getByRole('option').first().click();
+
+    // Log 8 hours first
+    await page.getByLabel('Hours').click();
+    await page.getByLabel('Hours').fill('8');
+    await page.getByLabel('Task type').click();
+    await page.getByRole('option').first().click();
+    await page.getByRole('button', { name: /log entry/i }).click();
+    await page.waitForTimeout(1500);
+
+    // Log 4 more hours (total 12h = blocked)
+    await page.getByLabel('Hours').click();
+    await page.getByLabel('Hours').fill('4');
+    await page.getByRole('button', { name: /log entry/i }).click();
+    await page.waitForTimeout(1500);
+
+    // Should see a blocking error mentioning daily hours exceeded or maximum 12h
+    await expect(page.getByText(/DAILY_HOURS_EXCEEDED|maximum 12h/i)).toBeVisible({
+      timeout: 5000,
+    });
+  });
 });
