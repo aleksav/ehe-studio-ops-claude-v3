@@ -12,7 +12,7 @@ import { BudgetType, ProjectStatus } from '@prisma/client';
 
 const createProjectSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),

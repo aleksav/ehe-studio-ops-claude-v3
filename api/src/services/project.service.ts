@@ -44,7 +44,7 @@ export async function getProject(id: string) {
 export async function createProjectService(
   data: {
     name: string;
-    description?: string;
+    description?: string | null;
     status?: ProjectStatus;
     start_date?: string;
     end_date?: string;
