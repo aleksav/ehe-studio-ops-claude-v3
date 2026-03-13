@@ -229,7 +229,8 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(600);
 
     await page.getByRole('button', { name: /create client/i }).click();
-    await page.waitForTimeout(2000);
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
     // 9. Team
@@ -375,14 +376,17 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'Audit entries can be filtered by entity type, action, and date range');
     await page.waitForTimeout(800);
 
-    // Apply entity type filter
-    await page.getByRole('combobox', { name: /entity type/i }).click();
+    // Apply entity type filter — MUI Select without labelId needs a DOM-based selector
+    const entityTypeSelect = page.locator(
+      '.MuiFormControl-root:has(label:text("Entity Type")) .MuiSelect-select',
+    );
+    await entityTypeSelect.click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: 'PROJECT' }).click();
     await page.waitForTimeout(2000);
 
     // Clear the filter to show all again
-    await page.getByRole('combobox', { name: /entity type/i }).click();
+    await entityTypeSelect.click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: 'All' }).click();
     await page.waitForTimeout(1500);
