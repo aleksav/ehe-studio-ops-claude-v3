@@ -175,64 +175,66 @@ export default function ClientsPage() {
             gap: 3,
           }}
         >
-          {clients.map((client) => (
-            <Card
-              key={client.id}
-              elevation={0}
-              sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <CardContent sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    mb: 1,
-                  }}
-                >
-                  <Typography variant="h4" sx={{ fontWeight: 600, flex: 1, mr: 1 }}>
-                    {client.name}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <Tooltip title="Edit">
-                      <IconButton size="small" aria-label="Edit" onClick={() => openEdit(client)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        aria-label="Delete"
-                        onClick={() => {
-                          setDeletingClient(client);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+          {[...clients]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((client) => (
+              <Card
+                key={client.id}
+                elevation={0}
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 3,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardContent sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 600, flex: 1, mr: 1 }}>
+                      {client.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Edit">
+                        <IconButton size="small" aria-label="Edit" onClick={() => openEdit(client)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          aria-label="Delete"
+                          onClick={() => {
+                            setDeletingClient(client);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </Box>
-                </Box>
-                {client.contact_name && (
-                  <Typography variant="body2" color="text.secondary">
-                    {client.contact_name}
-                  </Typography>
-                )}
-                {client.contact_email && (
-                  <Typography variant="body2" color="text.secondary">
-                    {client.contact_email}
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {client.contact_name && (
+                    <Typography variant="body2" color="text.secondary">
+                      {client.contact_name}
+                    </Typography>
+                  )}
+                  {client.contact_email && (
+                    <Typography variant="body2" color="text.secondary">
+                      {client.contact_email}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
         </Box>
       )}
 

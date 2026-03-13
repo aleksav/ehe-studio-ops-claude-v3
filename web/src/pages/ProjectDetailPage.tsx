@@ -104,7 +104,7 @@ const BUDGET_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 function formatProjectName(project: Project): string {
-  return project.client ? `${project.name} (${project.client.name})` : project.name;
+  return project.client ? `${project.client.name} — ${project.name}` : project.name;
 }
 
 function formatBudgetType(value: string | null): string | null {
