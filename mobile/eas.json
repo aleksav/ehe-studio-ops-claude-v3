@@ -3,16 +3,22 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "20.19.4"
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal"
     },
     "test": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "env": { "APP_ENV": "test" }
     },
     "production": {
+      "extends": "base",
       "distribution": "store",
       "env": { "APP_ENV": "production" }
     }
