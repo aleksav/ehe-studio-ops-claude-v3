@@ -666,14 +666,16 @@ export default function WeeklyGridPage() {
                                       type="button"
                                       onClick={() => {
                                         handleTaskTypeChange(ck, pid, t);
-                                        void handleCellBlur(pid, ds);
+                                        setTimeout(() => void handleCellBlur(pid, ds), 0);
                                       }}
                                       sx={{
                                         border: '1px solid',
                                         borderColor: isSelected ? 'primary.main' : 'divider',
                                         borderRadius: 1,
                                         bgcolor: isSelected ? 'primary.main' : 'transparent',
-                                        color: isSelected ? 'primary.contrastText' : 'text.secondary',
+                                        color: isSelected
+                                          ? 'primary.contrastText'
+                                          : 'text.secondary',
                                         fontSize: 10,
                                         fontWeight: isSelected ? 700 : 400,
                                         fontFamily: 'inherit',
