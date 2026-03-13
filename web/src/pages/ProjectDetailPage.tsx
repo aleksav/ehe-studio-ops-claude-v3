@@ -36,7 +36,7 @@ import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import FlagIcon from '@mui/icons-material/Flag';
 import PeopleIcon from '@mui/icons-material/People';
 import { api, ApiError } from '../lib/api';
-import AssigneeAvatars from '../components/AssigneeAvatars';
+import AssigneeAvatars, { type Assignment } from '../components/AssigneeAvatars';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,13 +64,6 @@ interface TeamMemberRef {
   email: string;
 }
 
-interface TaskAssignment {
-  id: string;
-  task_id: string;
-  team_member_id: string;
-  team_member: TeamMemberRef;
-}
-
 interface TaskMilestoneRef {
   id: string;
   name: string;
@@ -83,7 +76,7 @@ interface Task {
   description: string;
   status: string;
   is_stale?: boolean;
-  assignments?: TaskAssignment[];
+  assignments?: Assignment[];
   milestone?: TaskMilestoneRef | null;
 }
 
@@ -181,7 +174,7 @@ function TaskCard({
   onAssignmentsChange,
 }: {
   task: Task;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
 }) {
   return (
     <Card
@@ -265,7 +258,7 @@ function KanbanColumn({
   title: string;
   tasks: Task[];
   color: 'default' | 'info' | 'success';
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
 }) {
   const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
 
@@ -334,7 +327,7 @@ function MilestoneSwimlane({
   onAssignmentsChange,
 }: {
   swimlane: SwimlaneData;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -431,7 +424,7 @@ function PeopleBoardRow({
   onAssignmentsChange,
 }: {
   row: PersonRow;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
 }) {
   const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
@@ -731,7 +724,7 @@ export default function ProjectDetailPage() {
   }, [tasks, weeklyHoursMap]);
 
   // ---- Assignments change handler ----
-  const handleAssignmentsChange = useCallback((taskId: string, assignments: TaskAssignment[]) => {
+  const handleAssignmentsChange = useCallback((taskId: string, assignments: Assignment[]) => {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, assignments } : t)));
   }, []);
 

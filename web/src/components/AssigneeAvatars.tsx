@@ -27,7 +27,7 @@ interface TeamMemberRef {
   email: string;
 }
 
-interface Assignment {
+export interface Assignment {
   id: string;
   team_member_id: string;
   team_member: TeamMemberRef;
