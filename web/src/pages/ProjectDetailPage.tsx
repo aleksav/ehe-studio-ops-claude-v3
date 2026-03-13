@@ -15,8 +15,10 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   LinearProgress,
+  Menu,
   MenuItem,
   Select,
   Snackbar,
@@ -29,6 +31,8 @@ import type { SelectChangeEvent } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -171,11 +175,29 @@ function formatBudgetType(value: string | null): string | null {
 
 function TaskCard({
   task,
+  milestones,
   onAssignmentsChange,
+  onMilestoneChange,
 }: {
   task: Task;
+  milestones?: Milestone[];
   onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
 }) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleMilestoneClick = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setAnchorEl(e.currentTarget);
+  };
+
+  const handleMilestoneSelect = (milestoneId: string | null) => {
+    setAnchorEl(null);
+    if (onMilestoneChange) {
+      onMilestoneChange(task.id, milestoneId);
+    }
+  };
+
   return (
     <Card
       elevation={0}
@@ -221,14 +243,53 @@ function TaskCard({
               }}
             />
           )}
-          {task.milestone && (
-            <Chip
-              icon={<FlagIcon sx={{ fontSize: 13 }} />}
-              label={task.milestone.name}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: 10, height: 20, '& .MuiChip-icon': { fontSize: 13 } }}
-            />
+          {onMilestoneChange && milestones ? (
+            <>
+              <Chip
+                icon={<FlagIcon sx={{ fontSize: 13 }} />}
+                label={task.milestone ? task.milestone.name : 'No milestone'}
+                size="small"
+                variant="outlined"
+                onClick={handleMilestoneClick}
+                sx={{
+                  fontSize: 10,
+                  height: 20,
+                  cursor: 'pointer',
+                  '& .MuiChip-icon': { fontSize: 13 },
+                }}
+              />
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={() => setAnchorEl(null)}
+                slotProps={{ paper: { sx: { maxHeight: 300 } } }}
+              >
+                <MenuItem selected={!task.milestone_id} onClick={() => handleMilestoneSelect(null)}>
+                  <Typography variant="body2" color="text.secondary">
+                    No milestone
+                  </Typography>
+                </MenuItem>
+                {milestones.map((m) => (
+                  <MenuItem
+                    key={m.id}
+                    selected={task.milestone_id === m.id}
+                    onClick={() => handleMilestoneSelect(m.id)}
+                  >
+                    {m.name}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          ) : (
+            task.milestone && (
+              <Chip
+                icon={<FlagIcon sx={{ fontSize: 13 }} />}
+                label={task.milestone.name}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: 10, height: 20, '& .MuiChip-icon': { fontSize: 13 } }}
+              />
+            )
           )}
           {onAssignmentsChange && (
             <Box sx={{ ml: 'auto' }}>
@@ -253,12 +314,16 @@ function KanbanColumn({
   title,
   tasks,
   color,
+  milestones,
   onAssignmentsChange,
+  onMilestoneChange,
 }: {
   title: string;
   tasks: Task[];
   color: 'default' | 'info' | 'success';
+  milestones?: Milestone[];
   onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
 }) {
   const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
 
@@ -302,7 +367,13 @@ function KanbanColumn({
           </Typography>
         ) : (
           tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onAssignmentsChange={onAssignmentsChange} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              milestones={milestones}
+              onAssignmentsChange={onAssignmentsChange}
+              onMilestoneChange={onMilestoneChange}
+            />
           ))
         )}
       </Box>
@@ -324,10 +395,18 @@ interface SwimlaneData {
 
 function MilestoneSwimlane({
   swimlane,
+  allMilestones,
   onAssignmentsChange,
+  onMilestoneChange,
+  onEditMilestone,
+  onDeleteMilestone,
 }: {
   swimlane: SwimlaneData;
+  allMilestones?: Milestone[];
   onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
+  onEditMilestone?: (milestone: Milestone) => void;
+  onDeleteMilestone?: (milestone: Milestone) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -335,6 +414,10 @@ function MilestoneSwimlane({
   const inProgressTasks = swimlane.tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = swimlane.tasks.filter((t) => t.status === 'DONE');
   const totalCount = todoTasks.length + inProgressTasks.length + doneTasks.length;
+
+  // Find the full milestone object for edit/delete
+  const milestone =
+    swimlane.id && allMilestones ? allMilestones.find((m) => m.id === swimlane.id) : undefined;
 
   return (
     <Box sx={{ mb: 3 }}>
@@ -370,6 +453,30 @@ function MilestoneSwimlane({
         {swimlane.is_overdue && (
           <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
         )}
+        {milestone && onEditMilestone && (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditMilestone(milestone);
+            }}
+            sx={{ ml: 0.5 }}
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+        )}
+        {milestone && onDeleteMilestone && (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteMilestone(milestone);
+            }}
+            color="error"
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        )}
         <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
       </Box>
 
@@ -388,19 +495,25 @@ function MilestoneSwimlane({
             title="TODO"
             tasks={todoTasks}
             color="default"
+            milestones={allMilestones}
             onAssignmentsChange={onAssignmentsChange}
+            onMilestoneChange={onMilestoneChange}
           />
           <KanbanColumn
             title="In Progress"
             tasks={inProgressTasks}
             color="info"
+            milestones={allMilestones}
             onAssignmentsChange={onAssignmentsChange}
+            onMilestoneChange={onMilestoneChange}
           />
           <KanbanColumn
             title="Done"
             tasks={doneTasks}
             color="success"
+            milestones={allMilestones}
             onAssignmentsChange={onAssignmentsChange}
+            onMilestoneChange={onMilestoneChange}
           />
         </Box>
       </Collapse>
@@ -421,10 +534,14 @@ interface PersonRow {
 
 function PeopleBoardRow({
   row,
+  milestones,
   onAssignmentsChange,
+  onMilestoneChange,
 }: {
   row: PersonRow;
+  milestones?: Milestone[];
   onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
 }) {
   const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
@@ -526,7 +643,13 @@ function PeopleBoardRow({
                   </Typography>
                 ) : (
                   statusTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} onAssignmentsChange={onAssignmentsChange} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      milestones={milestones}
+                      onAssignmentsChange={onAssignmentsChange}
+                      onMilestoneChange={onMilestoneChange}
+                    />
                   ))
                 )}
               </Box>
@@ -575,6 +698,18 @@ export default function ProjectDetailPage() {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskStatus, setTaskStatus] = useState<string>('TODO');
   const [submitting, setSubmitting] = useState(false);
+
+  // Milestone dialog state
+  const [milestoneDialogOpen, setMilestoneDialogOpen] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [milestoneName, setMilestoneName] = useState('');
+  const [milestoneDueDate, setMilestoneDueDate] = useState('');
+  const [milestoneSubmitting, setMilestoneSubmitting] = useState(false);
+
+  // Delete milestone confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingMilestone, setDeletingMilestone] = useState<Milestone | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   // Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -759,6 +894,117 @@ export default function ProjectDetailPage() {
       setSubmitting(false);
     }
   };
+
+  // ---- Milestone CRUD ----
+  const handleOpenCreateMilestone = () => {
+    setEditingMilestone(null);
+    setMilestoneName('');
+    setMilestoneDueDate('');
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleOpenEditMilestone = (milestone: Milestone) => {
+    setEditingMilestone(milestone);
+    setMilestoneName(milestone.name);
+    setMilestoneDueDate(milestone.due_date ? milestone.due_date.split('T')[0] : '');
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleCloseMilestoneDialog = () => {
+    if (milestoneSubmitting) return;
+    setMilestoneDialogOpen(false);
+    setEditingMilestone(null);
+  };
+
+  const handleSubmitMilestone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!milestoneName.trim() || milestoneSubmitting || !id) return;
+
+    setMilestoneSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = {
+        name: milestoneName.trim(),
+        due_date: milestoneDueDate || null,
+      };
+
+      if (editingMilestone) {
+        await api.put(`/api/projects/${id}/milestones/${editingMilestone.id}`, payload);
+        showSnackbar('Milestone updated successfully.');
+      } else {
+        await api.post(`/api/projects/${id}/milestones`, payload);
+        showSnackbar('Milestone created successfully.');
+      }
+      setMilestoneDialogOpen(false);
+      setEditingMilestone(null);
+      // Refresh milestones
+      const updatedMilestones = await api.get<Milestone[]>(`/api/projects/${id}/milestones`);
+      setMilestones(updatedMilestones);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    } finally {
+      setMilestoneSubmitting(false);
+    }
+  };
+
+  const handleOpenDeleteMilestone = (milestone: Milestone) => {
+    setDeletingMilestone(milestone);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDeleteMilestone = async () => {
+    if (!deletingMilestone || deleteSubmitting || !id) return;
+
+    setDeleteSubmitting(true);
+    try {
+      await api.delete(`/api/projects/${id}/milestones/${deletingMilestone.id}`);
+      showSnackbar('Milestone deleted successfully.');
+      setDeleteDialogOpen(false);
+      setDeletingMilestone(null);
+      // Refresh milestones and tasks (tasks may have lost their milestone)
+      const [updatedMilestones, updatedTasks] = await Promise.all([
+        api.get<Milestone[]>(`/api/projects/${id}/milestones`),
+        api.get<Task[]>(`/api/projects/${id}/tasks`),
+      ]);
+      setMilestones(updatedMilestones);
+      setTasks(updatedTasks);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  // ---- Change task milestone ----
+  const handleMilestoneChange = useCallback(
+    async (taskId: string, milestoneId: string | null) => {
+      if (!id) return;
+      try {
+        await api.put(`/api/projects/${id}/tasks/${taskId}`, { milestone_id: milestoneId });
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id !== taskId) return t;
+            const milestone = milestoneId
+              ? (milestones.find((m) => m.id === milestoneId) ?? null)
+              : null;
+            return {
+              ...t,
+              milestone_id: milestoneId,
+              milestone: milestone ? { id: milestone.id, name: milestone.name } : null,
+            };
+          }),
+        );
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : 'Failed to update milestone assignment.';
+        showSnackbar(message, 'error');
+      }
+    },
+    [id, milestones],
+  );
 
   // ---- Loading state ----
   if (loading) {
@@ -1002,11 +1248,21 @@ export default function ProjectDetailPage() {
       )}
 
       {/* ---- Milestones ---- */}
-      {milestones.length > 0 && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
             Milestones
           </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={handleOpenCreateMilestone}
+          >
+            Add Milestone
+          </Button>
+        </Box>
+        {milestones.length > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
             {milestones.map((m) => (
               <Chip
@@ -1024,8 +1280,8 @@ export default function ProjectDetailPage() {
               />
             ))}
           </Box>
-        </Box>
-      )}
+        )}
+      </Box>
 
       {/* ---- Tasks Header with View Toggle ---- */}
       <Box
@@ -1080,19 +1336,25 @@ export default function ProjectDetailPage() {
               title="TODO"
               tasks={todoTasks}
               color="default"
+              milestones={milestones}
               onAssignmentsChange={handleAssignmentsChange}
+              onMilestoneChange={handleMilestoneChange}
             />
             <KanbanColumn
               title="In Progress"
               tasks={inProgressTasks}
               color="info"
+              milestones={milestones}
               onAssignmentsChange={handleAssignmentsChange}
+              onMilestoneChange={handleMilestoneChange}
             />
             <KanbanColumn
               title="Done"
               tasks={doneTasks}
               color="success"
+              milestones={milestones}
               onAssignmentsChange={handleAssignmentsChange}
+              onMilestoneChange={handleMilestoneChange}
             />
           </Box>
           {cancelledCount > 0 && (
@@ -1107,7 +1369,11 @@ export default function ProjectDetailPage() {
             <MilestoneSwimlane
               key={lane.id ?? '__none__'}
               swimlane={lane}
+              allMilestones={milestones}
               onAssignmentsChange={handleAssignmentsChange}
+              onMilestoneChange={handleMilestoneChange}
+              onEditMilestone={handleOpenEditMilestone}
+              onDeleteMilestone={handleOpenDeleteMilestone}
             />
           ))}
           {cancelledCount > 0 && (
@@ -1127,7 +1393,9 @@ export default function ProjectDetailPage() {
               <PeopleBoardRow
                 key={row.memberId ?? 'unassigned'}
                 row={row}
+                milestones={milestones}
                 onAssignmentsChange={handleAssignmentsChange}
+                onMilestoneChange={handleMilestoneChange}
               />
             ))
           )}
@@ -1194,6 +1462,100 @@ export default function ProjectDetailPage() {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* ---- Milestone Create/Edit Dialog ---- */}
+      <Dialog
+        open={milestoneDialogOpen}
+        onClose={handleCloseMilestoneDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+          {editingMilestone ? 'Edit Milestone' : 'New Milestone'}
+        </DialogTitle>
+        <Box component="form" onSubmit={handleSubmitMilestone}>
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="Name"
+                value={milestoneName}
+                onChange={(e) => setMilestoneName(e.target.value)}
+                required
+                fullWidth
+                autoFocus
+              />
+              <TextField
+                label="Due Date"
+                type="date"
+                value={milestoneDueDate}
+                onChange={(e) => setMilestoneDueDate(e.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              onClick={handleCloseMilestoneDialog}
+              color="inherit"
+              disabled={milestoneSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!milestoneName.trim() || milestoneSubmitting}
+              endIcon={
+                milestoneSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined
+              }
+              sx={{ px: 3 }}
+            >
+              {milestoneSubmitting
+                ? 'Saving...'
+                : editingMilestone
+                  ? 'Save Changes'
+                  : 'Create Milestone'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* ---- Delete Milestone Confirmation Dialog ---- */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deleteSubmitting && setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>Delete Milestone</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Are you sure you want to delete &ldquo;{deletingMilestone?.name}&rdquo;? Tasks assigned
+            to this milestone will become unassigned.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            color="inherit"
+            disabled={deleteSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDeleteMilestone}
+            disabled={deleteSubmitting}
+            endIcon={deleteSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+          >
+            {deleteSubmitting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* ---- Snackbar ---- */}
