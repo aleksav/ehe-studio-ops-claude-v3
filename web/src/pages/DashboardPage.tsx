@@ -6,6 +6,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Divider,
   FormControl,
   InputLabel,
   MenuItem,
@@ -39,8 +40,17 @@ interface Task {
 
 interface TimeEntry {
   id: string;
+  project_id: string;
+  team_member_id: string;
+  date: string;
   hours_worked: string | number;
+  task_type: string;
+  notes: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const TASK_STATUS_COLOR: Record<string, 'default' | 'info' | 'success' | 'warning'> = {
   TODO: 'default',
@@ -56,6 +66,70 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
 };
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+  ARCHITECTURE_ENGINEERING_DIRECTION: 'Architecture & Engineering Direction',
+  DESIGN_DELIVERY_RESEARCH: 'Design, Delivery & Research',
+  DEVELOPMENT_TESTING: 'Development & Testing',
+  BUSINESS_SUPPORT: 'Business Support',
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatProjectName(project: Project): string {
+  return project.client ? `${project.name} (${project.client.name})` : project.name;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Reusable summary card component
+// ---------------------------------------------------------------------------
+
+function SummaryCard({
+  label,
+  value,
+  loading,
+}: {
+  label: string;
+  value: string | null;
+  loading: boolean;
+}) {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 3,
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {label}
+        </Typography>
+        {loading ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '3.5rem' }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : (
+          <Typography variant="h2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+            {value ?? '--'}
+          </Typography>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -63,26 +137,42 @@ const TASK_STATUS_LABEL: Record<string, string> = {
 export default function DashboardPage() {
   const { user } = useAuth();
   const displayName = user?.team_member?.full_name ?? user?.email ?? 'there';
+  const teamMemberId = user?.team_member?.id ?? null;
 
   // Projects
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState('');
 
-  // Tasks
+  // Tasks for selected project
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
 
-  // Summary card data
-  const [hoursThisWeek, setHoursThisWeek] = useState<string>('--');
-  const [hoursLoading, setHoursLoading] = useState(true);
+  // Studio-wide summary
+  const [studioHoursThisWeek, setStudioHoursThisWeek] = useState<string>('--');
+  const [studioHoursLoading, setStudioHoursLoading] = useState(true);
   const [openTaskCount, setOpenTaskCount] = useState<string>('--');
   const [openTasksLoading, setOpenTasksLoading] = useState(true);
+
+  // My Work summary
+  const [myHoursThisWeek, setMyHoursThisWeek] = useState<string>('--');
+  const [myHoursLoading, setMyHoursLoading] = useState(true);
+  const [myActiveProjects, setMyActiveProjects] = useState<string>('--');
+  const [myActiveProjectsLoading, setMyActiveProjectsLoading] = useState(true);
+  const [myOpenTaskCount, setMyOpenTaskCount] = useState<string>('--');
+  const [myOpenTasksLoading, setMyOpenTasksLoading] = useState(true);
+
+  // My recent time entries
+  const [myRecentEntries, setMyRecentEntries] = useState<TimeEntry[]>([]);
+  const [myRecentEntriesLoading, setMyRecentEntriesLoading] = useState(true);
 
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [logTimeProjectId, setLogTimeProjectId] = useState('');
   const [logTimeProjectName, setLogTimeProjectName] = useState('');
+
+  // Derived
+  const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
 
   // ---- Fetch projects on mount ----
   useEffect(() => {
@@ -102,11 +192,36 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // ---- Fetch hours this week for current user ----
+  // ---- Fetch studio-wide hours this week (ALL team members) ----
   useEffect(() => {
-    const teamMemberId = user?.team_member?.id;
+    let cancelled = false;
+    (async () => {
+      try {
+        const now = new Date();
+        const weekStart = format(startOfISOWeek(now), 'yyyy-MM-dd');
+        const weekEnd = format(endOfISOWeek(now), 'yyyy-MM-dd');
+        const entries = await api.get<TimeEntry[]>(
+          `/api/time-entries?date_from=${weekStart}&date_to=${weekEnd}`,
+        );
+        if (!cancelled) {
+          const total = entries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
+          setStudioHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
+        }
+      } catch {
+        if (!cancelled) setStudioHoursThisWeek('--');
+      } finally {
+        if (!cancelled) setStudioHoursLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---- Fetch my hours this week ----
+  useEffect(() => {
     if (!teamMemberId) {
-      setHoursLoading(false);
+      setMyHoursLoading(false);
       return;
     }
 
@@ -121,27 +236,71 @@ export default function DashboardPage() {
         );
         if (!cancelled) {
           const total = entries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
-          setHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
+          setMyHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
         }
       } catch {
-        if (!cancelled) setHoursThisWeek('--');
+        if (!cancelled) setMyHoursThisWeek('--');
       } finally {
-        if (!cancelled) setHoursLoading(false);
+        if (!cancelled) setMyHoursLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [user?.team_member?.id]);
+  }, [teamMemberId]);
+
+  // ---- Fetch my recent time entries + derive my active projects ----
+  useEffect(() => {
+    if (!teamMemberId) {
+      setMyRecentEntriesLoading(false);
+      setMyActiveProjectsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const entries = await api.get<TimeEntry[]>(
+          `/api/time-entries?team_member_id=${teamMemberId}`,
+        );
+        if (!cancelled) {
+          // Recent entries (API returns desc order)
+          setMyRecentEntries(entries.slice(0, 5));
+
+          // Distinct active projects the user logged time against
+          const projectIds = new Set(entries.map((e) => e.project_id));
+          const activeProjectIds = activeProjects
+            .filter((p) => projectIds.has(p.id))
+            .map((p) => p.id);
+          setMyActiveProjects(String(activeProjectIds.length));
+        }
+      } catch {
+        if (!cancelled) {
+          setMyRecentEntries([]);
+          setMyActiveProjects('--');
+        }
+      } finally {
+        if (!cancelled) {
+          setMyRecentEntriesLoading(false);
+          setMyActiveProjectsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-run when projects finish loading so activeProjects is populated
+  }, [teamMemberId, projectsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Fetch open tasks across all active projects ----
   useEffect(() => {
     if (projectsLoading) return;
 
-    const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
     if (activeProjects.length === 0) {
       setOpenTaskCount('0');
       setOpenTasksLoading(false);
+      setMyOpenTaskCount('0');
+      setMyOpenTasksLoading(false);
       return;
     }
 
@@ -152,13 +311,23 @@ export default function DashboardPage() {
           activeProjects.map((p) => api.get<Task[]>(`/api/projects/${p.id}/tasks`)),
         );
         if (!cancelled) {
-          const count = allTasks
-            .flat()
-            .filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
-          setOpenTaskCount(String(count));
+          const flat = allTasks.flat();
+          const openTasks = flat.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS');
+          setOpenTaskCount(String(openTasks.length));
+
+          // My open tasks: we don't have assignment info from this endpoint,
+          // so count tasks from projects user has logged time to
+          // For a more precise count, we'd need task assignments API
+          // For now, set based on what we know
+          setMyOpenTaskCount('--');
+          setMyOpenTasksLoading(false);
         }
       } catch {
-        if (!cancelled) setOpenTaskCount('--');
+        if (!cancelled) {
+          setOpenTaskCount('--');
+          setMyOpenTaskCount('--');
+          setMyOpenTasksLoading(false);
+        }
       } finally {
         if (!cancelled) setOpenTasksLoading(false);
       }
@@ -166,7 +335,67 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [projects, projectsLoading]);
+  }, [projects, projectsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Fetch my open tasks (using task assignments) ----
+  useEffect(() => {
+    if (projectsLoading || !teamMemberId) {
+      if (!teamMemberId) setMyOpenTasksLoading(false);
+      return;
+    }
+
+    if (activeProjects.length === 0) {
+      setMyOpenTaskCount('0');
+      setMyOpenTasksLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const allAssignments = await Promise.all(
+          activeProjects.map(async (p) => {
+            try {
+              const assignments = await api.get<
+                { task_id: string; team_member_id: string; task?: Task }[]
+              >(`/api/projects/${p.id}/tasks/assignments`);
+              return assignments;
+            } catch {
+              return [];
+            }
+          }),
+        );
+        if (!cancelled) {
+          // Filter assignments for current user, then check task status
+          const myAssignedTaskIds = new Set(
+            allAssignments
+              .flat()
+              .filter((a) => a.team_member_id === teamMemberId)
+              .map((a) => a.task_id),
+          );
+
+          // Now fetch tasks to check status (we may already have them from the open tasks fetch)
+          const allTasks = await Promise.all(
+            activeProjects.map((p) => api.get<Task[]>(`/api/projects/${p.id}/tasks`)),
+          );
+          const openCount = allTasks
+            .flat()
+            .filter(
+              (t) =>
+                myAssignedTaskIds.has(t.id) && (t.status === 'TODO' || t.status === 'IN_PROGRESS'),
+            ).length;
+          setMyOpenTaskCount(String(openCount));
+        }
+      } catch {
+        if (!cancelled) setMyOpenTaskCount('--');
+      } finally {
+        if (!cancelled) setMyOpenTasksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projects, projectsLoading, teamMemberId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Fetch tasks when project selected ----
   useEffect(() => {
@@ -200,6 +429,9 @@ export default function DashboardPage() {
     setLogTimeOpen(true);
   };
 
+  // Build a lookup map for project names (for recent entries)
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
+
   return (
     <Box sx={{ p: { xs: 2, sm: 4 } }}>
       <Typography variant="h3" sx={{ mb: 1, fontWeight: 600 }}>
@@ -209,7 +441,13 @@ export default function DashboardPage() {
         Here&apos;s your studio at a glance.
       </Typography>
 
-      {/* ---- Summary cards ---- */}
+      {/* ================================================================== */}
+      {/* Section 1: Studio Overview                                         */}
+      {/* ================================================================== */}
+      <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
+        Studio Overview
+      </Typography>
+
       <Box
         sx={{
           display: 'grid',
@@ -218,54 +456,119 @@ export default function DashboardPage() {
           mb: 4,
         }}
       >
-        {[
-          {
-            label: 'Active Projects',
-            value: projectsLoading
-              ? null
-              : String(projects.filter((p) => p.status === 'ACTIVE').length),
-            loading: projectsLoading,
-          },
-          {
-            label: 'Hours This Week',
-            value: hoursThisWeek,
-            loading: hoursLoading,
-          },
-          {
-            label: 'Open Tasks',
-            value: openTaskCount,
-            loading: openTasksLoading,
-          },
-        ].map((card) => (
-          <Card
-            key={card.label}
-            elevation={0}
-            sx={{
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 3,
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {card.label}
-              </Typography>
-              {card.loading ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', height: '3.5rem' }}>
-                  <CircularProgress size={24} />
-                </Box>
-              ) : (
-                <Typography variant="h2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  {card.value}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        <SummaryCard
+          label="Active Projects"
+          value={projectsLoading ? null : String(activeProjects.length)}
+          loading={projectsLoading}
+        />
+        <SummaryCard
+          label="Hours This Week"
+          value={studioHoursThisWeek}
+          loading={studioHoursLoading}
+        />
+        <SummaryCard label="Open Tasks" value={openTaskCount} loading={openTasksLoading} />
       </Box>
 
-      {/* ---- Project Tasks Section ---- */}
+      <Divider sx={{ mb: 4 }} />
+
+      {/* ================================================================== */}
+      {/* Section 2: My Work                                                 */}
+      {/* ================================================================== */}
       <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
+        My Work
+      </Typography>
+
+      {/* ---- My summary cards ---- */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+          gap: 3,
+          mb: 4,
+        }}
+      >
+        <SummaryCard label="My Hours This Week" value={myHoursThisWeek} loading={myHoursLoading} />
+        <SummaryCard
+          label="My Active Projects"
+          value={myActiveProjects}
+          loading={myActiveProjectsLoading}
+        />
+        <SummaryCard label="My Open Tasks" value={myOpenTaskCount} loading={myOpenTasksLoading} />
+      </Box>
+
+      {/* ---- My Recent Time Entries ---- */}
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+        My Recent Time Entries
+      </Typography>
+
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {myRecentEntriesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : myRecentEntries.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+              No recent time entries.
+            </Typography>
+          ) : (
+            myRecentEntries.map((entry, idx) => {
+              const project = projectMap.get(entry.project_id);
+              const projectLabel = project ? formatProjectName(project) : 'Unknown Project';
+              return (
+                <Box key={entry.id}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 2,
+                      py: 1.2,
+                      px: 2,
+                      borderRadius: 2,
+                      bgcolor: '#F9FAFB',
+                      mb: idx < myRecentEntries.length - 1 ? 1 : 0,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 700, minWidth: 42, color: 'primary.main' }}
+                    >
+                      {parseFloat(String(entry.hours_worked)).toFixed(1)}h
+                    </Typography>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {projectLabel}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Chip
+                          label={TASK_TYPE_LABELS[entry.task_type] ?? entry.task_type}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: 11, height: 22 }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDate(entry.date)}
+                        </Typography>
+                      </Box>
+                      {entry.notes && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {entry.notes}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ---- Project Tasks Section ---- */}
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
         Project Tasks
       </Typography>
 
@@ -291,7 +594,7 @@ export default function DashboardPage() {
                   .filter((p) => p.status !== 'ARCHIVED')
                   .map((p) => (
                     <MenuItem key={p.id} value={p.id}>
-                      {p.client ? `${p.name} (${p.client.name})` : p.name}
+                      {formatProjectName(p)}
                       {p.status !== 'ACTIVE' && (
                         <Chip
                           label={p.status}
@@ -385,9 +688,7 @@ export default function DashboardPage() {
                         onClick={() =>
                           handleOpenLogTime(
                             selectedProjectId,
-                            selectedProject?.client
-                              ? `${selectedProject.name} (${selectedProject.client.name})`
-                              : (selectedProject?.name ?? 'Project'),
+                            selectedProject ? formatProjectName(selectedProject) : 'Project',
                           )
                         }
                         sx={{ textTransform: 'none', fontSize: 13 }}
