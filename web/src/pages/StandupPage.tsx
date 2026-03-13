@@ -21,6 +21,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
+import AssigneeAvatars from '../components/AssigneeAvatars';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +39,19 @@ interface Project {
   client: Client | null;
 }
 
+interface TeamMemberRef {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface TaskAssignment {
+  id: string;
+  task_id?: string;
+  team_member_id: string;
+  team_member: TeamMemberRef;
+}
+
 interface Task {
   id: string;
   project_id: string;
@@ -45,6 +59,7 @@ interface Task {
   status: string;
   completed_at?: string | null;
   is_stale?: boolean;
+  assignments?: TaskAssignment[];
 }
 
 interface Milestone {
@@ -122,12 +137,14 @@ function KanbanColumn({
   color,
   onStatusChange,
   onLogTime,
+  onAssignmentsChange,
 }: {
   title: string;
   tasks: Task[];
   color: 'default' | 'info' | 'success';
   onStatusChange: (task: Task) => void;
   onLogTime: (task: Task) => void;
+  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
 }) {
   const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
 
@@ -226,6 +243,13 @@ function KanbanColumn({
                     )}
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {onAssignmentsChange && (
+                      <AssigneeAvatars
+                        taskId={task.id}
+                        assignments={task.assignments ?? []}
+                        onAssignmentsChange={onAssignmentsChange}
+                      />
+                    )}
                     <Tooltip title="Log Time">
                       <IconButton size="small" onClick={() => onLogTime(task)}>
                         <AccessTimeIcon sx={{ fontSize: 18 }} />
@@ -355,6 +379,11 @@ export default function StandupPage() {
     [tasks, selectedProjectId],
   );
 
+  // ---- Assignments change handler ----
+  const handleAssignmentsChange = useCallback((taskId: string, assignments: TaskAssignment[]) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, assignments } : t)));
+  }, []);
+
   // ---- Log time handler ----
   const handleLogTime = useCallback(() => {
     const project = projects.find((p) => p.id === selectedProjectId);
@@ -451,6 +480,7 @@ export default function StandupPage() {
                 color="default"
                 onStatusChange={handleStatusChange}
                 onLogTime={handleLogTime}
+                onAssignmentsChange={handleAssignmentsChange}
               />
               <KanbanColumn
                 title="In Progress"
@@ -458,6 +488,7 @@ export default function StandupPage() {
                 color="info"
                 onStatusChange={handleStatusChange}
                 onLogTime={handleLogTime}
+                onAssignmentsChange={handleAssignmentsChange}
               />
               <KanbanColumn
                 title="Done (last 7 days)"
@@ -465,6 +496,7 @@ export default function StandupPage() {
                 color="success"
                 onStatusChange={handleStatusChange}
                 onLogTime={handleLogTime}
+                onAssignmentsChange={handleAssignmentsChange}
               />
             </Box>
           )}

@@ -36,6 +36,7 @@ import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import FlagIcon from '@mui/icons-material/Flag';
 import PeopleIcon from '@mui/icons-material/People';
 import { api, ApiError } from '../lib/api';
+import AssigneeAvatars, { type Assignment } from '../components/AssigneeAvatars';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,13 +64,6 @@ interface TeamMemberRef {
   email: string;
 }
 
-interface TaskAssignment {
-  id: string;
-  task_id: string;
-  team_member_id: string;
-  team_member: TeamMemberRef;
-}
-
 interface TaskMilestoneRef {
   id: string;
   name: string;
@@ -82,7 +76,7 @@ interface Task {
   description: string;
   status: string;
   is_stale?: boolean;
-  assignments?: TaskAssignment[];
+  assignments?: Assignment[];
   milestone?: TaskMilestoneRef | null;
 }
 
@@ -175,7 +169,13 @@ function formatBudgetType(value: string | null): string | null {
 // Task Card Component (shared between Board, Milestone, and People views)
 // ---------------------------------------------------------------------------
 
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({
+  task,
+  onAssignmentsChange,
+}: {
+  task: Task;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+}) {
   return (
     <Card
       elevation={0}
@@ -230,6 +230,15 @@ function TaskCard({ task }: { task: Task }) {
               sx={{ fontSize: 10, height: 20, '& .MuiChip-icon': { fontSize: 13 } }}
             />
           )}
+          {onAssignmentsChange && (
+            <Box sx={{ ml: 'auto' }}>
+              <AssigneeAvatars
+                taskId={task.id}
+                assignments={task.assignments ?? []}
+                onAssignmentsChange={onAssignmentsChange}
+              />
+            </Box>
+          )}
         </Box>
       </CardContent>
     </Card>
@@ -244,10 +253,12 @@ function KanbanColumn({
   title,
   tasks,
   color,
+  onAssignmentsChange,
 }: {
   title: string;
   tasks: Task[];
   color: 'default' | 'info' | 'success';
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
 }) {
   const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
 
@@ -290,7 +301,9 @@ function KanbanColumn({
             No tasks
           </Typography>
         ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onAssignmentsChange={onAssignmentsChange} />
+          ))
         )}
       </Box>
     </Box>
@@ -309,7 +322,13 @@ interface SwimlaneData {
   tasks: Task[];
 }
 
-function MilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
+function MilestoneSwimlane({
+  swimlane,
+  onAssignmentsChange,
+}: {
+  swimlane: SwimlaneData;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+}) {
   const [expanded, setExpanded] = useState(true);
 
   const todoTasks = swimlane.tasks.filter((t) => t.status === 'TODO');
@@ -365,9 +384,24 @@ function MilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
             pl: 2,
           }}
         >
-          <KanbanColumn title="TODO" tasks={todoTasks} color="default" />
-          <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
-          <KanbanColumn title="Done" tasks={doneTasks} color="success" />
+          <KanbanColumn
+            title="TODO"
+            tasks={todoTasks}
+            color="default"
+            onAssignmentsChange={onAssignmentsChange}
+          />
+          <KanbanColumn
+            title="In Progress"
+            tasks={inProgressTasks}
+            color="info"
+            onAssignmentsChange={onAssignmentsChange}
+          />
+          <KanbanColumn
+            title="Done"
+            tasks={doneTasks}
+            color="success"
+            onAssignmentsChange={onAssignmentsChange}
+          />
         </Box>
       </Collapse>
     </Box>
@@ -385,7 +419,13 @@ interface PersonRow {
   tasks: Task[];
 }
 
-function PeopleBoardRow({ row }: { row: PersonRow }) {
+function PeopleBoardRow({
+  row,
+  onAssignmentsChange,
+}: {
+  row: PersonRow;
+  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
+}) {
   const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
@@ -485,7 +525,9 @@ function PeopleBoardRow({ row }: { row: PersonRow }) {
                     --
                   </Typography>
                 ) : (
-                  statusTasks.map((task) => <TaskCard key={task.id} task={task} />)
+                  statusTasks.map((task) => (
+                    <TaskCard key={task.id} task={task} onAssignmentsChange={onAssignmentsChange} />
+                  ))
                 )}
               </Box>
             </Box>
@@ -680,6 +722,11 @@ export default function ProjectDetailPage() {
 
     return rows;
   }, [tasks, weeklyHoursMap]);
+
+  // ---- Assignments change handler ----
+  const handleAssignmentsChange = useCallback((taskId: string, assignments: Assignment[]) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, assignments } : t)));
+  }, []);
 
   // ---- Create task ----
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -1029,9 +1076,24 @@ export default function ProjectDetailPage() {
               gap: 3,
             }}
           >
-            <KanbanColumn title="TODO" tasks={todoTasks} color="default" />
-            <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
-            <KanbanColumn title="Done" tasks={doneTasks} color="success" />
+            <KanbanColumn
+              title="TODO"
+              tasks={todoTasks}
+              color="default"
+              onAssignmentsChange={handleAssignmentsChange}
+            />
+            <KanbanColumn
+              title="In Progress"
+              tasks={inProgressTasks}
+              color="info"
+              onAssignmentsChange={handleAssignmentsChange}
+            />
+            <KanbanColumn
+              title="Done"
+              tasks={doneTasks}
+              color="success"
+              onAssignmentsChange={handleAssignmentsChange}
+            />
           </Box>
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -1042,7 +1104,11 @@ export default function ProjectDetailPage() {
       ) : viewMode === 'milestones' ? (
         <>
           {swimlanes.map((lane) => (
-            <MilestoneSwimlane key={lane.id ?? '__none__'} swimlane={lane} />
+            <MilestoneSwimlane
+              key={lane.id ?? '__none__'}
+              swimlane={lane}
+              onAssignmentsChange={handleAssignmentsChange}
+            />
           ))}
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -1057,7 +1123,13 @@ export default function ProjectDetailPage() {
               No tasks to display.
             </Typography>
           ) : (
-            personRows.map((row) => <PeopleBoardRow key={row.memberId ?? 'unassigned'} row={row} />)
+            personRows.map((row) => (
+              <PeopleBoardRow
+                key={row.memberId ?? 'unassigned'}
+                row={row}
+                onAssignmentsChange={handleAssignmentsChange}
+              />
+            ))
           )}
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
