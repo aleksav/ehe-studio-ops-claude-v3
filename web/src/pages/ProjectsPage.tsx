@@ -336,14 +336,14 @@ export default function ProjectsPage() {
                   }}
                 >
                   <Box sx={{ flex: 1, mr: 1 }}>
-                    {project.client && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        {project.client.name}
-                      </Typography>
-                    )}
                     <Typography variant="h4" sx={{ fontWeight: 600 }}>
                       {project.name}
                     </Typography>
+                    {project.client && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        ({project.client.name})
+                      </Typography>
+                    )}
                   </Box>
                   <Chip
                     label={STATUS_LABEL[project.status] ?? project.status}

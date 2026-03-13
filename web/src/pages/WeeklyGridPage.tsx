@@ -518,7 +518,7 @@ export default function WeeklyGridPage() {
           >
             {availableProjects.map((p) => (
               <MenuItem key={p.id} value={p.id}>
-                {p.client ? `${p.client.name} / ${p.name}` : p.name}
+                {p.client ? `${p.name} (${p.client.name})` : p.name}
               </MenuItem>
             ))}
           </Select>
@@ -612,7 +612,7 @@ export default function WeeklyGridPage() {
                     >
                       {project
                         ? project.client
-                          ? `${project.client.name} / ${project.name}`
+                          ? `${project.name} (${project.client.name})`
                           : project.name
                         : pid}
                     </TableCell>

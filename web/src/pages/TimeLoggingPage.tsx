@@ -291,7 +291,7 @@ export default function TimeLoggingPage() {
                   .filter((p) => p.status !== 'ARCHIVED')
                   .map((p) => (
                     <MenuItem key={p.id} value={p.id}>
-                      {p.client ? `${p.client.name} / ${p.name}` : p.name}
+                      {p.client ? `${p.name} (${p.client.name})` : p.name}
                       {p.status !== 'ACTIVE' && (
                         <Chip
                           label={p.status}
@@ -315,7 +315,10 @@ export default function TimeLoggingPage() {
         >
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 600 }}>
-              Log Time{selectedProject ? ` — ${selectedProject.name}` : ''}
+              Log Time
+              {selectedProject
+                ? ` — ${selectedProject.name}${selectedProject.client ? ` (${selectedProject.client.name})` : ''}`
+                : ''}
             </Typography>
 
             {/* Alerts */}
