@@ -21,6 +21,7 @@ import type { SelectChangeEvent } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SendIcon from '@mui/icons-material/Send';
 import { api, ApiError } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +89,9 @@ function todayISO(): string {
 // ---------------------------------------------------------------------------
 
 export default function LogTimeModal({ open, onClose, projectId, projectName }: LogTimeModalProps) {
+  const { user } = useAuth();
+  const currentTeamMemberId = user?.team_member?.id ?? '';
+
   // Team members
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -134,7 +138,7 @@ export default function LogTimeModal({ open, onClose, projectId, projectName }: 
   // ---- Reset form when modal opens ----
   useEffect(() => {
     if (open) {
-      setSelectedMemberId('');
+      setSelectedMemberId(currentTeamMemberId);
       setDate(todayISO());
       setHours('');
       setTaskType('');
@@ -142,7 +146,18 @@ export default function LogTimeModal({ open, onClose, projectId, projectName }: 
       setDailyTotal(0);
       setErrorMsg(null);
     }
-  }, [open]);
+  }, [open, currentTeamMemberId]);
+
+  // ---- Default to logged-in user's preferred task type once members load ----
+  useEffect(() => {
+    if (!open || !currentTeamMemberId || teamMembers.length === 0) return;
+    if (selectedMemberId !== currentTeamMemberId) return;
+
+    const member = teamMembers.find((m) => m.id === currentTeamMemberId);
+    if (member?.preferred_task_type) {
+      setTaskType(member.preferred_task_type);
+    }
+  }, [open, currentTeamMemberId, teamMembers, selectedMemberId]);
 
   // ---- On user change: pre-fill task type from preferred_task_type ----
   const handleMemberChange = useCallback(
