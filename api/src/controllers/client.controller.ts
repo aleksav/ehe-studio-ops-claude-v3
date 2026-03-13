@@ -7,18 +7,39 @@ import {
   updateClientService,
   deleteClientService,
 } from '../services/client.service';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
 const createClientSchema = z.object({
-  name: z.string().min(1),
-  contact_name: z.string().optional(),
-  contact_email: z.string().email().optional().or(z.literal('')),
+  name: z.string().min(1).max(255),
+  contact_name: z.string().max(255).optional(),
+  contact_email: z
+    .string()
+    .email()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => v || undefined),
 });
 
 const updateClientSchema = z.object({
-  name: z.string().min(1).optional(),
-  contact_name: z.string().nullable().optional(),
-  contact_email: z.string().email().optional().or(z.literal('')).nullable().optional(),
+  name: z.string().min(1).max(255).optional(),
+  contact_name: z
+    .string()
+    .max(255)
+    .nullable()
+    .optional()
+    .transform((v) => (v === '' ? null : v)),
+  contact_email: z
+    .string()
+    .email()
+    .nullable()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v)),
 });
 
 export async function list(_req: AuthenticatedRequest, res: Response) {
@@ -57,6 +78,10 @@ export async function create(req: AuthenticatedRequest, res: Response) {
     const client = await createClientService(parsed.data, actorId);
     res.status(201).json(client);
   } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      res.status(409).json({ error: 'A client with that name already exists' });
+      return;
+    }
     console.error('Create client error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -80,6 +105,10 @@ export async function update(req: AuthenticatedRequest, res: Response) {
 
     res.json(client);
   } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      res.status(409).json({ error: 'A client with that name already exists' });
+      return;
+    }
     console.error('Update client error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -10,7 +10,10 @@ export function findAllProjects(where: Record<string, unknown>) {
 
 export function findProjectById(id: string, tx?: TransactionClient) {
   const client = tx ?? prisma;
-  return client.project.findUnique({ where: { id } });
+  return client.project.findUnique({
+    where: { id },
+    include: { client: { select: { id: true, name: true } } },
+  });
 }
 
 export function findProjectByIdWithBudgetSummary(id: string) {

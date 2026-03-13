@@ -80,6 +80,7 @@ model Client {
 
   projects Project[]
 
+  @@unique([name])
   @@map("clients")
 }
 

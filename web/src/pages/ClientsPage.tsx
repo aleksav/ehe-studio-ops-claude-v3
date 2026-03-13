@@ -31,6 +31,7 @@ interface Client {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,13 +50,15 @@ export default function ClientsPage() {
   // Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
   const fetchClients = async () => {
     try {
+      setFetchError(null);
       const data = await api.get<Client[]>('/api/clients');
       setClients(data);
     } catch {
-      // silently fail
+      setFetchError('Failed to load clients. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -88,18 +91,22 @@ export default function ClientsPage() {
     setSaving(true);
     setErrorMsg(null);
     try {
-      const payload = {
-        name: formName.trim(),
-        contact_name: formContactName.trim() || undefined,
-        contact_email: formContactEmail.trim() || undefined,
-      };
       if (editingClient) {
-        await api.put(`/api/clients/${editingClient.id}`, payload);
+        await api.put(`/api/clients/${editingClient.id}`, {
+          name: formName.trim(),
+          contact_name: formContactName.trim() || null,
+          contact_email: formContactEmail.trim() || null,
+        });
         setSnackbarMessage('Client updated.');
       } else {
-        await api.post('/api/clients', payload);
+        await api.post('/api/clients', {
+          name: formName.trim(),
+          contact_name: formContactName.trim() || undefined,
+          contact_email: formContactEmail.trim() || undefined,
+        });
         setSnackbarMessage('Client created.');
       }
+      setSnackbarSeverity('success');
       setDialogOpen(false);
       setSnackbarOpen(true);
       await fetchClients();
@@ -118,10 +125,12 @@ export default function ClientsPage() {
       setDeleteDialogOpen(false);
       setDeletingClient(null);
       setSnackbarMessage('Client deleted.');
+      setSnackbarSeverity('success');
       setSnackbarOpen(true);
       await fetchClients();
     } catch (err) {
       setSnackbarMessage(err instanceof ApiError ? err.message : 'Failed to delete client.');
+      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
       setDeleting(false);
@@ -146,6 +155,10 @@ export default function ClientsPage() {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress size={28} />
         </Box>
+      ) : fetchError ? (
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          {fetchError}
+        </Alert>
       ) : clients.length === 0 ? (
         <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
           <CardContent sx={{ p: 3, textAlign: 'center' }}>
@@ -188,7 +201,7 @@ export default function ClientsPage() {
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5 }}>
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openEdit(client)}>
+                      <IconButton size="small" aria-label="Edit" onClick={() => openEdit(client)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -196,6 +209,7 @@ export default function ClientsPage() {
                       <IconButton
                         size="small"
                         color="error"
+                        aria-label="Delete"
                         onClick={() => {
                           setDeletingClient(client);
                           setDeleteDialogOpen(true);
@@ -307,7 +321,7 @@ export default function ClientsPage() {
       >
         <Alert
           onClose={() => setSnackbarOpen(false)}
-          severity="success"
+          severity={snackbarSeverity}
           sx={{ borderRadius: 2, width: '100%' }}
         >
           {snackbarMessage}

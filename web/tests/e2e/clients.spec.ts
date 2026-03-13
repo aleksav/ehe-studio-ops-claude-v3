@@ -27,12 +27,14 @@ test.describe('Clients', () => {
   });
 
   test('can create a new client', async ({ page }) => {
+    const uniqueName = `Test Client ${Date.now()}`;
+
     // Click New Client button
     await page.getByRole('button', { name: /new client/i }).click();
 
     // Fill in the form
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.getByLabel('Client Name').fill('Test Client Co');
+    await page.getByLabel('Client Name').fill(uniqueName);
     await page.getByLabel('Contact Name').fill('John Doe');
     await page.getByLabel('Contact Email').fill('john@testclient.com');
 
@@ -43,7 +45,7 @@ test.describe('Clients', () => {
     await expect(page.getByText(/client created/i)).toBeVisible({ timeout: 10000 });
 
     // New client should appear in the list
-    await expect(page.getByText('Test Client Co')).toBeVisible();
+    await expect(page.getByText(uniqueName)).toBeVisible();
   });
 
   test('can edit a client', async ({ page }) => {

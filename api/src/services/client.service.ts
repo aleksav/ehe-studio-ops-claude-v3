@@ -74,6 +74,12 @@ export async function deleteClientService(id: string, actorId: string | null) {
     const existing = await findClientById(id, tx);
     if (!existing) return null;
 
+    // Explicitly unlink projects before deleting to avoid FK issues
+    await tx.project.updateMany({
+      where: { client_id: id },
+      data: { client_id: null },
+    });
+
     await repoDelete(tx, id);
 
     await writeAudit(tx, {
