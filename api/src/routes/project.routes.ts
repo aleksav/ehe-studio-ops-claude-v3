@@ -16,38 +16,44 @@ router.get('/:id', authMiddleware, projectController.get);
 router.get('/:id/budget', authMiddleware, budgetController.getBudget);
 
 // GET /api/projects/:id/weekly-hours — hours per team member for the current ISO week
-router.get('/:id/weekly-hours', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const projectId = req.params.id;
+router.get(
+  '/:id/weekly-hours',
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const projectId = req.params.id;
 
-    // Compute current ISO week boundaries (Monday–Sunday)
-    const now = new Date();
-    const dayOfWeek = now.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday));
-    const sunday = new Date(monday);
-    sunday.setUTCDate(monday.getUTCDate() + 6);
+      // Compute current ISO week boundaries (Monday–Sunday)
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday),
+      );
+      const sunday = new Date(monday);
+      sunday.setUTCDate(monday.getUTCDate() + 6);
 
-    const entries = await prisma.timeEntry.groupBy({
-      by: ['team_member_id'],
-      where: {
-        project_id: projectId,
-        date: { gte: monday, lte: sunday },
-      },
-      _sum: { hours_worked: true },
-    });
+      const entries = await prisma.timeEntry.groupBy({
+        by: ['team_member_id'],
+        where: {
+          project_id: projectId,
+          date: { gte: monday, lte: sunday },
+        },
+        _sum: { hours_worked: true },
+      });
 
-    const result: Record<string, number> = {};
-    for (const entry of entries) {
-      result[entry.team_member_id] = Number(entry._sum.hours_worked ?? 0);
+      const result: Record<string, number> = {};
+      for (const entry of entries) {
+        result[entry.team_member_id] = Number(entry._sum.hours_worked ?? 0);
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Weekly hours error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    res.json(result);
-  } catch (error) {
-    console.error('Weekly hours error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  },
+);
 
 // POST /api/projects
 router.post('/', authMiddleware, projectController.create);
