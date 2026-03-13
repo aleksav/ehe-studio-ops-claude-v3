@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Time Logging — Quick Entry', () => {
-  const testPassword = 'password123';
+  const testPassword = 'Password123';
 
   test.beforeEach(async ({ page }) => {
     const testEmail = `e2e-time-${Date.now()}@ehe.ai`;
