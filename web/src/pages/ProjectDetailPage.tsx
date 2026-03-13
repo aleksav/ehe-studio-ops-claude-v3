@@ -308,18 +308,9 @@ function MilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
           </Typography>
         )}
         {swimlane.is_overdue && (
-          <Chip
-            label="Overdue"
-            size="small"
-            color="error"
-            sx={{ fontSize: 11, height: 22 }}
-          />
+          <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
         )}
-        <Chip
-          label={totalCount}
-          size="small"
-          sx={{ fontSize: 12, height: 22, ml: 'auto' }}
-        />
+        <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
       </Box>
 
       {/* Swimlane Content */}
@@ -785,12 +776,7 @@ export default function ProjectDetailPage() {
           <Typography variant="h4" sx={{ fontWeight: 600 }}>
             Tasks
           </Typography>
-          <ToggleButtonGroup
-            value={boardView}
-            exclusive
-            onChange={handleViewChange}
-            size="small"
-          >
+          <ToggleButtonGroup value={boardView} exclusive onChange={handleViewChange} size="small">
             <ToggleButton value="board">
               <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
               Board
