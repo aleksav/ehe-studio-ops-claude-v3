@@ -37,7 +37,10 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
       where.is_active = is_active === 'true';
     }
 
-    const teamMembers = await prisma.teamMember.findMany({ where });
+    const teamMembers = await prisma.teamMember.findMany({
+      where,
+      orderBy: { full_name: 'asc' },
+    });
     res.json(teamMembers);
   } catch (error) {
     console.error('List team members error:', error);

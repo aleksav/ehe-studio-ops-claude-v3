@@ -67,6 +67,7 @@ model TeamMember {
   time_entries     TimeEntry[]
   audit_logs       AuditLog[]       @relation("AuditActor")
 
+  @@index([is_active])
   @@map("team_members")
 }
 
@@ -104,6 +105,7 @@ model Project {
   time_entries TimeEntry[]
 
   @@index([client_id])
+  @@index([status])
   @@map("projects")
 }
 
@@ -175,6 +177,7 @@ model TimeEntry {
   @@index([team_member_id])
   @@index([date])
   @@index([team_member_id, date])
+  @@index([project_id, date])
   @@map("time_entries")
 }
 
@@ -206,5 +209,7 @@ model AuditLog {
   @@index([entity_id])
   @@index([actor_id])
   @@index([created_at])
+  @@index([entity_type, entity_id])
+  @@index([entity_type, created_at])
   @@map("audit_logs")
 }

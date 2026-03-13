@@ -85,8 +85,8 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
     const entries = await prisma.timeEntry.findMany({
       where,
       include: {
-        project: true,
-        team_member: true,
+        project: { select: { id: true, name: true, status: true } },
+        team_member: { select: { id: true, full_name: true, email: true } },
       },
       orderBy: { date: 'desc' },
     });

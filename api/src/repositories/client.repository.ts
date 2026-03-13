@@ -2,7 +2,10 @@ import { Prisma } from '@prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
 export function findAllClients() {
-  return prisma.client.findMany({ orderBy: { name: 'asc' } });
+  return prisma.client.findMany({
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { projects: true } } },
+  });
 }
 
 export function findClientById(id: string, tx?: TransactionClient) {

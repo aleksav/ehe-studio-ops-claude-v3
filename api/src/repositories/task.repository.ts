@@ -43,7 +43,16 @@ export async function findTasksByProject(filters: TaskListFilters) {
     where.milestone_id = filters.milestone_id;
   }
 
-  return prisma.task.findMany({ where });
+  return prisma.task.findMany({
+    where,
+    include: {
+      assignments: {
+        include: { team_member: { select: { id: true, full_name: true, email: true } } },
+      },
+      milestone: { select: { id: true, name: true } },
+    },
+    orderBy: { created_at: 'desc' },
+  });
 }
 
 /**
