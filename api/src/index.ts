@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.routes';
 import teamMemberRoutes from './routes/team-member.routes';
 import projectRoutes from './routes/project.routes';
@@ -15,6 +17,9 @@ import meRoutes from './routes/me.routes';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security headers
+app.use(helmet());
+
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
   : ['http://localhost:3000'];
@@ -25,7 +30,16 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+// Rate limiting for auth endpoints (login, register, refresh)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -33,7 +47,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/milestones', milestoneRoutes);

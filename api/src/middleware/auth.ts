@@ -3,6 +3,12 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
+if (!process.env.JWT_SECRET) {
+  console.warn(
+    'WARNING: JWT_SECRET is not set. Using insecure default. Set JWT_SECRET in production.',
+  );
+}
+
 export interface AuthPayload {
   userId: string;
   teamMemberId: string | null;
