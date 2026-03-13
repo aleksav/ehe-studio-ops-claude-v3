@@ -14,6 +14,7 @@ async function main() {
   await prisma.milestone.deleteMany();
   await prisma.taskRate.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.client.deleteMany();
   await prisma.user.deleteMany();
   await prisma.teamMember.deleteMany();
 
@@ -61,6 +62,23 @@ async function main() {
     data: { email: 'carol@ehe.ai', password_hash: passwordHash, team_member_id: carol.id },
   });
 
+  // Create clients
+  const clientAcme = await prisma.client.create({
+    data: {
+      name: 'Acme Corp',
+      contact_name: 'Jane Smith',
+      contact_email: 'jane.smith@acme.com',
+    },
+  });
+
+  const clientGlobex = await prisma.client.create({
+    data: {
+      name: 'Globex Industries',
+      contact_name: 'Tom Wilson',
+      contact_email: 'tom.wilson@globex.com',
+    },
+  });
+
   // Create projects
   const project1 = await prisma.project.create({
     data: {
@@ -72,6 +90,7 @@ async function main() {
       budget_type: BudgetType.CAPPED,
       budget_amount: 50000,
       currency_code: 'GBP',
+      client_id: clientAcme.id,
     },
   });
 
@@ -85,6 +104,7 @@ async function main() {
       budget_type: BudgetType.TRACKED_ONLY,
       budget_amount: 80000,
       currency_code: 'GBP',
+      client_id: clientGlobex.id,
     },
   });
 
@@ -330,6 +350,7 @@ async function main() {
   });
 
   console.log('Seed complete.');
+  console.log(`  Clients: 2`);
   console.log(`  Team members: ${[alice, bob, carol].length}`);
   console.log(`  Projects: 2`);
   console.log(`  Milestones: 6`);

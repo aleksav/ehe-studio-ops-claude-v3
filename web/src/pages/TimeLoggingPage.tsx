@@ -29,6 +29,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
+  client: { id: string; name: string } | null;
 }
 
 interface TeamMemberDetail {
@@ -288,7 +289,7 @@ export default function TimeLoggingPage() {
               >
                 {projects.map((p) => (
                   <MenuItem key={p.id} value={p.id}>
-                    {p.name}
+                    {p.client ? `${p.client.name} / ${p.name}` : p.name}
                     {p.status !== 'ACTIVE' && (
                       <Chip
                         label={p.status}

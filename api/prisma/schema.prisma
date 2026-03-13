@@ -70,6 +70,20 @@ model TeamMember {
   @@map("team_members")
 }
 
+model Client {
+  id            String   @id @default(uuid())
+  name          String
+  contact_name  String?
+  contact_email String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  projects Project[]
+
+  @@unique([name])
+  @@map("clients")
+}
+
 model Project {
   id            String        @id @default(uuid())
   name          String
@@ -80,6 +94,8 @@ model Project {
   budget_type   BudgetType    @default(NONE)
   budget_amount Decimal?      @db.Decimal(12, 2)
   currency_code String        @default("GBP") @db.Char(3)
+  client_id     String?
+  client        Client?       @relation(fields: [client_id], references: [id], onDelete: SetNull)
   created_at    DateTime      @default(now())
   updated_at    DateTime      @updatedAt
 
@@ -87,6 +103,7 @@ model Project {
   tasks        Task[]
   time_entries TimeEntry[]
 
+  @@index([client_id])
   @@map("projects")
 }
 

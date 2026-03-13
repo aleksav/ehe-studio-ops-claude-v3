@@ -29,6 +29,11 @@ import { api, ApiError } from '../lib/api';
 // Types
 // ---------------------------------------------------------------------------
 
+interface Client {
+  id: string;
+  name: string;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -37,6 +42,7 @@ interface Project {
   budget_amount: number | string | null;
   currency_code: string | null;
   description: string | null;
+  client: Client | null;
 }
 
 interface ProjectFormData {
@@ -293,9 +299,16 @@ export default function ProjectsPage() {
                     mb: 1.5,
                   }}
                 >
-                  <Typography variant="h4" sx={{ fontWeight: 600, flex: 1, mr: 1 }}>
-                    {project.name}
-                  </Typography>
+                  <Box sx={{ flex: 1, mr: 1 }}>
+                    {project.client && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        {project.client.name}
+                      </Typography>
+                    )}
+                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                      {project.name}
+                    </Typography>
+                  </Box>
                   <Chip
                     label={STATUS_LABEL[project.status] ?? project.status}
                     size="small"

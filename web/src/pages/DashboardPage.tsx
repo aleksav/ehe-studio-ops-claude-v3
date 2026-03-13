@@ -26,6 +26,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
+  client: { id: string; name: string } | null;
 }
 
 interface Task {
@@ -190,7 +191,7 @@ export default function DashboardPage() {
               >
                 {projects.map((p) => (
                   <MenuItem key={p.id} value={p.id}>
-                    {p.name}
+                    {p.client ? `${p.client.name} / ${p.name}` : p.name}
                     {p.status !== 'ACTIVE' && (
                       <Chip
                         label={p.status}
@@ -282,7 +283,12 @@ export default function DashboardPage() {
                         size="small"
                         startIcon={<AccessTimeIcon sx={{ fontSize: 16 }} />}
                         onClick={() =>
-                          handleOpenLogTime(selectedProjectId, selectedProject?.name ?? 'Project')
+                          handleOpenLogTime(
+                            selectedProjectId,
+                            selectedProject?.client
+                              ? `${selectedProject.client.name} / ${selectedProject.name}`
+                              : (selectedProject?.name ?? 'Project'),
+                          )
                         }
                         sx={{ textTransform: 'none', fontSize: 13 }}
                       >

@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import TimeLoggingPage from './pages/TimeLoggingPage';
 import WeeklyGridPage from './pages/WeeklyGridPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ClientsPage from './pages/ClientsPage';
 import TeamPage from './pages/TeamPage';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -112,6 +113,7 @@ export default function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/team" element={<TeamPage />} />
           <Route path="/time-logging" element={<TimeLoggingPage />} />

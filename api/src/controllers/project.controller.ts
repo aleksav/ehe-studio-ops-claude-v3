@@ -19,6 +19,7 @@ const createProjectSchema = z.object({
   budget_type: z.nativeEnum(BudgetType).optional(),
   budget_amount: z.number().optional(),
   currency_code: z.string().length(3).optional(),
+  client_id: z.string().uuid().optional().nullable(),
 });
 
 const updateProjectSchema = z.object({
@@ -30,6 +31,7 @@ const updateProjectSchema = z.object({
   budget_type: z.nativeEnum(BudgetType).optional(),
   budget_amount: z.number().nullable().optional(),
   currency_code: z.string().length(3).optional(),
+  client_id: z.string().uuid().optional().nullable(),
 });
 
 export async function list(req: AuthenticatedRequest, res: Response) {

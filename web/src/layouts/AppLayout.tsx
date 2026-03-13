@@ -25,6 +25,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ForumIcon from '@mui/icons-material/Forum';
 import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
+import BusinessIcon from '@mui/icons-material/Business';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -38,6 +39,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+  { label: 'Clients', path: '/clients', icon: <BusinessIcon /> },
   { label: 'Projects', path: '/projects', icon: <FolderIcon /> },
   { label: 'Team', path: '/team', icon: <GroupIcon /> },
   { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
