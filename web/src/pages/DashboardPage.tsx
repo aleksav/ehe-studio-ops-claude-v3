@@ -116,7 +116,11 @@ function formatProjectName(project: { name: string; client?: { name: string } | 
   return project.client ? `${project.client.name} — ${project.name}` : project.name;
 }
 
-function formatProjectNameFromFlat(p: { project_name?: string; name?: string; client_name: string | null }): string {
+function formatProjectNameFromFlat(p: {
+  project_name?: string;
+  name?: string;
+  client_name: string | null;
+}): string {
   const projName = p.project_name ?? p.name ?? '';
   return p.client_name ? `${p.client_name} — ${projName}` : projName;
 }
@@ -274,10 +278,7 @@ export default function DashboardPage() {
     return Array.from(dayMap.entries()).map(([date, hours]) => ({ date, hours }));
   }, [myTimeEntries]);
 
-  const maxDailyHours = useMemo(
-    () => Math.max(...dailyHours.map((d) => d.hours), 1),
-    [dailyHours],
-  );
+  const maxDailyHours = useMemo(() => Math.max(...dailyHours.map((d) => d.hours), 1), [dailyHours]);
 
   // ---- Fetch projects on mount ----
   useEffect(() => {
@@ -778,7 +779,12 @@ export default function DashboardPage() {
                 {project.budget_spend_pct !== null && (
                   <Box sx={{ mt: 'auto', pt: 1 }}>
                     <Box
-                      sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: 0.5,
+                      }}
                     >
                       <Typography variant="caption" color="text.secondary">
                         Budget
