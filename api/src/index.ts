@@ -10,6 +10,7 @@ import taskRateRoutes from './routes/task-rate.routes';
 import timeEntryRoutes from './routes/time-entry.routes';
 import clientRoutes from './routes/client.routes';
 import auditLogRoutes from './routes/audit-log.routes';
+import meRoutes from './routes/me.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,6 +43,7 @@ app.use('/api/task-rates', taskRateRoutes);
 app.use('/api/time-entries', timeEntryRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/me', meRoutes);
 
 app.listen(PORT, () => {
   console.log(`EHEStudio Ops API running on port ${PORT}`);
