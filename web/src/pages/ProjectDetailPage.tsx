@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   LinearProgress,
@@ -22,9 +23,11 @@ import {
   MenuItem,
   Select,
   Snackbar,
+  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
@@ -39,6 +42,8 @@ import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import FlagIcon from '@mui/icons-material/Flag';
 import PeopleIcon from '@mui/icons-material/People';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { api, ApiError } from '../lib/api';
 import AssigneeAvatars, { type Assignment } from '../components/AssigneeAvatars';
 
@@ -155,6 +160,8 @@ const BUDGET_LABEL: Record<string, string> = {
 const PERSON_HEADER_COLOR = '#1976D2';
 
 const VIEW_STORAGE_KEY = 'project-detail-board-view';
+const HIDE_EMPTY_MILESTONES_KEY = 'milestoneHideEmpty';
+const HIDDEN_MILESTONES_KEY_PREFIX = 'hiddenMilestones_';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -400,6 +407,8 @@ function MilestoneSwimlane({
   onMilestoneChange,
   onEditMilestone,
   onDeleteMilestone,
+  isManuallyHidden,
+  onToggleVisibility,
 }: {
   swimlane: SwimlaneData;
   allMilestones?: Milestone[];
@@ -407,6 +416,8 @@ function MilestoneSwimlane({
   onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
   onEditMilestone?: (milestone: Milestone) => void;
   onDeleteMilestone?: (milestone: Milestone) => void;
+  isManuallyHidden?: boolean;
+  onToggleVisibility?: (swimlaneId: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -476,6 +487,24 @@ function MilestoneSwimlane({
           >
             <DeleteIcon fontSize="small" />
           </IconButton>
+        )}
+        {onToggleVisibility && (
+          <Tooltip title={isManuallyHidden ? 'Show milestone' : 'Hide milestone'}>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleVisibility(swimlane.id);
+              }}
+              sx={{ ml: 0.5 }}
+            >
+              {isManuallyHidden ? (
+                <VisibilityOffIcon fontSize="small" />
+              ) : (
+                <VisibilityIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
         )}
         <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
       </Box>
@@ -693,6 +722,57 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // Milestone visibility: hide empty milestones toggle
+  const [hideEmptyMilestones, setHideEmptyMilestones] = useState<boolean>(() => {
+    return localStorage.getItem(HIDE_EMPTY_MILESTONES_KEY) === 'true';
+  });
+
+  const handleHideEmptyChange = (checked: boolean) => {
+    setHideEmptyMilestones(checked);
+    localStorage.setItem(HIDE_EMPTY_MILESTONES_KEY, String(checked));
+  };
+
+  // Milestone visibility: per-milestone hidden IDs
+  const hiddenMilestonesKey = id ? `${HIDDEN_MILESTONES_KEY_PREFIX}${id}` : '';
+
+  const [hiddenMilestoneIds, setHiddenMilestoneIds] = useState<Set<string>>(() => {
+    if (!id) return new Set<string>();
+    try {
+      const stored = localStorage.getItem(`${HIDDEN_MILESTONES_KEY_PREFIX}${id}`);
+      if (stored) return new Set<string>(JSON.parse(stored) as string[]);
+    } catch {
+      // ignore
+    }
+    return new Set<string>();
+  });
+
+  const toggleMilestoneVisibility = useCallback(
+    (milestoneId: string | null) => {
+      // Use '__none__' as the key for the "No Milestone" swimlane
+      const key = milestoneId ?? '__none__';
+      setHiddenMilestoneIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        if (hiddenMilestonesKey) {
+          localStorage.setItem(hiddenMilestonesKey, JSON.stringify([...next]));
+        }
+        return next;
+      });
+    },
+    [hiddenMilestonesKey],
+  );
+
+  const showAllMilestones = useCallback(() => {
+    setHiddenMilestoneIds(new Set());
+    if (hiddenMilestonesKey) {
+      localStorage.setItem(hiddenMilestonesKey, JSON.stringify([]));
+    }
+  }, [hiddenMilestonesKey]);
+
   // Add task dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [taskDescription, setTaskDescription] = useState('');
@@ -806,6 +886,29 @@ export default function ProjectDetailPage() {
 
     return lanes;
   }, [tasks, milestones]);
+
+  // ---- Filtered swimlanes (hide empty + manually hidden) ----
+  const filteredSwimlanes = useMemo(() => {
+    return swimlanes.filter((lane) => {
+      const laneKey = lane.id ?? '__none__';
+
+      // Manually hidden
+      if (hiddenMilestoneIds.has(laneKey)) return false;
+
+      // Hide empty: milestones with no TODO or IN_PROGRESS tasks
+      if (hideEmptyMilestones) {
+        const hasActiveTasks = lane.tasks.some(
+          (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS',
+        );
+        if (!hasActiveTasks) return false;
+      }
+
+      return true;
+    });
+  }, [swimlanes, hiddenMilestoneIds, hideEmptyMilestones]);
+
+  const hiddenCount = swimlanes.length - filteredSwimlanes.length;
+  const manuallyHiddenCount = hiddenMilestoneIds.size;
 
   // ---- People board rows ----
   const personRows: PersonRow[] = useMemo(() => {
@@ -1365,17 +1468,78 @@ export default function ProjectDetailPage() {
         </>
       ) : viewMode === 'milestones' ? (
         <>
-          {swimlanes.map((lane) => (
-            <MilestoneSwimlane
-              key={lane.id ?? '__none__'}
-              swimlane={lane}
-              allMilestones={milestones}
-              onAssignmentsChange={handleAssignmentsChange}
-              onMilestoneChange={handleMilestoneChange}
-              onEditMilestone={handleOpenEditMilestone}
-              onDeleteMilestone={handleOpenDeleteMilestone}
+          {/* Milestone filter bar */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              mb: 2,
+              flexWrap: 'wrap',
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={hideEmptyMilestones}
+                  onChange={(e) => handleHideEmptyChange(e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="body2" color="text.secondary">
+                  Show only active milestones
+                </Typography>
+              }
+              sx={{ mr: 2 }}
             />
-          ))}
+            {manuallyHiddenCount > 0 && (
+              <Chip
+                label={`${manuallyHiddenCount} milestone${manuallyHiddenCount === 1 ? '' : 's'} hidden`}
+                size="small"
+                variant="outlined"
+                onClick={showAllMilestones}
+                onDelete={showAllMilestones}
+                deleteIcon={<VisibilityIcon fontSize="small" />}
+                sx={{ fontSize: 12, height: 26 }}
+              />
+            )}
+          </Box>
+          {filteredSwimlanes.length === 0 && swimlanes.length > 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+              All milestones are hidden.{' '}
+              <Box
+                component="span"
+                onClick={showAllMilestones}
+                sx={{
+                  color: 'primary.main',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Show all
+              </Box>
+            </Typography>
+          ) : (
+            filteredSwimlanes.map((lane) => (
+              <MilestoneSwimlane
+                key={lane.id ?? '__none__'}
+                swimlane={lane}
+                allMilestones={milestones}
+                onAssignmentsChange={handleAssignmentsChange}
+                onMilestoneChange={handleMilestoneChange}
+                onEditMilestone={handleOpenEditMilestone}
+                onDeleteMilestone={handleOpenDeleteMilestone}
+                isManuallyHidden={hiddenMilestoneIds.has(lane.id ?? '__none__')}
+                onToggleVisibility={toggleMilestoneVisibility}
+              />
+            ))
+          )}
+          {hiddenCount > 0 && filteredSwimlanes.length > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
+              {hiddenCount} milestone{hiddenCount === 1 ? '' : 's'} hidden
+            </Typography>
+          )}
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
