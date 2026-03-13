@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -9,13 +9,14 @@ import {
   Divider,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Select,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import { startOfISOWeek, endOfISOWeek, format } from 'date-fns';
+import { startOfISOWeek, endOfISOWeek, format, subDays } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
@@ -46,6 +47,40 @@ interface TimeEntry {
   hours_worked: string | number;
   task_type: string;
   notes: string | null;
+}
+
+interface MyTask {
+  id: string;
+  description: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  project_id: string;
+  project_name: string;
+  client_name: string | null;
+}
+
+interface MyTimeEntry {
+  id: string;
+  project_id: string;
+  project_name: string;
+  client_name: string | null;
+  date: string;
+  hours_worked: number;
+  task_type: string;
+  notes: string | null;
+}
+
+interface MyProject {
+  id: string;
+  name: string;
+  status: string;
+  client_name: string | null;
+  budget_type: string;
+  budget_amount: number | null;
+  actual_spend: number;
+  budget_spend_pct: number | null;
+  hours_this_week: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +116,11 @@ function formatProjectName(project: { name: string; client?: { name: string } | 
   return project.client ? `${project.client.name} — ${project.name}` : project.name;
 }
 
+function formatProjectNameFromFlat(p: { project_name?: string; name?: string; client_name: string | null }): string {
+  const projName = p.project_name ?? p.name ?? '';
+  return p.client_name ? `${p.client_name} — ${projName}` : projName;
+}
+
 function sortProjects<T extends { name: string; client?: { name: string } | null }>(
   list: T[],
 ): T[] {
@@ -98,6 +138,15 @@ function formatDate(iso: string): string {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+  });
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
   });
 }
 
@@ -165,17 +214,13 @@ export default function DashboardPage() {
   const [openTaskCount, setOpenTaskCount] = useState<string>('--');
   const [openTasksLoading, setOpenTasksLoading] = useState(true);
 
-  // My Work summary
-  const [myHoursThisWeek, setMyHoursThisWeek] = useState<string>('--');
-  const [myHoursLoading, setMyHoursLoading] = useState(true);
-  const [myActiveProjects, setMyActiveProjects] = useState<string>('--');
-  const [myActiveProjectsLoading, setMyActiveProjectsLoading] = useState(true);
-  const [myOpenTaskCount, setMyOpenTaskCount] = useState<string>('--');
-  const [myOpenTasksLoading, setMyOpenTasksLoading] = useState(true);
-
-  // My recent time entries
-  const [myRecentEntries, setMyRecentEntries] = useState<TimeEntry[]>([]);
-  const [myRecentEntriesLoading, setMyRecentEntriesLoading] = useState(true);
+  // My Work — from /api/me/* endpoints
+  const [myTasks, setMyTasks] = useState<MyTask[]>([]);
+  const [myTasksLoading, setMyTasksLoading] = useState(true);
+  const [myTimeEntries, setMyTimeEntries] = useState<MyTimeEntry[]>([]);
+  const [myTimeEntriesLoading, setMyTimeEntriesLoading] = useState(true);
+  const [myProjects, setMyProjects] = useState<MyProject[]>([]);
+  const [myProjectsLoading, setMyProjectsLoading] = useState(true);
 
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
@@ -184,6 +229,55 @@ export default function DashboardPage() {
 
   // Derived
   const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
+
+  // ---- Derived: My Work summary values ----
+  const myOpenTasks = useMemo(
+    () => myTasks.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS'),
+    [myTasks],
+  );
+  const myActiveProjectsList = useMemo(
+    () => myProjects.filter((p) => p.status === 'ACTIVE'),
+    [myProjects],
+  );
+  const myHoursThisWeek = useMemo(() => {
+    const total = myProjects.reduce((sum, p) => sum + p.hours_this_week, 0);
+    return total > 0 ? total.toFixed(1) : '0';
+  }, [myProjects]);
+
+  // ---- Derived: Tasks grouped by status ----
+  const tasksByStatus = useMemo(() => {
+    const groups: Record<string, MyTask[]> = {};
+    for (const task of myTasks) {
+      if (task.status === 'DONE' || task.status === 'CANCELLED') continue;
+      if (!groups[task.status]) groups[task.status] = [];
+      groups[task.status].push(task);
+    }
+    return groups;
+  }, [myTasks]);
+
+  // ---- Derived: Daily hours for last 7 days ----
+  const dailyHours = useMemo(() => {
+    const dayMap = new Map<string, number>();
+    // Initialize last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = subDays(new Date(), i);
+      const key = format(d, 'yyyy-MM-dd');
+      dayMap.set(key, 0);
+    }
+    // Fill in actual hours
+    for (const entry of myTimeEntries) {
+      const current = dayMap.get(entry.date);
+      if (current !== undefined) {
+        dayMap.set(entry.date, current + entry.hours_worked);
+      }
+    }
+    return Array.from(dayMap.entries()).map(([date, hours]) => ({ date, hours }));
+  }, [myTimeEntries]);
+
+  const maxDailyHours = useMemo(
+    () => Math.max(...dailyHours.map((d) => d.hours), 1),
+    [dailyHours],
+  );
 
   // ---- Fetch projects on mount ----
   useEffect(() => {
@@ -229,80 +323,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // ---- Fetch my hours this week ----
-  useEffect(() => {
-    if (!teamMemberId) {
-      setMyHoursLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const now = new Date();
-        const weekStart = format(startOfISOWeek(now), 'yyyy-MM-dd');
-        const weekEnd = format(endOfISOWeek(now), 'yyyy-MM-dd');
-        const entries = await api.get<TimeEntry[]>(
-          `/api/time-entries?team_member_id=${teamMemberId}&date_from=${weekStart}&date_to=${weekEnd}`,
-        );
-        if (!cancelled) {
-          const total = entries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
-          setMyHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
-        }
-      } catch {
-        if (!cancelled) setMyHoursThisWeek('--');
-      } finally {
-        if (!cancelled) setMyHoursLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [teamMemberId]);
-
-  // ---- Fetch my recent time entries + derive my active projects ----
-  useEffect(() => {
-    if (!teamMemberId) {
-      setMyRecentEntriesLoading(false);
-      setMyActiveProjectsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const entries = await api.get<TimeEntry[]>(
-          `/api/time-entries?team_member_id=${teamMemberId}`,
-        );
-        if (!cancelled) {
-          // Recent entries (API returns desc order)
-          setMyRecentEntries(entries.slice(0, 5));
-
-          // Distinct active projects the user logged time against
-          const projectIds = new Set(entries.map((e) => e.project_id));
-          const activeProjectIds = activeProjects
-            .filter((p) => projectIds.has(p.id))
-            .map((p) => p.id);
-          setMyActiveProjects(String(activeProjectIds.length));
-        }
-      } catch {
-        if (!cancelled) {
-          setMyRecentEntries([]);
-          setMyActiveProjects('--');
-        }
-      } finally {
-        if (!cancelled) {
-          setMyRecentEntriesLoading(false);
-          setMyActiveProjectsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Re-run when projects finish loading so activeProjects is populated
-  }, [teamMemberId, projectsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ---- Fetch open tasks across all active projects ----
   useEffect(() => {
     if (projectsLoading) return;
@@ -310,8 +330,6 @@ export default function DashboardPage() {
     if (activeProjects.length === 0) {
       setOpenTaskCount('0');
       setOpenTasksLoading(false);
-      setMyOpenTaskCount('0');
-      setMyOpenTasksLoading(false);
       return;
     }
 
@@ -325,19 +343,10 @@ export default function DashboardPage() {
           const flat = allTasks.flat();
           const openTasks = flat.filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS');
           setOpenTaskCount(String(openTasks.length));
-
-          // My open tasks: we don't have assignment info from this endpoint,
-          // so count tasks from projects user has logged time to
-          // For a more precise count, we'd need task assignments API
-          // For now, set based on what we know
-          setMyOpenTaskCount('--');
-          setMyOpenTasksLoading(false);
         }
       } catch {
         if (!cancelled) {
           setOpenTaskCount('--');
-          setMyOpenTaskCount('--');
-          setMyOpenTasksLoading(false);
         }
       } finally {
         if (!cancelled) setOpenTasksLoading(false);
@@ -348,65 +357,71 @@ export default function DashboardPage() {
     };
   }, [projects, projectsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Fetch my open tasks (using task assignments) ----
+  // ---- Fetch My Tasks (via /api/me/tasks) ----
   useEffect(() => {
-    if (projectsLoading || !teamMemberId) {
-      if (!teamMemberId) setMyOpenTasksLoading(false);
+    if (!teamMemberId) {
+      setMyTasksLoading(false);
       return;
     }
-
-    if (activeProjects.length === 0) {
-      setMyOpenTaskCount('0');
-      setMyOpenTasksLoading(false);
-      return;
-    }
-
     let cancelled = false;
     (async () => {
       try {
-        const allAssignments = await Promise.all(
-          activeProjects.map(async (p) => {
-            try {
-              const assignments = await api.get<
-                { task_id: string; team_member_id: string; task?: Task }[]
-              >(`/api/projects/${p.id}/tasks/assignments`);
-              return assignments;
-            } catch {
-              return [];
-            }
-          }),
-        );
-        if (!cancelled) {
-          // Filter assignments for current user, then check task status
-          const myAssignedTaskIds = new Set(
-            allAssignments
-              .flat()
-              .filter((a) => a.team_member_id === teamMemberId)
-              .map((a) => a.task_id),
-          );
-
-          // Now fetch tasks to check status (we may already have them from the open tasks fetch)
-          const allTasks = await Promise.all(
-            activeProjects.map((p) => api.get<Task[]>(`/api/projects/${p.id}/tasks`)),
-          );
-          const openCount = allTasks
-            .flat()
-            .filter(
-              (t) =>
-                myAssignedTaskIds.has(t.id) && (t.status === 'TODO' || t.status === 'IN_PROGRESS'),
-            ).length;
-          setMyOpenTaskCount(String(openCount));
-        }
+        const data = await api.get<MyTask[]>('/api/me/tasks');
+        if (!cancelled) setMyTasks(data);
       } catch {
-        if (!cancelled) setMyOpenTaskCount('--');
+        if (!cancelled) setMyTasks([]);
       } finally {
-        if (!cancelled) setMyOpenTasksLoading(false);
+        if (!cancelled) setMyTasksLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [projects, projectsLoading, teamMemberId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [teamMemberId]);
+
+  // ---- Fetch My Time Entries (via /api/me/time-entries?days=7) ----
+  useEffect(() => {
+    if (!teamMemberId) {
+      setMyTimeEntriesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<MyTimeEntry[]>('/api/me/time-entries?days=7');
+        if (!cancelled) setMyTimeEntries(data);
+      } catch {
+        if (!cancelled) setMyTimeEntries([]);
+      } finally {
+        if (!cancelled) setMyTimeEntriesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamMemberId]);
+
+  // ---- Fetch My Projects (via /api/me/projects) ----
+  useEffect(() => {
+    if (!teamMemberId) {
+      setMyProjectsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<MyProject[]>('/api/me/projects');
+        if (!cancelled) setMyProjects(data);
+      } catch {
+        if (!cancelled) setMyProjects([]);
+      } finally {
+        if (!cancelled) setMyProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamMemberId]);
 
   // ---- Fetch tasks when project selected ----
   useEffect(() => {
@@ -439,9 +454,6 @@ export default function DashboardPage() {
     setLogTimeProjectName(projectName);
     setLogTimeOpen(true);
   };
-
-  // Build a lookup map for project names (for recent entries)
-  const projectMap = new Map(projects.map((p) => [p.id, p]));
 
   return (
     <Box sx={{ p: { xs: 2, sm: 4 } }}>
@@ -500,12 +512,146 @@ export default function DashboardPage() {
       >
         <SummaryCard
           label="My Active Projects"
-          value={myActiveProjects}
-          loading={myActiveProjectsLoading}
+          value={myProjectsLoading ? null : String(myActiveProjectsList.length)}
+          loading={myProjectsLoading}
         />
-        <SummaryCard label="My Hours This Week" value={myHoursThisWeek} loading={myHoursLoading} />
-        <SummaryCard label="My Open Tasks" value={myOpenTaskCount} loading={myOpenTasksLoading} />
+        <SummaryCard
+          label="My Hours This Week"
+          value={myProjectsLoading ? null : myHoursThisWeek}
+          loading={myProjectsLoading}
+        />
+        <SummaryCard
+          label="My Open Tasks"
+          value={myTasksLoading ? null : String(myOpenTasks.length)}
+          loading={myTasksLoading}
+        />
       </Box>
+
+      {/* ---- My Assigned Tasks (grouped by status) ---- */}
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+        My Assigned Tasks
+      </Typography>
+
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {myTasksLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : myOpenTasks.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+              No open tasks assigned to you.
+            </Typography>
+          ) : (
+            (['IN_PROGRESS', 'TODO'] as const).map((status) => {
+              const statusTasks = tasksByStatus[status];
+              if (!statusTasks || statusTasks.length === 0) return null;
+              return (
+                <Box key={status} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Chip
+                      label={TASK_STATUS_LABEL[status] ?? status}
+                      size="small"
+                      color={TASK_STATUS_COLOR[status] ?? 'default'}
+                      sx={{ fontSize: 11, height: 22 }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      {statusTasks.length} {statusTasks.length === 1 ? 'task' : 'tasks'}
+                    </Typography>
+                  </Box>
+                  {statusTasks.map((task, idx) => (
+                    <Box
+                      key={task.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 2,
+                        py: 1,
+                        px: 2,
+                        borderRadius: 2,
+                        bgcolor: '#F9FAFB',
+                        mb: idx < statusTasks.length - 1 ? 0.5 : 0,
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {task.description}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatProjectNameFromFlat(task)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ---- Daily Hours (last 7 days) ---- */}
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+        Daily Hours (Last 7 Days)
+      </Typography>
+
+      <Card
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {myTimeEntriesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {dailyHours.map((day) => (
+                <Box key={day.date} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ minWidth: 90, color: 'text.secondary', fontSize: 13 }}
+                  >
+                    {formatShortDate(day.date)}
+                  </Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min((day.hours / maxDailyHours) * 100, 100)}
+                      sx={{
+                        height: 16,
+                        borderRadius: 2,
+                        bgcolor: '#F3F4F6',
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 2,
+                          bgcolor: day.hours > 0 ? 'primary.main' : '#F3F4F6',
+                        },
+                      }}
+                    />
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ minWidth: 40, textAlign: 'right', fontWeight: 600, fontSize: 13 }}
+                  >
+                    {day.hours > 0 ? `${day.hours.toFixed(1)}h` : '--'}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ---- My Recent Time Entries ---- */}
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
@@ -517,66 +663,168 @@ export default function DashboardPage() {
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
       >
         <CardContent sx={{ p: 3 }}>
-          {myRecentEntriesLoading ? (
+          {myTimeEntriesLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
               <CircularProgress size={28} />
             </Box>
-          ) : myRecentEntries.length === 0 ? (
+          ) : myTimeEntries.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
               No recent time entries.
             </Typography>
           ) : (
-            myRecentEntries.map((entry, idx) => {
-              const project = projectMap.get(entry.project_id);
-              const projectLabel = project ? formatProjectName(project) : 'Unknown Project';
-              return (
-                <Box key={entry.id}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 2,
-                      py: 1.2,
-                      px: 2,
-                      borderRadius: 2,
-                      bgcolor: '#F9FAFB',
-                      mb: idx < myRecentEntries.length - 1 ? 1 : 0,
-                    }}
+            myTimeEntries.slice(0, 10).map((entry, idx) => (
+              <Box key={entry.id}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 2,
+                    py: 1.2,
+                    px: 2,
+                    borderRadius: 2,
+                    bgcolor: '#F9FAFB',
+                    mb: idx < Math.min(myTimeEntries.length, 10) - 1 ? 1 : 0,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 700, minWidth: 42, color: 'primary.main' }}
                   >
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 700, minWidth: 42, color: 'primary.main' }}
-                    >
-                      {parseFloat(String(entry.hours_worked)).toFixed(1)}h
+                    {entry.hours_worked.toFixed(1)}h
+                  </Typography>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {formatProjectNameFromFlat(entry)}
                     </Typography>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {projectLabel}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                      <Chip
+                        label={TASK_TYPE_LABELS[entry.task_type] ?? entry.task_type}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: 11, height: 22 }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDate(entry.date)}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        <Chip
-                          label={TASK_TYPE_LABELS[entry.task_type] ?? entry.task_type}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontSize: 11, height: 22 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDate(entry.date)}
-                        </Typography>
-                      </Box>
-                      {entry.notes && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          {entry.notes}
-                        </Typography>
-                      )}
                     </Box>
+                    {entry.notes && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {entry.notes}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
-              );
-            })
+              </Box>
+            ))
           )}
         </CardContent>
       </Card>
+
+      {/* ---- My Active Projects ---- */}
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
+        My Active Projects
+      </Typography>
+
+      {myProjectsLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : myActiveProjectsList.length === 0 ? (
+        <Card
+          elevation={0}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+        >
+          <CardContent sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              No active projects found.
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+            gap: 2,
+            mb: 4,
+          }}
+        >
+          {myActiveProjectsList.map((project) => (
+            <Card
+              key={project.id}
+              elevation={0}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 3,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+                  {formatProjectNameFromFlat(project)}
+                </Typography>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <AccessTimeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {project.hours_this_week > 0
+                      ? `${project.hours_this_week.toFixed(1)}h this week`
+                      : 'No hours this week'}
+                  </Typography>
+                </Box>
+
+                {project.budget_spend_pct !== null && (
+                  <Box sx={{ mt: 'auto', pt: 1 }}>
+                    <Box
+                      sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Budget
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 600,
+                          color:
+                            project.budget_spend_pct > 90
+                              ? 'error.main'
+                              : project.budget_spend_pct > 75
+                                ? 'warning.main'
+                                : 'text.secondary',
+                        }}
+                      >
+                        {project.budget_spend_pct.toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(project.budget_spend_pct, 100)}
+                      sx={{
+                        height: 6,
+                        borderRadius: 3,
+                        bgcolor: '#F3F4F6',
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 3,
+                          bgcolor:
+                            project.budget_spend_pct > 90
+                              ? 'error.main'
+                              : project.budget_spend_pct > 75
+                                ? 'warning.main'
+                                : 'primary.main',
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
+
+      <Divider sx={{ mb: 4 }} />
 
       {/* ---- Project Tasks Section ---- */}
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
