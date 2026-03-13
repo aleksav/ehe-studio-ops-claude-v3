@@ -24,6 +24,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,15 @@ interface Task {
   project_id: string;
   description: string;
   status: string;
+  is_stale?: boolean;
+}
+
+interface Milestone {
+  id: string;
+  project_id: string;
+  name: string;
+  due_date: string | null;
+  is_overdue?: boolean;
 }
 
 interface TimeEntry {
@@ -203,12 +213,28 @@ function KanbanColumn({
                 >
                   {task.description}
                 </Typography>
-                <Chip
-                  label={TASK_STATUS_LABEL[task.status] ?? task.status}
-                  size="small"
-                  color={TASK_STATUS_COLOR[task.status] ?? 'default'}
-                  sx={{ fontSize: 11, height: 22 }}
-                />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <Chip
+                    label={TASK_STATUS_LABEL[task.status] ?? task.status}
+                    size="small"
+                    color={TASK_STATUS_COLOR[task.status] ?? 'default'}
+                    sx={{ fontSize: 11, height: 22 }}
+                  />
+                  {task.is_stale && (
+                    <Chip
+                      icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
+                      label="Stale"
+                      size="small"
+                      sx={{
+                        fontSize: 11,
+                        height: 22,
+                        bgcolor: '#FFF3E0',
+                        color: '#E65100',
+                        '& .MuiChip-icon': { color: '#E65100' },
+                      }}
+                    />
+                  )}
+                </Box>
               </CardContent>
             </Card>
           ))
@@ -229,6 +255,7 @@ export default function ProjectDetailPage() {
   // Data state
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -255,16 +282,18 @@ export default function ProjectDetailPage() {
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const [projects, projectTasks, timeEntries] = await Promise.all([
+      const [projects, projectTasks, projectMilestones, timeEntries] = await Promise.all([
         // TODO: use single-project endpoint when available
         api.get<Project[]>('/api/projects'),
         api.get<Task[]>(`/api/projects/${id}/tasks`),
+        api.get<Milestone[]>(`/api/projects/${id}/milestones`),
         api.get<TimeEntry[]>(`/api/time-entries?project_id=${id}`),
       ]);
 
       const found = projects.find((p) => p.id === id) ?? null;
       setProject(found);
       setTasks(projectTasks);
+      setMilestones(projectMilestones);
 
       const hours = timeEntries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
       setTotalHours(hours);
@@ -567,6 +596,32 @@ export default function ProjectDetailPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* ---- Milestones ---- */}
+      {milestones.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
+            Milestones
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            {milestones.map((m) => (
+              <Chip
+                key={m.id}
+                label={
+                  m.is_overdue
+                    ? `${m.name} — Overdue`
+                    : m.due_date
+                      ? `${m.name} — ${new Date(m.due_date).toLocaleDateString()}`
+                      : m.name
+                }
+                color={m.is_overdue ? 'error' : 'default'}
+                variant={m.is_overdue ? 'filled' : 'outlined'}
+                sx={{ fontSize: 13, height: 30 }}
+              />
+            ))}
+          </Box>
+        </Box>
       )}
 
       {/* ---- Kanban Header ---- */}

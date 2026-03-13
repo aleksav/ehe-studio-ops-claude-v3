@@ -44,6 +44,15 @@ interface Task {
   description: string;
   status: string;
   completed_at?: string | null;
+  is_stale?: boolean;
+}
+
+interface Milestone {
+  id: string;
+  project_id: string;
+  name: string;
+  due_date: string | null;
+  is_overdue?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,12 +203,28 @@ function KanbanColumn({
                     gap: 1,
                   }}
                 >
-                  <Chip
-                    label={TASK_STATUS_LABEL[task.status] ?? task.status}
-                    size="small"
-                    color={TASK_STATUS_COLOR[task.status] ?? 'default'}
-                    sx={{ fontSize: 11, height: 22 }}
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                    <Chip
+                      label={TASK_STATUS_LABEL[task.status] ?? task.status}
+                      size="small"
+                      color={TASK_STATUS_COLOR[task.status] ?? 'default'}
+                      sx={{ fontSize: 11, height: 22 }}
+                    />
+                    {task.is_stale && (
+                      <Chip
+                        icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
+                        label="Stale"
+                        size="small"
+                        sx={{
+                          fontSize: 11,
+                          height: 22,
+                          bgcolor: '#FFF3E0',
+                          color: '#E65100',
+                          '& .MuiChip-icon': { color: '#E65100' },
+                        }}
+                      />
+                    )}
+                  </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Tooltip title="Log Time">
                       <IconButton size="small" onClick={() => onLogTime(task)}>
@@ -232,8 +257,9 @@ export default function StandupPage() {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState('');
 
-  // Tasks
+  // Tasks & Milestones
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
 
   // Log time modal
@@ -276,14 +302,20 @@ export default function StandupPage() {
   const fetchTasks = useCallback(async (projectId: string) => {
     if (!projectId) {
       setTasks([]);
+      setMilestones([]);
       return;
     }
     setTasksLoading(true);
     try {
-      const data = await api.get<Task[]>(`/api/projects/${projectId}/tasks`);
-      setTasks(data);
+      const [taskData, milestoneData] = await Promise.all([
+        api.get<Task[]>(`/api/projects/${projectId}/tasks`),
+        api.get<Milestone[]>(`/api/projects/${projectId}/milestones`),
+      ]);
+      setTasks(taskData);
+      setMilestones(milestoneData);
     } catch {
       setTasks([]);
+      setMilestones([]);
     } finally {
       setTasksLoading(false);
     }
@@ -374,6 +406,28 @@ export default function StandupPage() {
         <Typography variant="body1" color="text.secondary">
           Select a project to view its task board.
         </Typography>
+      )}
+
+      {/* ---- Overdue Milestones ---- */}
+      {milestones.filter((m) => m.is_overdue).length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            Overdue Milestones
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {milestones
+              .filter((m) => m.is_overdue)
+              .map((m) => (
+                <Chip
+                  key={m.id}
+                  label={`${m.name} — Overdue`}
+                  color="error"
+                  variant="filled"
+                  sx={{ fontSize: 13, height: 30 }}
+                />
+              ))}
+          </Box>
+        </Box>
       )}
 
       {/* ---- Kanban Board ---- */}
