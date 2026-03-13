@@ -120,10 +120,7 @@ export default function DashboardPage() {
           `/api/time-entries?team_member_id=${teamMemberId}&date_from=${weekStart}&date_to=${weekEnd}`,
         );
         if (!cancelled) {
-          const total = entries.reduce(
-            (sum, e) => sum + parseFloat(String(e.hours_worked)),
-            0,
-          );
+          const total = entries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
           setHoursThisWeek(total > 0 ? total.toFixed(1) : '0');
         }
       } catch {
@@ -155,9 +152,9 @@ export default function DashboardPage() {
           activeProjects.map((p) => api.get<Task[]>(`/api/projects/${p.id}/tasks`)),
         );
         if (!cancelled) {
-          const count = allTasks.flat().filter(
-            (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS',
-          ).length;
+          const count = allTasks
+            .flat()
+            .filter((t) => t.status === 'TODO' || t.status === 'IN_PROGRESS').length;
           setOpenTaskCount(String(count));
         }
       } catch {
