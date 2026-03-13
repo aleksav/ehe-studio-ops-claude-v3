@@ -53,6 +53,7 @@ interface ProjectFormData {
   name: string;
   description: string;
   status: string;
+  client_id: string;
   budget_type: string;
   budget_amount: string;
   currency_code: string;
@@ -62,6 +63,7 @@ const EMPTY_FORM: ProjectFormData = {
   name: '',
   description: '',
   status: 'PLANNED',
+  client_id: '',
   budget_type: 'NONE',
   budget_amount: '',
   currency_code: 'GBP',
@@ -118,6 +120,7 @@ function formatBudgetType(value: string | null): string | null {
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
@@ -135,8 +138,12 @@ export default function ProjectsPage() {
   // ---- Fetch projects ----
   const fetchProjects = useCallback(async () => {
     try {
-      const data = await api.get<Project[]>('/api/projects');
-      setProjects(data);
+      const [projectData, clientData] = await Promise.all([
+        api.get<Project[]>('/api/projects'),
+        api.get<Client[]>('/api/clients'),
+      ]);
+      setProjects(projectData);
+      setClients(clientData);
     } catch {
       // silently fail
     } finally {
@@ -169,6 +176,7 @@ export default function ProjectsPage() {
       name: project.name,
       description: project.description ?? '',
       status: project.status,
+      client_id: project.client?.id ?? '',
       budget_type: project.budget_type ?? 'NONE',
       budget_amount: project.budget_amount != null ? String(project.budget_amount) : '',
       currency_code: project.currency_code ?? 'GBP',
@@ -195,6 +203,7 @@ export default function ProjectsPage() {
       name: form.name.trim(),
       description: form.description.trim() || null,
       status: form.status,
+      client_id: form.client_id || null,
       budget_type: form.budget_type,
     };
 
@@ -446,6 +455,26 @@ export default function ProjectsPage() {
                 fullWidth
                 autoFocus
               />
+              <FormControl fullWidth>
+                <InputLabel id="project-client-label">Client</InputLabel>
+                <Select
+                  labelId="project-client-label"
+                  value={form.client_id}
+                  label="Client"
+                  onChange={(e: SelectChangeEvent) =>
+                    setForm((f) => ({ ...f, client_id: e.target.value }))
+                  }
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {clients.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 label="Description"
                 value={form.description}
