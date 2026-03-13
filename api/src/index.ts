@@ -38,7 +38,7 @@ app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/milestones', milestoneRoutes);
 app.use('/api/projects/:projectId/tasks', taskRoutes);
-app.use('/api/tasks', taskAssignmentRoutes);
+app.use('/api/tasks/:taskId/assignments', taskAssignmentRoutes);
 app.use('/api/task-rates', taskRateRoutes);
 app.use('/api/time-entries', timeEntryRoutes);
 app.use('/api/clients', clientRoutes);
