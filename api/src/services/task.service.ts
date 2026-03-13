@@ -11,6 +11,7 @@ import {
   findTasksByProject,
   findTaskByIdAndProject,
   findTaskByIdAndProjectTx,
+  findStaleTaskIds,
   createTask,
   updateTask,
   deleteTask,
@@ -21,8 +22,17 @@ export async function listTasks(filters: TaskListFilters) {
   const project = await findProjectById(filters.project_id);
   if (!project) return { error: 'Project not found' as const };
 
-  const tasks = await findTasksByProject(filters);
-  return { data: tasks };
+  const [tasks, staleIds] = await Promise.all([
+    findTasksByProject(filters),
+    findStaleTaskIds(filters.project_id),
+  ]);
+
+  const tasksWithStale = tasks.map((task) => ({
+    ...task,
+    is_stale: staleIds.has(task.id),
+  }));
+
+  return { data: tasksWithStale };
 }
 
 export async function getTask(projectId: string, taskId: string) {

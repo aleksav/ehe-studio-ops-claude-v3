@@ -4,6 +4,7 @@ import { findProjectById } from '../repositories/project.repository';
 import {
   findMilestonesByProjectId,
   findMilestoneByIdAndProject,
+  findOverdueMilestoneIds,
   createMilestone as repoCreate,
   updateMilestone as repoUpdate,
   deleteMilestone as repoDelete,
@@ -18,7 +19,16 @@ import {
 export async function listMilestones(projectId: string) {
   const project = await findProjectById(projectId);
   if (!project) return null;
-  return findMilestonesByProjectId(projectId);
+
+  const [milestones, overdueIds] = await Promise.all([
+    findMilestonesByProjectId(projectId),
+    findOverdueMilestoneIds(projectId),
+  ]);
+
+  return milestones.map((m) => ({
+    ...m,
+    is_overdue: overdueIds.has(m.id),
+  }));
 }
 
 export async function getMilestone(projectId: string, id: string) {
