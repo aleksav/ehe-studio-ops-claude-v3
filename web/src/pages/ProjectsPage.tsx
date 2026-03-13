@@ -26,6 +26,7 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,7 @@ function formatBudgetType(value: string | null): string | null {
 // ---------------------------------------------------------------------------
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -336,7 +338,15 @@ export default function ProjectsPage() {
                   }}
                 >
                   <Box sx={{ flex: 1, mr: 1 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                      onClick={() => navigate(`/projects/${project.id}`)}
+                    >
                       {project.name}
                     </Typography>
                     {project.client && (
