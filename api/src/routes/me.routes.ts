@@ -217,37 +217,35 @@ router.get('/projects', authMiddleware, async (req: AuthenticatedRequest, res: R
       hoursMap.set(e.project_id, current + Number(e.hours_worked));
     }
 
-    // For budget spend %, fetch total time entries per project and task rates
-    const allEntries = await prisma.timeEntry.findMany({
-      where: {
-        project_id: { in: projectIds },
-      },
-      select: {
-        project_id: true,
-        hours_worked: true,
-        task_type: true,
-        date: true,
-      },
-    });
+    // For budget spend %, aggregate spend per project in the database.
+    // Join time_entries with the most recent applicable task_rate (DESC by
+    // effective_from) so we pick the latest matching rate, not the earliest.
+    const spendRows = await prisma.$queryRawUnsafe<
+      { project_id: string; total_spend: number }[]
+    >(
+      `
+      SELECT
+        te.project_id,
+        COALESCE(SUM((te.hours_worked / 8.0) * tr.day_rate), 0)::float AS total_spend
+      FROM time_entries te
+      INNER JOIN LATERAL (
+        SELECT day_rate
+        FROM task_rates r
+        WHERE r.task_type::text = te.task_type::text
+          AND r.effective_from <= te.date
+          AND (r.effective_to IS NULL OR r.effective_to >= te.date)
+        ORDER BY r.effective_from DESC
+        LIMIT 1
+      ) tr ON true
+      WHERE te.project_id = ANY($1)
+      GROUP BY te.project_id
+      `,
+      projectIds,
+    );
 
-    const taskRates = await prisma.taskRate.findMany({
-      orderBy: { effective_from: 'asc' },
-    });
-
-    // Calculate actual spend per project
     const spendMap = new Map<string, number>();
-    for (const entry of allEntries) {
-      const hours = Number(entry.hours_worked);
-      const matchingRate = taskRates.find((rate) => {
-        if (rate.task_type !== entry.task_type) return false;
-        if (entry.date < rate.effective_from) return false;
-        if (rate.effective_to && entry.date > rate.effective_to) return false;
-        return true;
-      });
-      if (matchingRate) {
-        const cost = (hours / 8.0) * Number(matchingRate.day_rate);
-        spendMap.set(entry.project_id, (spendMap.get(entry.project_id) ?? 0) + cost);
-      }
+    for (const row of spendRows) {
+      spendMap.set(row.project_id, row.total_spend);
     }
 
     const result = projects.map((p) => {
