@@ -59,7 +59,7 @@ async function clearSubtitle(page: import('@playwright/test').Page) {
 
 test.describe('Demo Recording', () => {
   test('full app walkthrough with subtitles', async ({ page }) => {
-    test.slow(); // extend timeout for this long demo
+    test.setTimeout(300_000); // 5 minutes for the full demo walkthrough
 
     const timestamp = Date.now();
     const testName = 'Demo User';
@@ -134,7 +134,7 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'Viewing all projects with their status and client');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Projects' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Projects', { exact: true }).click();
     await expect(page).toHaveURL(/\/projects/);
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
     await page.waitForTimeout(2000);
@@ -193,7 +193,7 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'Managing clients and their contact information');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Clients' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Clients', { exact: true }).click();
     await expect(page).toHaveURL(/\/clients/);
     await expect(page.getByRole('heading', { name: 'Clients' })).toBeVisible();
     await page.waitForTimeout(1500);
@@ -237,7 +237,7 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'The team directory shows all members and their roles');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Team' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Team', { exact: true }).click();
     await expect(page).toHaveURL(/\/team/);
     await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
     await page.waitForTimeout(1500);
@@ -254,13 +254,13 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'Quick Entry lets you log time against project tasks');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Time Logging' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Time Logging', { exact: true }).click();
     await expect(page).toHaveURL(/\/time-logging/);
     await expect(page.getByRole('heading', { name: /quick entry/i })).toBeVisible();
     await page.waitForTimeout(1500);
 
     // Select a project
-    await page.getByLabel('Select project').click();
+    await page.getByRole('combobox', { name: /select project/i }).click();
     await page.waitForTimeout(500);
     await expect(page.getByRole('option', { name: /brand refresh campaign/i })).toBeVisible({
       timeout: 10000,
@@ -282,7 +282,7 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(400);
 
     // Select task type
-    await page.getByLabel('Task type').click();
+    await page.getByRole('combobox', { name: /task type/i }).click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: /development & testing/i }).click();
     await page.waitForTimeout(400);
@@ -306,13 +306,13 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'The Weekly Grid provides a spreadsheet-like view for batch time entry');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Weekly Grid' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Weekly Grid', { exact: true }).click();
     await expect(page).toHaveURL(/\/weekly-grid/);
     await expect(page.getByRole('heading', { name: /weekly grid/i })).toBeVisible();
     await page.waitForTimeout(1500);
 
     // Add a project row
-    await page.getByLabel('Add project').click();
+    await page.getByRole('combobox', { name: /add project/i }).click();
     await page.waitForTimeout(500);
     const projectOptions = page.getByRole('option');
     const optionCount = await projectOptions.count();
@@ -330,13 +330,13 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'The Standup board helps run daily standups with task status at a glance');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Standup' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Standup', { exact: true }).click();
     await expect(page).toHaveURL(/\/standup/);
     await expect(page.getByRole('heading', { name: /standup/i })).toBeVisible();
     await page.waitForTimeout(1000);
 
     // Select a project to show the kanban board
-    await page.getByLabel('Select Project').click();
+    await page.getByRole('combobox', { name: /select project/i }).click();
     await page.waitForTimeout(500);
     await expect(page.getByRole('option').first()).toBeVisible({
       timeout: 10000,
@@ -350,7 +350,7 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'The Audit Log tracks every change made in the system');
     await page.waitForTimeout(800);
 
-    await page.getByRole('button', { name: 'Audit Log' }).click();
+    await page.locator('.MuiDrawer-root').getByText('Audit Log', { exact: true }).click();
     await expect(page).toHaveURL(/\/audit-log/);
     await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible();
     await page.waitForTimeout(1500);
@@ -376,13 +376,13 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(800);
 
     // Apply entity type filter
-    await page.getByLabel('Entity Type').click();
+    await page.getByRole('combobox', { name: /entity type/i }).click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: 'PROJECT' }).click();
     await page.waitForTimeout(2000);
 
     // Clear the filter to show all again
-    await page.getByLabel('Entity Type').click();
+    await page.getByRole('combobox', { name: /entity type/i }).click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: 'All' }).click();
     await page.waitForTimeout(1500);
