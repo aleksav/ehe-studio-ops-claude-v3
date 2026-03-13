@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { AuditAction, TaskType } from '@prisma/client';
+import { AuditAction, ProjectStatus, TaskType } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import {
@@ -110,6 +110,17 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
     const { date: dateStr, hours_worked, task_type, ...rest } = parsed.data;
     const date = new Date(dateStr);
 
+    // Reject time entries against archived projects
+    const project = await prisma.project.findUnique({ where: { id: rest.project_id } });
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    if (project.status === ProjectStatus.ARCHIVED) {
+      res.status(422).json({ error: 'Cannot log time against an archived project.' });
+      return;
+    }
+
     // Daily cap validation
     const validation = await validateDailyHours(rest.team_member_id, date, hours_worked);
     if (validation.blocked) {
@@ -181,6 +192,17 @@ router.put('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Respon
 
     const { date: dateStr, hours_worked, task_type, ...rest } = parsed.data;
     const date = new Date(dateStr);
+
+    // Reject time entries against archived projects
+    const project = await prisma.project.findUnique({ where: { id: rest.project_id } });
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+    if (project.status === ProjectStatus.ARCHIVED) {
+      res.status(422).json({ error: 'Cannot log time against an archived project.' });
+      return;
+    }
 
     // Daily cap validation, excluding current entry
     const validation = await validateDailyHours(
