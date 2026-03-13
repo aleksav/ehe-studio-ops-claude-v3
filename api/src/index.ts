@@ -47,7 +47,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', ...(process.env.NODE_ENV === 'test' ? [] : [authLimiter]), authRoutes);
 app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/milestones', milestoneRoutes);
