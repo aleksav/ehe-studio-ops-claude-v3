@@ -70,11 +70,11 @@ test.describe('Dashboard', () => {
   });
 
   test('navigation sidebar shows all expected links', async ({ page }) => {
-    await expect(page.getByText('Dashboard')).toBeVisible();
-    await expect(page.getByText('Projects')).toBeVisible();
-    await expect(page.getByText('Team')).toBeVisible();
-    await expect(page.getByText('Time Logging')).toBeVisible();
-    await expect(page.getByText('Weekly Grid')).toBeVisible();
-    await expect(page.getByText('Standup')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Time Logging' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Weekly Grid' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Standup' })).toBeVisible();
   });
 });

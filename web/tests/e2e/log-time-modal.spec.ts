@@ -32,11 +32,14 @@ test.describe('Log Time Modal', () => {
       .first()
       .click();
 
-    // Modal dialog should open with "Log Time" title
-    await expect(page.getByRole('heading', { name: /log time/i })).toBeVisible();
+    // Modal dialog should open
+    await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Should show the project name in the modal
-    await expect(page.getByText('Brand Refresh Campaign')).toBeVisible();
+    // Should show "Log Time" heading inside the dialog
+    await expect(page.getByRole('dialog').getByText('Log Time')).toBeVisible();
+
+    // Should show the project name inside the dialog
+    await expect(page.getByRole('dialog').getByText('Brand Refresh Campaign')).toBeVisible();
   });
 
   test('modal shows form fields: team member, date, hours, task type', async ({ page }) => {

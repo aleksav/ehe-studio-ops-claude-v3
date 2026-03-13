@@ -99,10 +99,10 @@ test.describe('Weekly Grid', () => {
     }
 
     // "Project" column header
-    await expect(page.getByText('Project')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Project' })).toBeVisible();
 
     // "Total" column header
-    await expect(page.getByText('Total')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Total' })).toBeVisible();
 
     // Daily Total row in footer
     await expect(page.getByText('Daily Total')).toBeVisible();
