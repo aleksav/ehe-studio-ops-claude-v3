@@ -17,10 +17,10 @@ test.describe('Dashboard', () => {
     // Welcome heading should include the user name
     await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();
 
-    // Summary cards should be visible
-    await expect(page.getByText('Active Projects')).toBeVisible();
-    await expect(page.getByText('Hours This Week')).toBeVisible();
-    await expect(page.getByText('Open Tasks')).toBeVisible();
+    // Summary cards should be visible (exact: true to avoid matching "My Active Projects" etc.)
+    await expect(page.getByText('Active Projects', { exact: true })).toBeVisible();
+    await expect(page.getByText('Hours This Week', { exact: true })).toBeVisible();
+    await expect(page.getByText('Open Tasks', { exact: true })).toBeVisible();
   });
 
   test('project selector shows projects from seed data', async ({ page }) => {
