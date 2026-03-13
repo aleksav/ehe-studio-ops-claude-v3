@@ -11,6 +11,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import ClientsPage from './pages/ClientsPage';
 import TeamPage from './pages/TeamPage';
 import AuditLogPage from './pages/AuditLogPage';
+import StandupPage from './pages/StandupPage';
 import { Box, CircularProgress } from '@mui/material';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -121,7 +122,7 @@ export default function App() {
           <Route path="/team" element={<TeamPage />} />
           <Route path="/time-logging" element={<TimeLoggingPage />} />
           <Route path="/weekly-grid" element={<WeeklyGridPage />} />
-          <Route path="/standup" element={<PlaceholderPage title="Standup" />} />
+          <Route path="/standup" element={<StandupPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
         </Route>
 
