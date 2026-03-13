@@ -47,26 +47,19 @@ test.describe('Responsive layout', () => {
 
     await registerAndLogin(page, '768');
 
-    // At 768px the MUI "md" breakpoint (900px) means this is still "mobile"
-    // so sidebar should be collapsible via hamburger
-    const menuButton = page.locator('button:has([data-testid="MenuIcon"])');
-
-    if (await menuButton.isVisible()) {
-      // Mobile layout — open hamburger to verify nav
-      await menuButton.click();
-      await expect(page.getByText('Dashboard')).toBeVisible();
-      await expect(page.getByText('Clients')).toBeVisible();
-    } else {
-      // Desktop layout — permanent sidebar visible
-      await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Clients' })).toBeVisible();
-    }
-
-    // Dashboard welcome heading should be visible regardless
+    // 768px is below MUI "md" breakpoint (900px) so this is mobile layout.
+    // Verify welcome heading and user menu are visible before opening the drawer.
     await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();
-
-    // User menu button should be visible
     await expect(page.locator('[data-testid="user-menu-button"]')).toBeVisible();
+
+    // Hamburger menu should be present (mobile layout)
+    const menuButton = page.locator('button:has([data-testid="MenuIcon"])');
+    await expect(menuButton).toBeVisible();
+
+    // Open hamburger to verify nav items inside temporary drawer
+    await menuButton.click();
+    await expect(page.getByText('Dashboard')).toBeVisible();
+    await expect(page.getByText('Clients')).toBeVisible();
 
     await context.close();
   });
