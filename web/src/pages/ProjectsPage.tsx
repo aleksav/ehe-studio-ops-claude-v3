@@ -1,6 +1,29 @@
-import { useState, useEffect } from 'react';
-import { Box, Card, CardContent, Chip, CircularProgress, Typography } from '@mui/material';
-import { api } from '../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Snackbar,
+  TextField,
+  Typography,
+} from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,8 +34,28 @@ interface Project {
   name: string;
   status: string;
   budget_type: string | null;
+  budget_amount: number | string | null;
+  currency_code: string | null;
   description: string | null;
 }
+
+interface ProjectFormData {
+  name: string;
+  description: string;
+  status: string;
+  budget_type: string;
+  budget_amount: string;
+  currency_code: string;
+}
+
+const EMPTY_FORM: ProjectFormData = {
+  name: '',
+  description: '',
+  status: 'PLANNED',
+  budget_type: 'NONE',
+  budget_amount: '',
+  currency_code: 'GBP',
+};
 
 // ---------------------------------------------------------------------------
 // Status chip colours
@@ -32,6 +75,15 @@ const STATUS_LABEL: Record<string, string> = {
   ARCHIVED: 'Archived',
 };
 
+const STATUSES = ['PLANNED', 'ACTIVE', 'COMPLETED', 'ARCHIVED'] as const;
+const BUDGET_TYPES = ['NONE', 'CAPPED', 'TRACKED_ONLY'] as const;
+
+const BUDGET_TYPE_LABEL: Record<string, string> = {
+  NONE: 'None',
+  CAPPED: 'Capped',
+  TRACKED_ONLY: 'Tracked Only',
+};
+
 // ---------------------------------------------------------------------------
 // Budget type helpers
 // ---------------------------------------------------------------------------
@@ -40,10 +92,12 @@ const BUDGET_LABEL: Record<string, string> = {
   FIXED: 'Fixed',
   TIME_AND_MATERIALS: 'Time & Materials',
   RETAINER: 'Retainer',
+  CAPPED: 'Capped',
+  TRACKED_ONLY: 'Tracked Only',
 };
 
 function formatBudgetType(value: string | null): string | null {
-  if (!value) return null;
+  if (!value || value === 'NONE') return null;
   return BUDGET_LABEL[value] ?? value;
 }
 
@@ -55,28 +109,140 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await api.get<Project[]>('/api/projects');
-        if (!cancelled) setProjects(data);
-      } catch {
-        // silently fail
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [form, setForm] = useState<ProjectFormData>(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Snackbar state
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+
+  // ---- Fetch projects ----
+  const fetchProjects = useCallback(async () => {
+    try {
+      const data = await api.get<Project[]>('/api/projects');
+      setProjects(data);
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  // ---- Snackbar helper ----
+  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // ---- Open dialog for create ----
+  const handleOpenCreate = () => {
+    setEditingProject(null);
+    setForm(EMPTY_FORM);
+    setDialogOpen(true);
+  };
+
+  // ---- Open dialog for edit ----
+  const handleOpenEdit = (project: Project) => {
+    setEditingProject(project);
+    setForm({
+      name: project.name,
+      description: project.description ?? '',
+      status: project.status,
+      budget_type: project.budget_type ?? 'NONE',
+      budget_amount: project.budget_amount != null ? String(project.budget_amount) : '',
+      currency_code: project.currency_code ?? 'GBP',
+    });
+    setDialogOpen(true);
+  };
+
+  // ---- Close dialog ----
+  const handleCloseDialog = () => {
+    if (submitting) return;
+    setDialogOpen(false);
+    setEditingProject(null);
+  };
+
+  // ---- Submit create/edit ----
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || submitting) return;
+
+    setSubmitting(true);
+
+    const showBudgetFields = form.budget_type === 'CAPPED' || form.budget_type === 'TRACKED_ONLY';
+    const payload: Record<string, unknown> = {
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      status: form.status,
+      budget_type: form.budget_type,
+    };
+
+    if (showBudgetFields) {
+      payload.budget_amount = form.budget_amount ? parseFloat(form.budget_amount) : null;
+      payload.currency_code = form.currency_code.trim() || 'GBP';
+    }
+
+    try {
+      if (editingProject) {
+        await api.put(`/api/projects/${editingProject.id}`, payload);
+        showSnackbar('Project updated successfully.');
+      } else {
+        await api.post('/api/projects', payload);
+        showSnackbar('Project created successfully.');
+      }
+      setDialogOpen(false);
+      setEditingProject(null);
+      await fetchProjects();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ---- Archive ----
+  const handleArchive = async (project: Project) => {
+    try {
+      await api.delete(`/api/projects/${project.id}`);
+      showSnackbar(`"${project.name}" archived.`);
+      await fetchProjects();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    }
+  };
+
+  const showBudgetFields = form.budget_type === 'CAPPED' || form.budget_type === 'TRACKED_ONLY';
 
   return (
     <Box sx={{ p: { xs: 2, sm: 4 } }}>
-      <Typography variant="h3" sx={{ mb: 1, fontWeight: 600 }}>
-        Projects
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          mb: 1,
+        }}
+      >
+        <Typography variant="h3" sx={{ fontWeight: 600 }}>
+          Projects
+        </Typography>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
+          New Project
+        </Button>
+      </Box>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         All studio projects at a glance.
       </Typography>
@@ -163,11 +329,151 @@ export default function ProjectsPage() {
                     {project.description}
                   </Typography>
                 )}
+
+                {/* Action buttons */}
+                <Box sx={{ display: 'flex', gap: 1, mt: 2, pt: 1 }}>
+                  <Button
+                    size="small"
+                    startIcon={<EditIcon />}
+                    onClick={() => handleOpenEdit(project)}
+                  >
+                    Edit
+                  </Button>
+                  {project.status !== 'ARCHIVED' && (
+                    <Button
+                      size="small"
+                      color="warning"
+                      startIcon={<ArchiveIcon />}
+                      onClick={() => handleArchive(project)}
+                    >
+                      Archive
+                    </Button>
+                  )}
+                </Box>
               </CardContent>
             </Card>
           ))}
         </Box>
       )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+          {editingProject ? 'Edit Project' : 'New Project'}
+        </DialogTitle>
+        <Box component="form" onSubmit={handleSubmit}>
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="Name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                required
+                fullWidth
+                autoFocus
+              />
+              <TextField
+                label="Description"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                multiline
+                minRows={2}
+                maxRows={4}
+                fullWidth
+              />
+              <FormControl fullWidth>
+                <InputLabel id="project-status-label">Status</InputLabel>
+                <Select
+                  labelId="project-status-label"
+                  value={form.status}
+                  label="Status"
+                  onChange={(e: SelectChangeEvent) =>
+                    setForm((f) => ({ ...f, status: e.target.value }))
+                  }
+                >
+                  {STATUSES.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="project-budget-type-label">Budget Type</InputLabel>
+                <Select
+                  labelId="project-budget-type-label"
+                  value={form.budget_type}
+                  label="Budget Type"
+                  onChange={(e: SelectChangeEvent) =>
+                    setForm((f) => ({ ...f, budget_type: e.target.value }))
+                  }
+                >
+                  {BUDGET_TYPES.map((bt) => (
+                    <MenuItem key={bt} value={bt}>
+                      {BUDGET_TYPE_LABEL[bt]}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {showBudgetFields && (
+                <>
+                  <TextField
+                    label="Budget Amount"
+                    type="number"
+                    value={form.budget_amount}
+                    onChange={(e) => setForm((f) => ({ ...f, budget_amount: e.target.value }))}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Currency Code"
+                    value={form.currency_code}
+                    onChange={(e) => setForm((f) => ({ ...f, currency_code: e.target.value }))}
+                    fullWidth
+                    placeholder="GBP"
+                  />
+                </>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button onClick={handleCloseDialog} color="inherit" disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!form.name.trim() || submitting}
+              endIcon={submitting ? <CircularProgress size={18} color="inherit" /> : undefined}
+              sx={{ px: 3 }}
+            >
+              {submitting ? 'Saving...' : editingProject ? 'Save Changes' : 'Create Project'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarSeverity}
+          sx={{ borderRadius: 2, width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
