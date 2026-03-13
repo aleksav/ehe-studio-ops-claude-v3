@@ -147,6 +147,74 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
 };
 
+// ---------------------------------------------------------------------------
+// Milestone color coding based on due date proximity
+// ---------------------------------------------------------------------------
+
+function getMilestoneColor(dueDate: string | null): {
+  border: string;
+  bg: string;
+  label: string;
+} {
+  if (!dueDate) {
+    return { border: '#bdbdbd', bg: 'rgba(189,189,189,0.05)', label: '' };
+  }
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const diffMs = due.getTime() - now.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    const absDays = Math.abs(diffDays);
+    return {
+      border: '#d32f2f',
+      bg: 'rgba(211,47,47,0.05)',
+      label: `Overdue by ${absDays} day${absDays === 1 ? '' : 's'}`,
+    };
+  }
+  if (diffDays === 0) {
+    return { border: '#d32f2f', bg: 'rgba(211,47,47,0.05)', label: 'Due today' };
+  }
+  if (diffDays <= 7) {
+    return {
+      border: '#e65100',
+      bg: 'rgba(230,81,0,0.05)',
+      label: `${diffDays} day${diffDays === 1 ? '' : 's'} left`,
+    };
+  }
+  if (diffDays <= 14) {
+    return {
+      border: '#f57c00',
+      bg: 'rgba(245,124,0,0.05)',
+      label: `${diffDays} days left`,
+    };
+  }
+  if (diffDays <= 30) {
+    return {
+      border: '#ffa000',
+      bg: 'rgba(255,160,0,0.05)',
+      label: `${diffDays} days left`,
+    };
+  }
+  if (diffDays <= 60) {
+    const weeks = Math.round(diffDays / 7);
+    return {
+      border: '#7cb342',
+      bg: 'rgba(124,179,66,0.05)',
+      label: `${weeks} week${weeks === 1 ? '' : 's'} left`,
+    };
+  }
+  const months = Math.round(diffDays / 30);
+  return {
+    border: '#a5d6a7',
+    bg: 'rgba(165,214,167,0.05)',
+    label: `${months} month${months === 1 ? '' : 's'} left`,
+  };
+}
+
 const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 
 const BUDGET_LABEL: Record<string, string> = {
@@ -430,6 +498,9 @@ function MilestoneSwimlane({
   const milestone =
     swimlane.id && allMilestones ? allMilestones.find((m) => m.id === swimlane.id) : undefined;
 
+  // Color coding based on due date proximity (only for real milestones)
+  const milestoneColor = swimlane.id ? getMilestoneColor(swimlane.due_date) : null;
+
   return (
     <Box sx={{ mb: 3 }}>
       {/* Swimlane Header */}
@@ -440,9 +511,9 @@ function MilestoneSwimlane({
           alignItems: 'center',
           gap: 1.5,
           p: 1.5,
-          borderLeft: '4px solid #E91E63',
+          borderLeft: milestoneColor ? `5px solid ${milestoneColor.border}` : '4px solid #E91E63',
           borderRadius: 1,
-          bgcolor: 'grey.50',
+          bgcolor: milestoneColor ? milestoneColor.bg : 'grey.50',
           cursor: 'pointer',
           userSelect: 'none',
           '&:hover': { bgcolor: 'grey.100' },
@@ -461,8 +532,18 @@ function MilestoneSwimlane({
             Due {new Date(swimlane.due_date).toLocaleDateString()}
           </Typography>
         )}
-        {swimlane.is_overdue && (
-          <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
+        {milestoneColor && milestoneColor.label && (
+          <Chip
+            label={milestoneColor.label}
+            size="small"
+            sx={{
+              fontSize: 11,
+              height: 22,
+              bgcolor: milestoneColor.border,
+              color: '#fff',
+              fontWeight: 500,
+            }}
+          />
         )}
         {milestone && onEditMilestone && (
           <IconButton
