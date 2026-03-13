@@ -220,9 +220,7 @@ router.get('/projects', authMiddleware, async (req: AuthenticatedRequest, res: R
     // For budget spend %, aggregate spend per project in the database.
     // Join time_entries with the most recent applicable task_rate (DESC by
     // effective_from) so we pick the latest matching rate, not the earliest.
-    const spendRows = await prisma.$queryRawUnsafe<
-      { project_id: string; total_spend: number }[]
-    >(
+    const spendRows = await prisma.$queryRawUnsafe<{ project_id: string; total_spend: number }[]>(
       `
       SELECT
         te.project_id,
