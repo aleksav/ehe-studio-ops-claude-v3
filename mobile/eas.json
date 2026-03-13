@@ -17,6 +17,11 @@
       "distribution": "internal",
       "env": { "APP_ENV": "test" }
     },
+    "internal": {
+      "extends": "base",
+      "distribution": "internal",
+      "env": { "APP_ENV": "production" }
+    },
     "production": {
       "extends": "base",
       "distribution": "store",
