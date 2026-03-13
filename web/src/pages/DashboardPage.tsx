@@ -291,7 +291,7 @@ export default function DashboardPage() {
                   .filter((p) => p.status !== 'ARCHIVED')
                   .map((p) => (
                     <MenuItem key={p.id} value={p.id}>
-                      {p.client ? `${p.client.name} / ${p.name}` : p.name}
+                      {p.client ? `${p.name} (${p.client.name})` : p.name}
                       {p.status !== 'ACTIVE' && (
                         <Chip
                           label={p.status}
@@ -386,7 +386,7 @@ export default function DashboardPage() {
                           handleOpenLogTime(
                             selectedProjectId,
                             selectedProject?.client
-                              ? `${selectedProject.client.name} / ${selectedProject.name}`
+                              ? `${selectedProject.name} (${selectedProject.client.name})`
                               : (selectedProject?.name ?? 'Project'),
                           )
                         }
