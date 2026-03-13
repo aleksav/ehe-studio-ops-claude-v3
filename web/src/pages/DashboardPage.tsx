@@ -509,7 +509,7 @@ export default function DashboardPage() {
                 }
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
-                Log time
+                Fill timesheet
               </Button>
             ) : undefined
           }
