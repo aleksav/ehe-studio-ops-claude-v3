@@ -4,24 +4,73 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) return false;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) return false;
+
+    const data = (await response.json()) as { access_token: string; refresh_token: string };
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshOnce(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = tryRefreshToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers: customHeaders, ...rest } = options;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(customHeaders as Record<string, string>),
+  const makeHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(customHeaders as Record<string, string>),
+    };
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+      h['Authorization'] = `Bearer ${accessToken}`;
+    }
+    return h;
   };
 
-  const accessToken = localStorage.getItem('access_token');
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const fetchOptions: RequestInit = {
     ...rest,
-    headers,
+    headers: makeHeaders(),
     body: body ? JSON.stringify(body) : undefined,
-  });
+  };
+
+  let response = await fetch(`${API_BASE_URL}${endpoint}`, fetchOptions);
+
+  // On 401, try refreshing the token and retry once (skip for auth endpoints)
+  if (response.status === 401 && !endpoint.startsWith('/api/auth/')) {
+    const refreshed = await refreshOnce();
+    if (refreshed) {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...rest,
+        headers: makeHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
