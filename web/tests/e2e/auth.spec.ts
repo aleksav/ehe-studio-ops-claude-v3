@@ -49,4 +49,19 @@ test.describe('Auth flow', () => {
     await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/login/);
   });
+
+  test('rejected domain shows error on register', async ({ page }) => {
+    await page.goto('/register');
+    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible();
+
+    await page.getByLabel('Full name').fill('Bad Domain User');
+    await page.getByLabel('Email address').fill('test@gmail.com');
+    await page.getByLabel('Password').fill('Password123');
+    await page.getByRole('button', { name: /create account/i }).click();
+
+    // The API returns a 403 with a message about restricted email domains
+    await expect(page.getByText(/restricted|not allowed|@ehe\.ai/i)).toBeVisible({
+      timeout: 5000,
+    });
+  });
 });
