@@ -260,7 +260,17 @@ export default function ProjectsPage() {
 
   const showBudgetFields = form.budget_type === 'CAPPED' || form.budget_type === 'TRACKED_ONLY';
 
-  const visibleProjects = showArchived ? projects : projects.filter((p) => p.status !== 'ARCHIVED');
+  const sortByClient = (list: Project[]) =>
+    [...list].sort((a, b) => {
+      const ca = a.client?.name ?? '';
+      const cb = b.client?.name ?? '';
+      const cmp = ca.localeCompare(cb);
+      return cmp !== 0 ? cmp : a.name.localeCompare(b.name);
+    });
+
+  const visibleProjects = sortByClient(
+    showArchived ? projects : projects.filter((p) => p.status !== 'ARCHIVED'),
+  );
 
   const archivedCount = projects.filter((p) => p.status === 'ARCHIVED').length;
 
@@ -347,6 +357,11 @@ export default function ProjectsPage() {
                   }}
                 >
                   <Box sx={{ flex: 1, mr: 1 }}>
+                    {project.client && (
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                        {project.client.name}
+                      </Typography>
+                    )}
                     <Typography
                       variant="h4"
                       sx={{
@@ -358,11 +373,6 @@ export default function ProjectsPage() {
                     >
                       {project.name}
                     </Typography>
-                    {project.client && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                        ({project.client.name})
-                      </Typography>
-                    )}
                   </Box>
                   <Chip
                     label={STATUS_LABEL[project.status] ?? project.status}
@@ -468,11 +478,13 @@ export default function ProjectsPage() {
                   <MenuItem value="">
                     <em>None</em>
                   </MenuItem>
-                  {clients.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
+                  {[...clients]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
                 </Select>
               </FormControl>
               <TextField

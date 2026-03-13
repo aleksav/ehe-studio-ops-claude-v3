@@ -287,11 +287,16 @@ export default function TimeLoggingPage() {
                   setSuccessMsg(null);
                 }}
               >
-                {projects
-                  .filter((p) => p.status !== 'ARCHIVED')
+                {[...projects.filter((p) => p.status !== 'ARCHIVED')]
+                  .sort((a, b) => {
+                    const ca = a.client?.name ?? '';
+                    const cb = b.client?.name ?? '';
+                    const cmp = ca.localeCompare(cb);
+                    return cmp !== 0 ? cmp : a.name.localeCompare(b.name);
+                  })
                   .map((p) => (
                     <MenuItem key={p.id} value={p.id}>
-                      {p.client ? `${p.name} (${p.client.name})` : p.name}
+                      {p.client ? `${p.client.name} — ${p.name}` : p.name}
                       {p.status !== 'ACTIVE' && (
                         <Chip
                           label={p.status}
@@ -317,7 +322,7 @@ export default function TimeLoggingPage() {
             <Typography variant="h4" sx={{ mb: 2.5, fontWeight: 600 }}>
               Log Time
               {selectedProject
-                ? ` — ${selectedProject.name}${selectedProject.client ? ` (${selectedProject.client.name})` : ''}`
+                ? ` — ${selectedProject.client ? `${selectedProject.client.name} — ` : ''}${selectedProject.name}`
                 : ''}
             </Typography>
 

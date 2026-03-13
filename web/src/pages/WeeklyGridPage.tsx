@@ -456,9 +456,14 @@ export default function WeeklyGridPage() {
   }
 
   // Unselected projects for the add-project dropdown
-  const availableProjects = allProjects.filter(
-    (p) => p.status !== 'ARCHIVED' && !selectedProjectIds.includes(p.id),
-  );
+  const availableProjects = [
+    ...allProjects.filter((p) => p.status !== 'ARCHIVED' && !selectedProjectIds.includes(p.id)),
+  ].sort((a, b) => {
+    const ca = a.client?.name ?? '';
+    const cb = b.client?.name ?? '';
+    const cmp = ca.localeCompare(cb);
+    return cmp !== 0 ? cmp : a.name.localeCompare(b.name);
+  });
   const projectMap = useMemo(() => {
     const m = new Map<string, Project>();
     for (const p of allProjects) m.set(p.id, p);
@@ -518,7 +523,7 @@ export default function WeeklyGridPage() {
           >
             {availableProjects.map((p) => (
               <MenuItem key={p.id} value={p.id}>
-                {p.client ? `${p.name} (${p.client.name})` : p.name}
+                {p.client ? `${p.client.name} — ${p.name}` : p.name}
               </MenuItem>
             ))}
           </Select>
@@ -612,7 +617,7 @@ export default function WeeklyGridPage() {
                     >
                       {project
                         ? project.client
-                          ? `${project.name} (${project.client.name})`
+                          ? `${project.client.name} — ${project.name}`
                           : project.name
                         : pid}
                     </TableCell>

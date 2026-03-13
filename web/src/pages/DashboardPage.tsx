@@ -77,8 +77,19 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatProjectName(project: Project): string {
-  return project.client ? `${project.name} (${project.client.name})` : project.name;
+function formatProjectName(project: { name: string; client?: { name: string } | null }): string {
+  return project.client ? `${project.client.name} — ${project.name}` : project.name;
+}
+
+function sortProjects<T extends { name: string; client?: { name: string } | null }>(
+  list: T[],
+): T[] {
+  return [...list].sort((a, b) => {
+    const ca = a.client?.name ?? '';
+    const cb = b.client?.name ?? '';
+    const cmp = ca.localeCompare(cb);
+    return cmp !== 0 ? cmp : a.name.localeCompare(b.name);
+  });
 }
 
 function formatDate(iso: string): string {
@@ -590,20 +601,18 @@ export default function DashboardPage() {
                 label="Select project"
                 onChange={(e: SelectChangeEvent) => setSelectedProjectId(e.target.value)}
               >
-                {projects
-                  .filter((p) => p.status !== 'ARCHIVED')
-                  .map((p) => (
-                    <MenuItem key={p.id} value={p.id}>
-                      {formatProjectName(p)}
-                      {p.status !== 'ACTIVE' && (
-                        <Chip
-                          label={p.status}
-                          size="small"
-                          sx={{ ml: 1, height: 20, fontSize: 11 }}
-                        />
-                      )}
-                    </MenuItem>
-                  ))}
+                {sortProjects(projects.filter((p) => p.status !== 'ARCHIVED')).map((p) => (
+                  <MenuItem key={p.id} value={p.id}>
+                    {formatProjectName(p)}
+                    {p.status !== 'ACTIVE' && (
+                      <Chip
+                        label={p.status}
+                        size="small"
+                        sx={{ ml: 1, height: 20, fontSize: 11 }}
+                      />
+                    )}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           )}
