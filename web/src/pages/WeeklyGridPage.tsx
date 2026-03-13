@@ -230,8 +230,12 @@ export default function WeeklyGridPage() {
   const weekParam = searchParams.get('week');
   const currentWeekStart = useMemo(() => {
     if (weekParam) {
-      const parsed = parseISOWeekString(weekParam);
-      if (parsed) return startOfISOWeek(parsed);
+      // Support ISO week format (e.g. 2026-W10)
+      const parsedWeek = parseISOWeekString(weekParam);
+      if (parsedWeek) return startOfISOWeek(parsedWeek);
+      // Support date format (e.g. 2026-03-02) — navigate to the week containing that date
+      const parsedDate = parseISO(weekParam);
+      if (!isNaN(parsedDate.getTime())) return startOfISOWeek(parsedDate);
     }
     return startOfISOWeek(new Date());
   }, [weekParam]);
