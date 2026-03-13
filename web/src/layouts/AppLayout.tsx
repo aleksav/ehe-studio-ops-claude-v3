@@ -26,6 +26,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ForumIcon from '@mui/icons-material/Forum';
 import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import BusinessIcon from '@mui/icons-material/Business';
+import HistoryIcon from '@mui/icons-material/History';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -45,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
   { label: 'Weekly Grid', path: '/weekly-grid', icon: <CalendarViewWeekIcon /> },
   { label: 'Standup', path: '/standup', icon: <ForumIcon /> },
+  { label: 'Audit Log', path: '/audit-log', icon: <HistoryIcon /> },
 ];
 
 export default function AppLayout() {
