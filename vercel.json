@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run --workspace=web build",
   "outputDirectory": "web/dist",
-  "installCommand": "mkdir -p api && echo '{\"name\":\"@ehestudio-ops/api\",\"version\":\"0.0.1\",\"private\":true}' > api/package.json && npm ci",
+  "installCommand": "mkdir -p api && echo '{\"name\":\"@ehestudio-ops/api\",\"version\":\"0.0.1\",\"private\":true}' > api/package.json && mkdir -p mobile && echo '{\"name\":\"@ehestudio-ops/mobile\",\"version\":\"0.0.1\",\"private\":true}' > mobile/package.json && npm install",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
