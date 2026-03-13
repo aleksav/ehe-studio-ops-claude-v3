@@ -328,7 +328,7 @@ test.describe('Demo Recording', () => {
     // ------------------------------------------------------------------
     // 13. Standup
     // ------------------------------------------------------------------
-    await subtitle(page, 'The Standup board helps run daily standups with task status at a glance');
+    await subtitle(page, 'The Standup carousel guides the team through each project one at a time');
     await page.waitForTimeout(800);
 
     await page.locator('.MuiDrawer-root').getByText('Standup', { exact: true }).click();
@@ -336,14 +336,41 @@ test.describe('Demo Recording', () => {
     await expect(page.getByRole('heading', { name: /standup/i })).toBeVisible();
     await page.waitForTimeout(1000);
 
-    // Select a project to show the kanban board
-    await page.getByRole('combobox', { name: /select project/i }).click();
-    await page.waitForTimeout(500);
-    await expect(page.getByRole('option').first()).toBeVisible({
-      timeout: 10000,
-    });
-    await page.getByRole('option').first().click();
-    await page.waitForTimeout(2500);
+    // The carousel auto-loads the first active project — wait for the daily prompt and project name
+    await expect(page.getByText(/Project 1 of/)).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1500);
+
+    // Show the kanban board for the first project
+    await expect(page.getByText('TODO').first()).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(2000);
+
+    // Click the Next arrow to advance to the next project
+    const nextButton = page.locator('button:has([data-testid="ArrowForwardIosIcon"])');
+    if (await nextButton.isEnabled()) {
+      await subtitle(page, 'Clicking through projects — each one shows its own task board');
+      await page.waitForTimeout(800);
+      await nextButton.click();
+      await page.waitForTimeout(1500);
+
+      // Wait for the next project's board to render
+      await expect(page.getByText(/Project 2 of/)).toBeVisible({ timeout: 5000 });
+      await page.waitForTimeout(2000);
+
+      // Advance once more if possible
+      if (await nextButton.isEnabled()) {
+        await nextButton.click();
+        await page.waitForTimeout(1500);
+        await expect(page.getByText(/Project 3 of/)).toBeVisible({ timeout: 5000 });
+        await page.waitForTimeout(1500);
+      }
+    }
+
+    // Check for the "Up next" teaser beside the next arrow
+    const upNext = page.getByText('Up next');
+    if (await upNext.isVisible()) {
+      await page.waitForTimeout(1000);
+    }
+    await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
     // 14. Audit Log
