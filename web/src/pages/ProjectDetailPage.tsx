@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -8,6 +8,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -19,12 +20,18 @@ import {
   Select,
   Snackbar,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +57,7 @@ interface Project {
 interface Task {
   id: string;
   project_id: string;
+  milestone_id: string | null;
   description: string;
   status: string;
   is_stale?: boolean;
@@ -120,6 +128,10 @@ const BUDGET_LABEL: Record<string, string> = {
   CAPPED: 'Capped',
   TRACKED_ONLY: 'Tracked Only',
 };
+
+type BoardView = 'board' | 'milestones';
+
+const VIEW_STORAGE_KEY = 'project-detail-board-view';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -245,6 +257,83 @@ function KanbanColumn({
 }
 
 // ---------------------------------------------------------------------------
+// Milestone Swimlane Component
+// ---------------------------------------------------------------------------
+
+interface SwimlaneData {
+  id: string | null;
+  name: string;
+  due_date: string | null;
+  is_overdue?: boolean;
+  tasks: Task[];
+}
+
+function MilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const todoTasks = swimlane.tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = swimlane.tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = swimlane.tasks.filter((t) => t.status === 'DONE');
+  const totalCount = todoTasks.length + inProgressTasks.length + doneTasks.length;
+
+  return (
+    <Box sx={{ mb: 3 }}>
+      {/* Swimlane Header */}
+      <Box
+        onClick={() => setExpanded(!expanded)}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          p: 1.5,
+          borderLeft: '4px solid #E91E63',
+          borderRadius: 1,
+          bgcolor: 'grey.50',
+          cursor: 'pointer',
+          userSelect: 'none',
+          '&:hover': { bgcolor: 'grey.100' },
+        }}
+      >
+        {expanded ? (
+          <ExpandLessIcon fontSize="small" color="action" />
+        ) : (
+          <ExpandMoreIcon fontSize="small" color="action" />
+        )}
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          {swimlane.name}
+        </Typography>
+        {swimlane.due_date && (
+          <Typography variant="body2" color="text.secondary">
+            Due {new Date(swimlane.due_date).toLocaleDateString()}
+          </Typography>
+        )}
+        {swimlane.is_overdue && (
+          <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
+        )}
+        <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
+      </Box>
+
+      {/* Swimlane Content */}
+      <Collapse in={expanded}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 3,
+            mt: 2,
+            pl: 2,
+          }}
+        >
+          <KanbanColumn title="TODO" tasks={todoTasks} color="default" />
+          <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
+          <KanbanColumn title="Done" tasks={doneTasks} color="success" />
+        </Box>
+      </Collapse>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -260,6 +349,19 @@ export default function ProjectDetailPage() {
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
+
+  // Board view toggle
+  const [boardView, setBoardView] = useState<BoardView>(() => {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+    return stored === 'milestones' ? 'milestones' : 'board';
+  });
+
+  const handleViewChange = (_: React.MouseEvent<HTMLElement>, newView: BoardView | null) => {
+    if (newView !== null) {
+      setBoardView(newView);
+      localStorage.setItem(VIEW_STORAGE_KEY, newView);
+    }
+  };
 
   // Add task dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -324,6 +426,41 @@ export default function ProjectDetailPage() {
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter((t) => t.status === 'DONE');
   const cancelledCount = tasks.filter((t) => t.status === 'CANCELLED').length;
+
+  // ---- Milestone swimlane data ----
+  const swimlanes = useMemo<SwimlaneData[]>(() => {
+    // Sort milestones by due_date ASC, NULLS LAST
+    const sorted = [...milestones].sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
+
+    const activeTasks = tasks.filter((t) => t.status !== 'CANCELLED');
+
+    const lanes: SwimlaneData[] = sorted.map((m) => ({
+      id: m.id,
+      name: m.name,
+      due_date: m.due_date,
+      is_overdue: m.is_overdue,
+      tasks: activeTasks.filter((t) => t.milestone_id === m.id),
+    }));
+
+    // "No Milestone" swimlane at the bottom
+    const unassigned = activeTasks.filter((t) => !t.milestone_id);
+    if (unassigned.length > 0 || lanes.length > 0) {
+      lanes.push({
+        id: null,
+        name: 'No Milestone',
+        due_date: null,
+        is_overdue: false,
+        tasks: unassigned,
+      });
+    }
+
+    return lanes;
+  }, [tasks, milestones]);
 
   // ---- Create task ----
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -630,12 +767,26 @@ export default function ProjectDetailPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
           mb: 3,
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          Tasks
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
+            Tasks
+          </Typography>
+          <ToggleButtonGroup value={boardView} exclusive onChange={handleViewChange} size="small">
+            <ToggleButton value="board">
+              <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
+              Board
+            </ToggleButton>
+            <ToggleButton value="milestones">
+              <ViewStreamIcon sx={{ mr: 0.5, fontSize: 18 }} />
+              Milestones
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
           Add Task
         </Button>
@@ -646,7 +797,7 @@ export default function ProjectDetailPage() {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress size={24} />
         </Box>
-      ) : (
+      ) : boardView === 'board' ? (
         <>
           <Box
             sx={{
@@ -659,6 +810,17 @@ export default function ProjectDetailPage() {
             <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
             <KanbanColumn title="Done" tasks={doneTasks} color="success" />
           </Box>
+          {cancelledCount > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
+            </Typography>
+          )}
+        </>
+      ) : (
+        <>
+          {swimlanes.map((lane) => (
+            <MilestoneSwimlane key={lane.id ?? '__none__'} swimlane={lane} />
+          ))}
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
