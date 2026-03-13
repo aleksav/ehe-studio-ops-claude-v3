@@ -126,6 +126,9 @@ test.describe('Log Time Modal', () => {
     await expect(page.getByRole('option', { name: /alice chen/i })).toBeVisible({ timeout: 10000 });
     await page.getByRole('option', { name: /alice chen/i }).click();
 
+    // Set date to a past date with no existing entries to avoid daily cap
+    await page.getByLabel('Date').fill('2023-01-02');
+
     // Fill hours
     await page.getByLabel('Hours').click();
     await page.getByLabel('Hours').fill('2');

@@ -287,18 +287,20 @@ export default function TimeLoggingPage() {
                   setSuccessMsg(null);
                 }}
               >
-                {projects.map((p) => (
-                  <MenuItem key={p.id} value={p.id}>
-                    {p.client ? `${p.client.name} / ${p.name}` : p.name}
-                    {p.status !== 'ACTIVE' && (
-                      <Chip
-                        label={p.status}
-                        size="small"
-                        sx={{ ml: 1, height: 20, fontSize: 11 }}
-                      />
-                    )}
-                  </MenuItem>
-                ))}
+                {projects
+                  .filter((p) => p.status !== 'ARCHIVED')
+                  .map((p) => (
+                    <MenuItem key={p.id} value={p.id}>
+                      {p.client ? `${p.client.name} / ${p.name}` : p.name}
+                      {p.status !== 'ACTIVE' && (
+                        <Chip
+                          label={p.status}
+                          size="small"
+                          sx={{ ml: 1, height: 20, fontSize: 11 }}
+                        />
+                      )}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
           )}

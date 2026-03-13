@@ -449,7 +449,9 @@ export default function WeeklyGridPage() {
   }
 
   // Unselected projects for the add-project dropdown
-  const availableProjects = allProjects.filter((p) => !selectedProjectIds.includes(p.id));
+  const availableProjects = allProjects.filter(
+    (p) => p.status !== 'ARCHIVED' && !selectedProjectIds.includes(p.id),
+  );
   const projectMap = useMemo(() => {
     const m = new Map<string, Project>();
     for (const p of allProjects) m.set(p.id, p);

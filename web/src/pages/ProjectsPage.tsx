@@ -23,6 +23,9 @@ import type { SelectChangeEvent } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ArchiveIcon from '@mui/icons-material/Archive';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -114,6 +117,7 @@ function formatBudgetType(value: string | null): string | null {
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -230,7 +234,24 @@ export default function ProjectsPage() {
     }
   };
 
+  // ---- Unarchive ----
+  const handleUnarchive = async (project: Project) => {
+    try {
+      await api.put(`/api/projects/${project.id}`, { status: 'PLANNED' });
+      showSnackbar(`"${project.name}" restored.`);
+      await fetchProjects();
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    }
+  };
+
   const showBudgetFields = form.budget_type === 'CAPPED' || form.budget_type === 'TRACKED_ONLY';
+
+  const visibleProjects = showArchived ? projects : projects.filter((p) => p.status !== 'ARCHIVED');
+
+  const archivedCount = projects.filter((p) => p.status === 'ARCHIVED').length;
 
   return (
     <Box sx={{ p: { xs: 2, sm: 4 } }}>
@@ -249,15 +270,30 @@ export default function ProjectsPage() {
           New Project
         </Button>
       </Box>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        All studio projects at a glance.
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+        <Typography variant="body1" color="text.secondary">
+          All studio projects at a glance.
+        </Typography>
+        {archivedCount > 0 && (
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />
+            }
+            label={`Show archived (${archivedCount})`}
+            slotProps={{ typography: { variant: 'body2', color: 'text.secondary' } }}
+          />
+        )}
+      </Box>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress size={28} />
         </Box>
-      ) : projects.length === 0 ? (
+      ) : visibleProjects.length === 0 ? (
         <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
           <CardContent sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
@@ -277,7 +313,7 @@ export default function ProjectsPage() {
             gap: 3,
           }}
         >
-          {projects.map((project) => (
+          {visibleProjects.map((project) => (
             <Card
               key={project.id}
               elevation={0}
@@ -352,7 +388,16 @@ export default function ProjectsPage() {
                   >
                     Edit
                   </Button>
-                  {project.status !== 'ARCHIVED' && (
+                  {project.status === 'ARCHIVED' ? (
+                    <Button
+                      size="small"
+                      color="info"
+                      startIcon={<UnarchiveIcon />}
+                      onClick={() => handleUnarchive(project)}
+                    >
+                      Unarchive
+                    </Button>
+                  ) : (
                     <Button
                       size="small"
                       color="warning"
