@@ -487,12 +487,12 @@ export default function DashboardPage() {
           mb: 4,
         }}
       >
-        <SummaryCard label="My Hours This Week" value={myHoursThisWeek} loading={myHoursLoading} />
         <SummaryCard
           label="My Active Projects"
           value={myActiveProjects}
           loading={myActiveProjectsLoading}
         />
+        <SummaryCard label="My Hours This Week" value={myHoursThisWeek} loading={myHoursLoading} />
         <SummaryCard label="My Open Tasks" value={myOpenTaskCount} loading={myOpenTasksLoading} />
       </Box>
 
