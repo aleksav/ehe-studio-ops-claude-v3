@@ -219,6 +219,7 @@ export default function ProjectDetailPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   // Add task dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -242,6 +243,7 @@ export default function ProjectDetailPage() {
     if (!id) return;
     try {
       const [projects, projectTasks, timeEntries] = await Promise.all([
+        // TODO: use single-project endpoint when available
         api.get<Project[]>('/api/projects'),
         api.get<Task[]>(`/api/projects/${id}/tasks`),
         api.get<TimeEntry[]>(`/api/time-entries?project_id=${id}`),
@@ -268,6 +270,7 @@ export default function ProjectDetailPage() {
   const todoTasks = tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter((t) => t.status === 'DONE');
+  const cancelledCount = tasks.filter((t) => t.status === 'CANCELLED').length;
 
   // ---- Create task ----
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -285,8 +288,13 @@ export default function ProjectDetailPage() {
       setTaskDescription('');
       setTaskStatus('TODO');
       // Refresh tasks
-      const updatedTasks = await api.get<Task[]>(`/api/projects/${id}/tasks`);
-      setTasks(updatedTasks);
+      setTasksLoading(true);
+      try {
+        const updatedTasks = await api.get<Task[]>(`/api/projects/${id}/tasks`);
+        setTasks(updatedTasks);
+      } finally {
+        setTasksLoading(false);
+      }
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
@@ -347,6 +355,13 @@ export default function ProjectDetailPage() {
           sx={{ fontSize: 13, height: 28 }}
         />
       </Box>
+
+      {/* ---- Project Description ---- */}
+      {project.description && (
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          {project.description}
+        </Typography>
+      )}
 
       {/* ---- Stats row ---- */}
       <Box
@@ -435,17 +450,30 @@ export default function ProjectDetailPage() {
       </Box>
 
       {/* ---- Kanban Board ---- */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          gap: 3,
-        }}
-      >
-        <KanbanColumn title="TODO" tasks={todoTasks} color="default" />
-        <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
-        <KanbanColumn title="Done" tasks={doneTasks} color="success" />
-      </Box>
+      {tasksLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : (
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 3,
+            }}
+          >
+            <KanbanColumn title="TODO" tasks={todoTasks} color="default" />
+            <KanbanColumn title="In Progress" tasks={inProgressTasks} color="info" />
+            <KanbanColumn title="Done" tasks={doneTasks} color="success" />
+          </Box>
+          {cancelledCount > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
+            </Typography>
+          )}
+        </>
+      )}
 
       {/* ---- Add Task Dialog ---- */}
       <Dialog
