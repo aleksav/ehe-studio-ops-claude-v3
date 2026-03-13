@@ -5,6 +5,11 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
@@ -103,6 +108,44 @@ const LS_KEY_TASK_TYPES = 'weeklyGrid:taskTypes';
 
 const DAILY_WARN_THRESHOLD = 8;
 const DAILY_BLOCK_THRESHOLD = 12;
+
+// ---------------------------------------------------------------------------
+// UK Bank Holidays (England & Wales)
+// TODO: fetch from https://www.gov.uk/bank-holidays.json
+// ---------------------------------------------------------------------------
+
+const UK_BANK_HOLIDAYS: Set<string> = new Set([
+  // 2025
+  '2025-01-01', // New Year's Day
+  '2025-04-18', // Good Friday
+  '2025-04-21', // Easter Monday
+  '2025-05-05', // Early May bank holiday
+  '2025-05-26', // Spring bank holiday
+  '2025-08-25', // Summer bank holiday
+  '2025-12-25', // Christmas Day
+  '2025-12-26', // Boxing Day
+  // 2026
+  '2026-01-01', // New Year's Day
+  '2026-04-03', // Good Friday
+  '2026-04-06', // Easter Monday
+  '2026-05-04', // Early May bank holiday
+  '2026-05-25', // Spring bank holiday
+  '2026-08-31', // Summer bank holiday
+  '2026-12-25', // Christmas Day
+  '2026-12-28', // Boxing Day (substitute)
+]);
+
+/**
+ * Returns 'weekend' | 'holiday' | null indicating whether the given ISO date
+ * string falls on a blocked date.
+ */
+function isBlockedDate(dateStr: string): 'weekend' | 'holiday' | null {
+  const d = parseISO(dateStr);
+  const day = d.getDay();
+  if (day === 0 || day === 6) return 'weekend';
+  if (UK_BANK_HOLIDAYS.has(dateStr)) return 'holiday';
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // ISO week helpers
@@ -222,6 +265,16 @@ export default function WeeklyGridPage() {
   const [cells, setCells] = useState<Record<string, CellData>>({});
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ---- Weekend / holiday override state ----
+  const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
+  const [blockDialog, setBlockDialog] = useState<{
+    open: boolean;
+    dateStr: string;
+    projectId: string;
+    reason: 'weekend' | 'holiday';
+  }>({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+  const [pendingFocusCellKey, setPendingFocusCellKey] = useState<string | null>(null);
 
   // ---- Fetch all projects ----
   useEffect(() => {
@@ -368,6 +421,10 @@ export default function WeeklyGridPage() {
         return;
       }
 
+      // Check weekend / bank holiday block before daily threshold
+      const blockReason = isBlockedDate(dateStr);
+      if (blockReason && !unblockedDates.has(dateStr)) return;
+
       // Check daily limit
       const dailyTotal = computeDailyTotal(dateStr);
       if (dailyTotal >= DAILY_BLOCK_THRESHOLD) return;
@@ -410,8 +467,55 @@ export default function WeeklyGridPage() {
         setErrorMsg('Failed to save entry. Please try again.');
       }
     },
-    [teamMemberId, cells],
+    [teamMemberId, cells, unblockedDates],
   );
+
+  // ---- Block dialog handlers ----
+  const handleBlockDialogConfirm = useCallback(() => {
+    const { dateStr, projectId } = blockDialog;
+    setUnblockedDates((prev) => {
+      const next = new Set(prev);
+      next.add(dateStr);
+      return next;
+    });
+    setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+    if (dateStr && projectId) {
+      setPendingFocusCellKey(cellKey(projectId, dateStr));
+    }
+  }, [blockDialog]);
+
+  const handleBlockDialogCancel = useCallback(() => {
+    setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+  }, []);
+
+  /**
+   * Returns true if the date is blocked (weekend/holiday and not yet unblocked).
+   * When true, shows the confirmation dialog instead of allowing editing.
+   */
+  const interceptBlockedFocus = useCallback(
+    (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
+      const blockReason = isBlockedDate(dateStr);
+      if (blockReason && !unblockedDates.has(dateStr)) {
+        e.preventDefault();
+        (e.target as HTMLElement).blur?.();
+        setBlockDialog({ open: true, dateStr, projectId, reason: blockReason });
+        return true;
+      }
+      return false;
+    },
+    [unblockedDates],
+  );
+
+  // ---- Auto-focus cell after unblocking ----
+  useEffect(() => {
+    if (!pendingFocusCellKey) return;
+    const key = pendingFocusCellKey;
+    setPendingFocusCellKey(null);
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(`input[data-cell-key="${key}"]`);
+      input?.focus();
+    }, 50);
+  }, [pendingFocusCellKey]);
 
   // ---- Computed totals ----
   const computeRowTotal = useCallback(
@@ -575,13 +679,15 @@ export default function WeeklyGridPage() {
                 {weekDates.map((d, i) => {
                   const ds = dateKey(d);
                   const dt = computeDailyTotal(ds);
+                  const blockReason = isBlockedDate(ds);
+                  const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                   return (
                     <TableCell
                       key={ds}
                       align="center"
                       sx={{
                         fontWeight: 600,
-                        bgcolor: dailyTotalBg(dt),
+                        bgcolor: isDateBlocked ? '#F0F0F0' : dailyTotalBg(dt),
                         minWidth: 100,
                       }}
                     >
@@ -590,6 +696,15 @@ export default function WeeklyGridPage() {
                       <Typography variant="caption" color="text.secondary">
                         {format(d, 'MMM d')}
                       </Typography>
+                      {blockReason && (
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          sx={{ fontSize: 9, color: 'text.disabled' }}
+                        >
+                          {blockReason === 'weekend' ? '(Weekend)' : '(Holiday)'}
+                        </Typography>
+                      )}
                     </TableCell>
                   );
                 })}
@@ -626,22 +741,39 @@ export default function WeeklyGridPage() {
                       const ck = cellKey(pid, ds);
                       const cell = cells[ck];
                       const dt = computeDailyTotal(ds);
-                      const blocked = dt >= DAILY_BLOCK_THRESHOLD;
+                      const dailyBlocked = dt >= DAILY_BLOCK_THRESHOLD;
+                      const blockReason = isBlockedDate(ds);
+                      const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
+                      const hasValue = parseFloat(cell?.hours ?? '0') > 0;
+                      const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
                       return (
                         <TableCell
                           key={ds}
                           align="center"
-                          sx={{ bgcolor: dailyTotalBg(dt), p: 0.5 }}
+                          sx={{
+                            bgcolor: dateBlocked ? '#F0F0F0' : dailyTotalBg(dt),
+                            p: 0.5,
+                            ...(dateBlocked && { color: 'text.disabled' }),
+                          }}
                         >
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             <TextField
                               size="small"
                               type="number"
-                              inputProps={{ min: 0, max: 24, step: 0.25 }}
+                              inputProps={{
+                                min: 0,
+                                max: 24,
+                                step: 0.25,
+                                'data-cell-key': ck,
+                              }}
                               value={cell?.hours ?? ''}
                               onChange={(e) => handleHoursChange(ck, e.target.value)}
                               onBlur={() => void handleCellBlur(pid, ds)}
-                              disabled={blocked && !(parseFloat(cell?.hours ?? '0') > 0)}
+                              onFocus={(e) => interceptBlockedFocus(ds, pid, e)}
+                              onClick={(e) => {
+                                if (dateBlocked) interceptBlockedFocus(ds, pid, e);
+                              }}
+                              disabled={isDisabled}
                               sx={{
                                 '& .MuiInputBase-input': {
                                   textAlign: 'center',
@@ -742,11 +874,16 @@ export default function WeeklyGridPage() {
                 {weekDates.map((d) => {
                   const ds = dateKey(d);
                   const dt = computeDailyTotal(ds);
+                  const footerBlockReason = isBlockedDate(ds);
+                  const footerDateBlocked = footerBlockReason !== null && !unblockedDates.has(ds);
                   return (
                     <TableCell
                       key={ds}
                       align="center"
-                      sx={{ fontWeight: 600, bgcolor: dailyTotalBg(dt) }}
+                      sx={{
+                        fontWeight: 600,
+                        bgcolor: footerDateBlocked ? '#F0F0F0' : dailyTotalBg(dt),
+                      }}
                     >
                       {dt > 0 ? dt.toFixed(1) : '-'}
                       {dt >= DAILY_BLOCK_THRESHOLD && (
@@ -771,6 +908,23 @@ export default function WeeklyGridPage() {
           </Table>
         </TableContainer>
       )}
+
+      {/* ---- Weekend / holiday confirmation dialog ---- */}
+      <Dialog open={blockDialog.open} onClose={handleBlockDialogCancel}>
+        <DialogTitle>Blocked Date</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This date is a {blockDialog.reason === 'weekend' ? 'weekend' : 'bank holiday'}. Do you
+            still want to log time?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleBlockDialogCancel}>Cancel</Button>
+          <Button onClick={handleBlockDialogConfirm} variant="contained">
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
