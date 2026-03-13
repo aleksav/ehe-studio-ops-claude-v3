@@ -1,26 +1,11 @@
 import { Prisma } from '@prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
-export async function findAllClients(page = 1, perPage = 50) {
-  const [data, total] = await Promise.all([
-    prisma.client.findMany({
-      orderBy: { name: 'asc' },
-      include: { _count: { select: { projects: true } } },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.client.count(),
-  ]);
-
-  return {
-    data,
-    pagination: {
-      page,
-      per_page: perPage,
-      total,
-      total_pages: Math.ceil(total / perPage),
-    },
-  };
+export function findAllClients() {
+  return prisma.client.findMany({
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { projects: true } } },
+  });
 }
 
 export function findClientById(id: string, tx?: TransactionClient) {

@@ -24,8 +24,6 @@ export interface TaskListFilters {
   status?: TaskStatus;
   milestone_id?: string;
   include_cancelled?: boolean;
-  page?: number;
-  per_page?: number;
 }
 
 export async function findProjectById(projectId: string) {
@@ -45,34 +43,66 @@ export async function findTasksByProject(filters: TaskListFilters) {
     where.milestone_id = filters.milestone_id;
   }
 
-  const page = Math.max(1, filters.page ?? 1);
-  const perPage = Math.min(100, Math.max(1, filters.per_page ?? 50));
-
-  const [data, total] = await Promise.all([
-    prisma.task.findMany({
-      where,
-      include: {
-        assignments: {
-          include: { team_member: { select: { id: true, full_name: true, email: true } } },
-        },
-        milestone: { select: { id: true, name: true } },
+  return prisma.task.findMany({
+    where,
+    include: {
+      assignments: {
+        include: { team_member: { select: { id: true, full_name: true, email: true } } },
       },
-      orderBy: { created_at: 'desc' },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.task.count({ where }),
-  ]);
-
-  return {
-    data,
-    pagination: {
-      page,
-      per_page: perPage,
-      total,
-      total_pages: Math.ceil(total / perPage),
+      milestone: { select: { id: true, name: true } },
     },
-  };
+    orderBy: { created_at: 'desc' },
+  });
+}
+
+/**
+ * Compute the set of stale task IDs for a project.
+ *
+ * A task is stale when:
+ *   - status is TODO or IN_PROGRESS
+ *   - it has at least one assignee
+ *   - none of the assigned team members have a time entry on the project
+ *     within the last 5 working days (weekends excluded)
+ *
+ * The cutoff date is computed in SQL by walking backwards from today,
+ * skipping Saturdays (dow=6) and Sundays (dow=0).
+ */
+export async function findStaleTaskIds(projectId: string): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    WITH RECURSIVE working_days AS (
+      SELECT CURRENT_DATE - INTERVAL '1 day' AS d, 1 AS cnt
+      WHERE EXTRACT(DOW FROM CURRENT_DATE - INTERVAL '1 day') NOT IN (0, 6)
+      UNION ALL
+      SELECT CURRENT_DATE - INTERVAL '1 day' AS d, 0 AS cnt
+      WHERE EXTRACT(DOW FROM CURRENT_DATE - INTERVAL '1 day') IN (0, 6)
+      UNION ALL
+      SELECT d - INTERVAL '1 day',
+             CASE WHEN EXTRACT(DOW FROM d - INTERVAL '1 day') NOT IN (0, 6) THEN cnt + 1 ELSE cnt END
+      FROM working_days
+      WHERE cnt < 5
+    ),
+    cutoff AS (
+      SELECT MIN(d) AS cutoff_date FROM working_days
+    )
+    SELECT t.id
+    FROM tasks t
+    WHERE t.project_id = ${projectId}
+      AND t.status IN ('TODO', 'IN_PROGRESS')
+      AND EXISTS (
+        SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM task_assignments ta
+        JOIN time_entries te
+          ON te.team_member_id = ta.team_member_id
+         AND te.project_id = t.project_id
+         AND te.date >= (SELECT cutoff_date FROM cutoff)
+        WHERE ta.task_id = t.id
+      )
+  `);
+
+  return new Set(rows.map((r) => r.id));
 }
 
 /**

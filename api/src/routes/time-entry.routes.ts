@@ -54,7 +54,7 @@ function parseISOWeek(weekStr: string): { start: Date; end: Date } | null {
 // GET /api/time-entries
 router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { project_id, team_member_id, date_from, date_to, week, page: pageParam, per_page: perPageParam } = req.query;
+    const { project_id, team_member_id, date_from, date_to, week } = req.query;
     const where: Record<string, unknown> = {};
 
     if (project_id) {
@@ -82,32 +82,16 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
       }
     }
 
-    const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
-    const perPage = Math.min(100, Math.max(1, parseInt(perPageParam as string, 10) || 50));
-
-    const [entries, total] = await Promise.all([
-      prisma.timeEntry.findMany({
-        where,
-        include: {
-          project: { select: { id: true, name: true, status: true } },
-          team_member: { select: { id: true, full_name: true, email: true } },
-        },
-        orderBy: { date: 'desc' },
-        skip: (page - 1) * perPage,
-        take: perPage,
-      }),
-      prisma.timeEntry.count({ where }),
-    ]);
-
-    res.json({
-      data: entries,
-      pagination: {
-        page,
-        per_page: perPage,
-        total,
-        total_pages: Math.ceil(total / perPage),
+    const entries = await prisma.timeEntry.findMany({
+      where,
+      include: {
+        project: { select: { id: true, name: true, status: true } },
+        team_member: { select: { id: true, full_name: true, email: true } },
       },
+      orderBy: { date: 'desc' },
     });
+
+    res.json(entries);
   } catch (error) {
     console.error('List time entries error:', error);
     res.status(500).json({ error: 'Internal server error' });

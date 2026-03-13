@@ -14,12 +14,7 @@ import {
   buildDeleteAuditFields,
 } from './audit.service';
 
-export async function listClients(page?: number, perPage?: number) {
-  return findAllClients(
-    Math.max(1, page ?? 1),
-    Math.min(100, Math.max(1, perPage ?? 50)),
-  );
-}
+export { findAllClients as listClients };
 
 export async function getClient(id: string) {
   return findClientById(id);

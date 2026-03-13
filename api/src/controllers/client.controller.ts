@@ -42,13 +42,9 @@ const updateClientSchema = z.object({
     .transform((v) => (v === '' ? null : v)),
 });
 
-export async function list(req: AuthenticatedRequest, res: Response) {
+export async function list(_req: AuthenticatedRequest, res: Response) {
   try {
-    const { page, per_page } = req.query;
-    const clients = await listClients(
-      page ? parseInt(page as string, 10) : undefined,
-      per_page ? parseInt(per_page as string, 10) : undefined,
-    );
+    const clients = await listClients();
     res.json(clients);
   } catch (error) {
     console.error('List clients error:', error);
