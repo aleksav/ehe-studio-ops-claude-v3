@@ -159,7 +159,7 @@ export default function AuditLogPage() {
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
+          InputLabelProps={{ shrink: true }}
           sx={{ width: 160 }}
         />
 
@@ -169,7 +169,7 @@ export default function AuditLogPage() {
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
+          InputLabelProps={{ shrink: true }}
           sx={{ width: 160 }}
         />
       </Box>
