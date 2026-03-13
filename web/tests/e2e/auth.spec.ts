@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Auth flow', () => {
   const testEmail = `e2e-${Date.now()}@ehe.ai`;
-  const testPassword = 'password123';
+  const testPassword = 'Password123';
   const testName = 'E2E Test User';
 
   test('register and land on dashboard', async ({ page }) => {

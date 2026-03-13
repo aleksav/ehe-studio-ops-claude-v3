@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Log Time Modal', () => {
-  const testPassword = 'password123';
+  const testPassword = 'Password123';
 
   test.beforeEach(async ({ page }) => {
     const testEmail = `e2e-modal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@ehe.ai`;

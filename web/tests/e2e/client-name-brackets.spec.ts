@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Client name before project name', () => {
-  const testPassword = 'password123';
+  const testPassword = 'Password123';
 
   test.beforeEach(async ({ page }) => {
     const testEmail = `e2e-brackets-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@ehe.ai`;

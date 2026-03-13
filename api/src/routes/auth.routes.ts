@@ -45,6 +45,14 @@ router.post('/register', async (req: Request, res: Response) => {
       return;
     }
 
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      res.status(400).json({
+        error:
+          'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+      });
+      return;
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       res.status(409).json({ error: 'Email already registered' });

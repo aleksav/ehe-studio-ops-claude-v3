@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 
@@ -220,8 +221,8 @@ router.get('/projects', authMiddleware, async (req: AuthenticatedRequest, res: R
     // For budget spend %, aggregate spend per project in the database.
     // Join time_entries with the most recent applicable task_rate (DESC by
     // effective_from) so we pick the latest matching rate, not the earliest.
-    const spendRows = await prisma.$queryRawUnsafe<{ project_id: string; total_spend: number }[]>(
-      `
+    const spendRows = await prisma.$queryRaw<{ project_id: string; total_spend: number }[]>(
+      Prisma.sql`
       SELECT
         te.project_id,
         COALESCE(SUM((te.hours_worked / 8.0) * tr.day_rate), 0)::float AS total_spend
@@ -235,10 +236,9 @@ router.get('/projects', authMiddleware, async (req: AuthenticatedRequest, res: R
         ORDER BY r.effective_from DESC
         LIMIT 1
       ) tr ON true
-      WHERE te.project_id = ANY($1)
+      WHERE te.project_id = ANY(${projectIds})
       GROUP BY te.project_id
       `,
-      projectIds,
     );
 
     const spendMap = new Map<string, number>();
