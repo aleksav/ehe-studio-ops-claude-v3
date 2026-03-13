@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import * as projectController from '../controllers/project.controller';
+import * as budgetController from '../controllers/budget.controller';
 
 const router = Router();
 
@@ -9,6 +10,9 @@ router.get('/', authMiddleware, projectController.list);
 
 // GET /api/projects/:id
 router.get('/:id', authMiddleware, projectController.get);
+
+// GET /api/projects/:id/budget
+router.get('/:id/budget', authMiddleware, budgetController.getBudget);
 
 // POST /api/projects
 router.post('/', authMiddleware, projectController.create);

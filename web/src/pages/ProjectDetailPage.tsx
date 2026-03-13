@@ -14,6 +14,7 @@ import {
   DialogTitle,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Select,
   Snackbar,
@@ -55,6 +56,17 @@ interface Task {
 interface TimeEntry {
   id: string;
   hours_worked: string | number;
+}
+
+interface BudgetSummary {
+  project_id: string;
+  budget_type: string;
+  budget_amount: number | null;
+  currency_code: string;
+  actual_spend: number;
+  budget_remaining: number | null;
+  hours_logged: number;
+  anomalies?: { time_entry_id: string; date: string; task_type: string; hours_worked: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +230,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [totalHours, setTotalHours] = useState<number>(0);
+  const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
 
@@ -255,6 +268,17 @@ export default function ProjectDetailPage() {
 
       const hours = timeEntries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
       setTotalHours(hours);
+
+      // Fetch budget summary if project has a budget
+      const foundProject = projects.find((p) => p.id === id) ?? null;
+      if (foundProject && foundProject.budget_type && foundProject.budget_type !== 'NONE') {
+        try {
+          const budget = await api.get<BudgetSummary>(`/api/projects/${id}/budget`);
+          setBudgetSummary(budget);
+        } catch {
+          // Budget fetch is non-critical
+        }
+      }
     } catch {
       // silently fail
     } finally {
@@ -431,6 +455,119 @@ export default function ProjectDetailPage() {
           </Card>
         )}
       </Box>
+
+      {/* ---- Budget Summary ---- */}
+      {budgetSummary && (
+        <Card
+          elevation={0}
+          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Budget Summary
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr 1fr' },
+                gap: 2,
+                mb: budgetSummary.budget_type === 'CAPPED' && budgetSummary.budget_amount ? 2 : 0,
+              }}
+            >
+              {budgetSummary.budget_amount != null && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Budget
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {budgetSummary.currency_code}{' '}
+                    {budgetSummary.budget_amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Typography>
+                </Box>
+              )}
+              <Box>
+                <Typography variant="body2" color="text.secondary">
+                  Actual Spend
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {budgetSummary.currency_code}{' '}
+                  {budgetSummary.actual_spend.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Typography>
+              </Box>
+              {budgetSummary.budget_remaining != null && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Remaining
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {budgetSummary.currency_code}{' '}
+                    {budgetSummary.budget_remaining.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Typography>
+                </Box>
+              )}
+              <Box>
+                <Typography variant="body2" color="text.secondary">
+                  Hours Logged
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {budgetSummary.hours_logged.toFixed(1)}
+                </Typography>
+              </Box>
+            </Box>
+            {budgetSummary.budget_type === 'CAPPED' &&
+              budgetSummary.budget_amount != null &&
+              budgetSummary.budget_amount > 0 &&
+              (() => {
+                const spendPercent = Math.min(
+                  (budgetSummary.actual_spend / budgetSummary.budget_amount) * 100,
+                  100,
+                );
+                const barColor =
+                  spendPercent > 90 ? 'error' : spendPercent > 75 ? 'warning' : 'primary';
+                return (
+                  <Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Spend vs Budget
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {spendPercent.toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={spendPercent}
+                      color={barColor}
+                      sx={{ height: 8, borderRadius: 4 }}
+                    />
+                  </Box>
+                );
+              })()}
+            {budgetSummary.anomalies && budgetSummary.anomalies.length > 0 && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                {budgetSummary.anomalies.length} time{' '}
+                {budgetSummary.anomalies.length === 1 ? 'entry has' : 'entries have'} no matching
+                task rate and could not be costed.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ---- Kanban Header ---- */}
       <Box
