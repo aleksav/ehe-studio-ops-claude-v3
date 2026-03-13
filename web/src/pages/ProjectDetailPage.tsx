@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Card,
@@ -32,6 +33,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
+import FlagIcon from '@mui/icons-material/Flag';
+import PeopleIcon from '@mui/icons-material/People';
 import { api, ApiError } from '../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +57,24 @@ interface Project {
   client: Client | null;
 }
 
+interface TeamMemberRef {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+interface TaskAssignment {
+  id: string;
+  task_id: string;
+  team_member_id: string;
+  team_member: TeamMemberRef;
+}
+
+interface TaskMilestoneRef {
+  id: string;
+  name: string;
+}
+
 interface Task {
   id: string;
   project_id: string;
@@ -61,6 +82,8 @@ interface Task {
   description: string;
   status: string;
   is_stale?: boolean;
+  assignments?: TaskAssignment[];
+  milestone?: TaskMilestoneRef | null;
 }
 
 interface Milestone {
@@ -86,6 +109,8 @@ interface BudgetSummary {
   hours_logged: number;
   anomalies?: { time_entry_id: string; date: string; task_type: string; hours_worked: number }[];
 }
+
+type ViewMode = 'board' | 'milestones' | 'people';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -129,7 +154,7 @@ const BUDGET_LABEL: Record<string, string> = {
   TRACKED_ONLY: 'Tracked Only',
 };
 
-type BoardView = 'board' | 'milestones';
+const PERSON_HEADER_COLOR = '#1976D2';
 
 const VIEW_STORAGE_KEY = 'project-detail-board-view';
 
@@ -144,6 +169,71 @@ function formatProjectName(project: Project): string {
 function formatBudgetType(value: string | null): string | null {
   if (!value || value === 'NONE') return null;
   return BUDGET_LABEL[value] ?? value;
+}
+
+// ---------------------------------------------------------------------------
+// Task Card Component (shared between Board, Milestone, and People views)
+// ---------------------------------------------------------------------------
+
+function TaskCard({ task }: { task: Task }) {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+      }}
+    >
+      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 500,
+            mb: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
+          {task.description}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+          <Chip
+            label={TASK_STATUS_LABEL[task.status] ?? task.status}
+            size="small"
+            color={TASK_STATUS_COLOR[task.status] ?? 'default'}
+            sx={{ fontSize: 11, height: 22 }}
+          />
+          {task.is_stale && (
+            <Chip
+              icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
+              label="Stale"
+              size="small"
+              sx={{
+                fontSize: 11,
+                height: 22,
+                bgcolor: '#FFF3E0',
+                color: '#E65100',
+                '& .MuiChip-icon': { color: '#E65100' },
+              }}
+            />
+          )}
+          {task.milestone && (
+            <Chip
+              icon={<FlagIcon sx={{ fontSize: 13 }} />}
+              label={task.milestone.name}
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: 10, height: 20, '& .MuiChip-icon': { fontSize: 13 } }}
+            />
+          )}
+        </Box>
+      </CardContent>
+    </Card>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -200,56 +290,7 @@ function KanbanColumn({
             No tasks
           </Typography>
         ) : (
-          tasks.map((task) => (
-            <Card
-              key={task.id}
-              elevation={0}
-              sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 2,
-              }}
-            >
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 500,
-                    mb: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                  }}
-                >
-                  {task.description}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  <Chip
-                    label={TASK_STATUS_LABEL[task.status] ?? task.status}
-                    size="small"
-                    color={TASK_STATUS_COLOR[task.status] ?? 'default'}
-                    sx={{ fontSize: 11, height: 22 }}
-                  />
-                  {task.is_stale && (
-                    <Chip
-                      icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
-                      label="Stale"
-                      size="small"
-                      sx={{
-                        fontSize: 11,
-                        height: 22,
-                        bgcolor: '#FFF3E0',
-                        color: '#E65100',
-                        '& .MuiChip-icon': { color: '#E65100' },
-                      }}
-                    />
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-          ))
+          tasks.map((task) => <TaskCard key={task.id} task={task} />)
         )}
       </Box>
     </Box>
@@ -334,6 +375,128 @@ function MilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
 }
 
 // ---------------------------------------------------------------------------
+// People Board Row Component
+// ---------------------------------------------------------------------------
+
+interface PersonRow {
+  memberId: string | null; // null = Unassigned
+  memberName: string;
+  weeklyHours: number;
+  tasks: Task[];
+}
+
+function PeopleBoardRow({ row }: { row: PersonRow }) {
+  const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
+
+  const initial = row.memberName.charAt(0).toUpperCase();
+
+  return (
+    <Box sx={{ mb: 3 }}>
+      {/* Row header */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 1.5,
+          px: 1,
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 32,
+            height: 32,
+            fontSize: 14,
+            fontWeight: 700,
+            bgcolor: PERSON_HEADER_COLOR,
+            color: '#fff',
+          }}
+        >
+          {initial}
+        </Avatar>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: PERSON_HEADER_COLOR }}>
+          {row.memberName}
+        </Typography>
+        {row.memberId && (
+          <Chip
+            label={`${row.weeklyHours.toFixed(1)}h this week`}
+            size="small"
+            sx={{
+              fontSize: 11,
+              height: 22,
+              bgcolor: '#E3F2FD',
+              color: PERSON_HEADER_COLOR,
+              fontWeight: 600,
+            }}
+          />
+        )}
+        <Chip
+          label={`${row.tasks.length} task${row.tasks.length === 1 ? '' : 's'}`}
+          size="small"
+          sx={{ fontSize: 11, height: 22 }}
+        />
+      </Box>
+
+      {/* Three columns */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2,
+        }}
+      >
+        {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
+          const statusTasks =
+            status === 'TODO' ? todoTasks : status === 'IN_PROGRESS' ? inProgressTasks : doneTasks;
+          const bgColor =
+            status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
+          const label =
+            status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
+
+          return (
+            <Box key={status} sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, px: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                  {label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  ({statusTasks.length})
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  bgcolor: bgColor,
+                  borderRadius: 1.5,
+                  p: 1,
+                  minHeight: 60,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                }}
+              >
+                {statusTasks.length === 0 ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ textAlign: 'center', py: 1.5 }}
+                  >
+                    --
+                  </Typography>
+                ) : (
+                  statusTasks.map((task) => <TaskCard key={task.id} task={task} />)
+                )}
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -347,18 +510,20 @@ export default function ProjectDetailPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
+  const [weeklyHoursMap, setWeeklyHoursMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
 
-  // Board view toggle
-  const [boardView, setBoardView] = useState<BoardView>(() => {
+  // Board view toggle with localStorage persistence
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const stored = localStorage.getItem(VIEW_STORAGE_KEY);
-    return stored === 'milestones' ? 'milestones' : 'board';
+    if (stored === 'milestones' || stored === 'people') return stored;
+    return 'board';
   });
 
-  const handleViewChange = (_: React.MouseEvent<HTMLElement>, newView: BoardView | null) => {
+  const handleViewChange = (_: React.MouseEvent<HTMLElement>, newView: ViewMode | null) => {
     if (newView !== null) {
-      setBoardView(newView);
+      setViewMode(newView);
       localStorage.setItem(VIEW_STORAGE_KEY, newView);
     }
   };
@@ -384,18 +549,21 @@ export default function ProjectDetailPage() {
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const [projects, projectTasks, projectMilestones, timeEntries] = await Promise.all([
-        // TODO: use single-project endpoint when available
-        api.get<Project[]>('/api/projects'),
-        api.get<Task[]>(`/api/projects/${id}/tasks`),
-        api.get<Milestone[]>(`/api/projects/${id}/milestones`),
-        api.get<TimeEntry[]>(`/api/time-entries?project_id=${id}`),
-      ]);
+      const [projects, projectTasks, projectMilestones, timeEntries, weeklyHours] =
+        await Promise.all([
+          // TODO: use single-project endpoint when available
+          api.get<Project[]>('/api/projects'),
+          api.get<Task[]>(`/api/projects/${id}/tasks`),
+          api.get<Milestone[]>(`/api/projects/${id}/milestones`),
+          api.get<TimeEntry[]>(`/api/time-entries?project_id=${id}`),
+          api.get<Record<string, number>>(`/api/projects/${id}/weekly-hours`),
+        ]);
 
       const found = projects.find((p) => p.id === id) ?? null;
       setProject(found);
       setTasks(projectTasks);
       setMilestones(projectMilestones);
+      setWeeklyHoursMap(weeklyHours);
 
       const hours = timeEntries.reduce((sum, e) => sum + parseFloat(String(e.hours_worked)), 0);
       setTotalHours(hours);
@@ -461,6 +629,57 @@ export default function ProjectDetailPage() {
 
     return lanes;
   }, [tasks, milestones]);
+
+  // ---- People board rows ----
+  const personRows: PersonRow[] = useMemo(() => {
+    const memberMap = new Map<string, { member: TeamMemberRef; tasks: Task[] }>();
+    const unassignedTasks: Task[] = [];
+
+    for (const task of tasks) {
+      if (task.status === 'CANCELLED') continue;
+
+      const assignments = task.assignments ?? [];
+      if (assignments.length === 0) {
+        unassignedTasks.push(task);
+      } else {
+        for (const assignment of assignments) {
+          const memberId = assignment.team_member.id;
+          if (!memberMap.has(memberId)) {
+            memberMap.set(memberId, { member: assignment.team_member, tasks: [] });
+          }
+          memberMap.get(memberId)!.tasks.push(task);
+        }
+      }
+    }
+
+    const rows: PersonRow[] = [];
+
+    // Sort members alphabetically
+    const sortedMembers = Array.from(memberMap.entries()).sort((a, b) =>
+      a[1].member.full_name.localeCompare(b[1].member.full_name),
+    );
+
+    for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
+      rows.push({
+        memberId,
+        memberName: member.full_name,
+        weeklyHours: weeklyHoursMap[memberId] ?? 0,
+        tasks: memberTasks,
+      });
+    }
+
+    // Unassigned row at bottom
+    if (unassignedTasks.length > 0) {
+      rows.push({
+        memberId: null,
+        memberName: 'Unassigned',
+        weeklyHours: 0,
+        tasks: unassignedTasks,
+      });
+    }
+
+    return rows;
+  }, [tasks, weeklyHoursMap]);
 
   // ---- Create task ----
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -761,7 +980,7 @@ export default function ProjectDetailPage() {
         </Box>
       )}
 
-      {/* ---- Kanban Header ---- */}
+      {/* ---- Tasks Header with View Toggle ---- */}
       <Box
         sx={{
           display: 'flex',
@@ -776,14 +995,18 @@ export default function ProjectDetailPage() {
           <Typography variant="h4" sx={{ fontWeight: 600 }}>
             Tasks
           </Typography>
-          <ToggleButtonGroup value={boardView} exclusive onChange={handleViewChange} size="small">
-            <ToggleButton value="board">
+          <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} size="small">
+            <ToggleButton value="board" aria-label="Board view">
               <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
               Board
             </ToggleButton>
-            <ToggleButton value="milestones">
+            <ToggleButton value="milestones" aria-label="Milestones view">
               <ViewStreamIcon sx={{ mr: 0.5, fontSize: 18 }} />
               Milestones
+            </ToggleButton>
+            <ToggleButton value="people" aria-label="People view">
+              <PeopleIcon sx={{ mr: 0.5, fontSize: 18 }} />
+              People
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
@@ -792,12 +1015,12 @@ export default function ProjectDetailPage() {
         </Button>
       </Box>
 
-      {/* ---- Kanban Board ---- */}
+      {/* ---- Task Views ---- */}
       {tasksLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress size={24} />
         </Box>
-      ) : boardView === 'board' ? (
+      ) : viewMode === 'board' ? (
         <>
           <Box
             sx={{
@@ -816,11 +1039,26 @@ export default function ProjectDetailPage() {
             </Typography>
           )}
         </>
-      ) : (
+      ) : viewMode === 'milestones' ? (
         <>
           {swimlanes.map((lane) => (
             <MilestoneSwimlane key={lane.id ?? '__none__'} swimlane={lane} />
           ))}
+          {cancelledCount > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
+            </Typography>
+          )}
+        </>
+      ) : (
+        <>
+          {personRows.length === 0 ? (
+            <Typography variant="body1" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+              No tasks to display.
+            </Typography>
+          ) : (
+            personRows.map((row) => <PeopleBoardRow key={row.memberId ?? 'unassigned'} row={row} />)
+          )}
           {cancelledCount > 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
               {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
