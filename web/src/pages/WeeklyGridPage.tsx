@@ -89,6 +89,13 @@ const TASK_TYPE_LABELS: Record<TaskTypeValue, string> = {
   BUSINESS_SUPPORT: 'Business',
 };
 
+const TASK_TYPE_ABBR: Record<TaskTypeValue, string> = {
+  ARCHITECTURE_ENGINEERING_DIRECTION: 'A&E',
+  DESIGN_DELIVERY_RESEARCH: 'D&R',
+  DEVELOPMENT_TESTING: 'D&T',
+  BUSINESS_SUPPORT: 'Biz',
+};
+
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const LS_KEY_PROJECTS = 'weeklyGrid:projectRows';
@@ -641,25 +648,55 @@ export default function WeeklyGridPage() {
                                 mx: 'auto',
                               }}
                             />
-                            <FormControl size="small" sx={{ maxWidth: 110, mx: 'auto' }}>
-                              <Select
-                                value={cell?.taskType ?? TASK_TYPES[0]}
-                                onChange={(e: SelectChangeEvent) =>
-                                  handleTaskTypeChange(ck, pid, e.target.value)
-                                }
-                                onBlur={() => void handleCellBlur(pid, ds)}
-                                sx={{
-                                  fontSize: 11,
-                                  '& .MuiSelect-select': { py: 0.3, px: 0.5 },
-                                }}
-                              >
-                                {TASK_TYPES.map((t) => (
-                                  <MenuItem key={t} value={t} sx={{ fontSize: 12 }}>
-                                    {TASK_TYPE_LABELS[t]}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
+                            <Box
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '2px',
+                                maxWidth: 110,
+                                mx: 'auto',
+                              }}
+                            >
+                              {TASK_TYPES.map((t) => {
+                                const isSelected = (cell?.taskType ?? TASK_TYPES[0]) === t;
+                                return (
+                                  <Tooltip key={t} title={TASK_TYPE_LABELS[t]} arrow>
+                                    <Box
+                                      component="button"
+                                      type="button"
+                                      onClick={() => {
+                                        handleTaskTypeChange(ck, pid, t);
+                                        setTimeout(() => void handleCellBlur(pid, ds), 0);
+                                      }}
+                                      sx={{
+                                        border: '1px solid',
+                                        borderColor: isSelected ? 'primary.main' : 'divider',
+                                        borderRadius: 1,
+                                        bgcolor: isSelected ? 'primary.main' : 'transparent',
+                                        color: isSelected
+                                          ? 'primary.contrastText'
+                                          : 'text.secondary',
+                                        fontSize: 10,
+                                        fontWeight: isSelected ? 700 : 400,
+                                        fontFamily: 'inherit',
+                                        lineHeight: 1,
+                                        px: 0.25,
+                                        py: 0.4,
+                                        cursor: 'pointer',
+                                        textAlign: 'center',
+                                        transition: 'all 0.15s ease',
+                                        '&:hover': {
+                                          borderColor: 'primary.main',
+                                          bgcolor: isSelected ? 'primary.dark' : 'action.hover',
+                                        },
+                                      }}
+                                    >
+                                      {TASK_TYPE_ABBR[t]}
+                                    </Box>
+                                  </Tooltip>
+                                );
+                              })}
+                            </Box>
                             {cell?.saving && <CircularProgress size={12} sx={{ mx: 'auto' }} />}
                           </Box>
                         </TableCell>
