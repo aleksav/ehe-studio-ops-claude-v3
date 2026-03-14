@@ -261,10 +261,10 @@ async function main() {
   const rateMidDateMinusOne = new Date('2023-12-31');
 
   const taskTypeRates: { type: TaskType; oldRate: number; newRate: number }[] = [
-    { type: TaskType.ARCHITECTURE_ENGINEERING_DIRECTION, oldRate: 850, newRate: 900 },
-    { type: TaskType.DESIGN_DELIVERY_RESEARCH, oldRate: 650, newRate: 700 },
-    { type: TaskType.DEVELOPMENT_TESTING, oldRate: 750, newRate: 800 },
-    { type: TaskType.BUSINESS_SUPPORT, oldRate: 500, newRate: 550 },
+    { type: TaskType.ARCHITECTURE_ENGINEERING_DIRECTION, oldRate: 850, newRate: 1200 },
+    { type: TaskType.DESIGN_DELIVERY_RESEARCH, oldRate: 650, newRate: 950 },
+    { type: TaskType.DEVELOPMENT_TESTING, oldRate: 750, newRate: 650 },
+    { type: TaskType.BUSINESS_SUPPORT, oldRate: 500, newRate: 800 },
   ];
 
   for (const { type, oldRate, newRate } of taskTypeRates) {
