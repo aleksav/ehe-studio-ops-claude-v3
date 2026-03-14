@@ -522,22 +522,18 @@ export default function StandupPage() {
 
   return (
     <Box ref={containerRef} sx={{ p: { xs: 2, sm: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      {/* ---- Page Header & Daily Prompt ---- */}
-      <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
-        Standup
-      </Typography>
-      <Typography
-        variant="h6"
-        sx={{
-          fontWeight: 400,
-          color: 'primary.main',
-          fontStyle: 'italic',
-          mb: 4,
-          opacity: 0.85,
-        }}
-      >
-        {standupPrompt}
-      </Typography>
+      {/* ---- Page Header & Daily Prompt (compact) ---- */}
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          Standup
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ color: 'primary.main', fontStyle: 'italic', opacity: 0.85 }}
+        >
+          {standupPrompt}
+        </Typography>
+      </Box>
 
       {/* ---- Progress indicator ---- */}
       <Box
@@ -546,7 +542,7 @@ export default function StandupPage() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 1,
-          mb: 3,
+          mb: 2,
         }}
       >
         {carouselItems.map((item, idx) => (
@@ -578,7 +574,7 @@ export default function StandupPage() {
           />
         ))}
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 3 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 2 }}>
         {currentItem?.type === 'planned'
           ? 'Coming Up Next'
           : `Project ${currentIndex + 1} of ${activeProjects.length}`}
@@ -598,7 +594,7 @@ export default function StandupPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            pt: 12,
+            pt: 6,
             gap: 1,
             minWidth: 80,
           }}
@@ -815,7 +811,7 @@ export default function StandupPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            pt: 12,
+            pt: 6,
             gap: 1,
             minWidth: 80,
           }}
