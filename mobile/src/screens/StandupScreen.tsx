@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
+  Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api } from '../lib/api';
@@ -148,6 +150,19 @@ export default function StandupScreen() {
   const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>({});
   const [milestonesByProject, setMilestonesByProject] = useState<Record<string, Milestone[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
+  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(false);
+
+  // Load hideEmptyMilestones from AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem('standup-hide-empty-milestones').then((val) => {
+      if (val === 'true') setHideEmptyMilestones(true);
+    });
+  }, []);
+
+  const handleHideEmptyChange = (checked: boolean) => {
+    setHideEmptyMilestones(checked);
+    AsyncStorage.setItem('standup-hide-empty-milestones', String(checked));
+  };
 
   const activeProjects = useMemo(() => {
     const active = allProjects.filter((p) => p.status === 'ACTIVE');
@@ -280,6 +295,15 @@ export default function StandupScreen() {
     }
     return lanes;
   }, [currentProject, currentTasks, currentMilestones]);
+
+  const filteredSwimlanes = useMemo(() => {
+    if (!hideEmptyMilestones) return swimlanes;
+    return swimlanes.filter((lane) => {
+      return lane.tasks.some((t) => t.status === 'IN_PROGRESS' || t.status === 'DONE');
+    });
+  }, [swimlanes, hideEmptyMilestones]);
+
+  const hiddenMilestoneCount = swimlanes.length - filteredSwimlanes.length;
 
   // ---- People rows ----
   const personRows = useMemo<PersonRow[]>(() => {
@@ -476,10 +500,23 @@ export default function StandupScreen() {
                 </ScrollView>
               ) : viewMode === 'milestones' ? (
                 <View style={styles.milestonesContainer}>
-                  {swimlanes.length === 0 ? (
+                  {/* Hide empty milestones toggle */}
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Show only active milestones</Text>
+                    <Switch
+                      value={hideEmptyMilestones}
+                      onValueChange={handleHideEmptyChange}
+                      trackColor={{ false: '#D0D0D0', true: colors.primary + '80' }}
+                      thumbColor={hideEmptyMilestones ? colors.primary : '#f4f3f4'}
+                    />
+                    {hiddenMilestoneCount > 0 && (
+                      <Text style={styles.hiddenCount}>({hiddenMilestoneCount} hidden)</Text>
+                    )}
+                  </View>
+                  {filteredSwimlanes.length === 0 ? (
                     <Text style={styles.noTasksText}>No milestones or tasks to display.</Text>
                   ) : (
-                    swimlanes.map((lane) => (
+                    filteredSwimlanes.map((lane) => (
                       <View
                         key={lane.id ?? '__none__'}
                         style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
@@ -504,21 +541,12 @@ export default function StandupScreen() {
                           <Text style={styles.noTasksText}>No tasks</Text>
                         ) : (
                           lane.tasks.map((task) => (
-                            <View key={task.id} style={styles.milestoneTaskRow}>
-                              <View
-                                style={[
-                                  styles.statusChipSmall,
-                                  { backgroundColor: TASK_STATUS_BG[task.status] ?? '#E0E0E0' },
-                                ]}
-                              >
-                                <Text style={styles.statusChipSmallText}>
-                                  {TASK_STATUS_LABEL[task.status] ?? task.status}
-                                </Text>
-                              </View>
-                              <Text style={styles.milestoneTaskText} numberOfLines={1}>
-                                {task.description}
-                              </Text>
-                            </View>
+                            <TaskCard
+                              key={task.id}
+                              title={task.description}
+                              status={task.status}
+                              assignments={task.assignments}
+                            />
                           ))
                         )}
                       </View>
@@ -549,21 +577,12 @@ export default function StandupScreen() {
                           </View>
                         </View>
                         {row.tasks.map((task) => (
-                          <View key={task.id} style={styles.milestoneTaskRow}>
-                            <View
-                              style={[
-                                styles.statusChipSmall,
-                                { backgroundColor: TASK_STATUS_BG[task.status] ?? '#E0E0E0' },
-                              ]}
-                            >
-                              <Text style={styles.statusChipSmallText}>
-                                {TASK_STATUS_LABEL[task.status] ?? task.status}
-                              </Text>
-                            </View>
-                            <Text style={styles.milestoneTaskText} numberOfLines={1}>
-                              {task.description}
-                            </Text>
-                          </View>
+                          <TaskCard
+                            key={task.id}
+                            title={task.description}
+                            status={task.status}
+                            assignments={task.assignments}
+                          />
                         ))}
                       </View>
                     ))
@@ -830,6 +849,22 @@ const styles = StyleSheet.create({
   viewToggleTextActive: {
     color: '#fff',
     fontWeight: typography.weights.semibold,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  toggleLabel: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+    flex: 1,
+  },
+  hiddenCount: {
+    fontSize: typography.sizes.caption,
+    color: '#999',
   },
   milestonesContainer: {
     paddingHorizontal: spacing.xs,
