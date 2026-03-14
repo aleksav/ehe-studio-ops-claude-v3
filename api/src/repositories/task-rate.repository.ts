@@ -1,4 +1,4 @@
-import { TaskType } from '@prisma/client';
+import { TaskType } from '../generated/prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
 export function findAllTaskRates(where: Record<string, unknown>) {

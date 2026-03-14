@@ -1,4 +1,4 @@
-import { AuditAction, ProjectStatus, Prisma } from '@prisma/client';
+import { AuditAction, ProjectStatus, Prisma } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import {
   findAllProjects,

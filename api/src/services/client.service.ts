@@ -1,4 +1,4 @@
-import { AuditAction, Prisma } from '@prisma/client';
+import { AuditAction, Prisma } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import {
   findAllClients,

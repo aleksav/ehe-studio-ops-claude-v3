@@ -1,7 +1,9 @@
-import { PrismaClient, TaskType, ProjectStatus, BudgetType, TaskStatus } from '@prisma/client';
+import { PrismaClient, TaskType, ProjectStatus, BudgetType, TaskStatus } from '../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Seeding database...');

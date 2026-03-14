@@ -298,7 +298,7 @@ function TaskCard({
         border: '1px solid',
         borderColor: 'divider',
         borderRadius: 2,
-        height: 100,
+        height: 130,
         cursor: draggable ? 'grab' : undefined,
         '&:active': draggable ? { cursor: 'grabbing' } : undefined,
         '&[draggable]:hover': draggable ? { boxShadow: 2 } : undefined,
@@ -317,8 +317,7 @@ function TaskCard({
           variant="body2"
           sx={{
             fontWeight: 500,
-            mb: 1,
-            flex: 1,
+            mb: 0.5,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: '-webkit-box',
@@ -331,12 +330,13 @@ function TaskCard({
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
+            flexDirection: 'column',
+            gap: 0.75,
+            mt: 'auto',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+          {/* Row 1: Status + Milestone chips */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minHeight: 24 }}>
             <Chip
               label={TASK_STATUS_LABEL[task.status] ?? task.status}
               size="small"
@@ -409,7 +409,8 @@ function TaskCard({
               )
             )}
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* Row 2: Assignees + action buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minHeight: 24 }}>
             {onAssignmentsChange && (
               <AssigneeAvatars
                 taskId={task.id}

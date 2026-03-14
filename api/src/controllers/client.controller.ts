@@ -7,7 +7,7 @@ import {
   updateClientService,
   deleteClientService,
 } from '../services/client.service';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { z } from 'zod';
 
 function isUniqueConstraintError(error: unknown): boolean {

@@ -71,6 +71,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: cd api && npx prisma generate
       - run: cd api && npx prisma migrate deploy
       - run: cd api && npm test
 

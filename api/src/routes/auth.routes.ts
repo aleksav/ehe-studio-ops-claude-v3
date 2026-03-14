@@ -9,7 +9,7 @@ import {
   AuthenticatedRequest,
 } from '../middleware/auth';
 import { writeAudit, buildCreateAuditFields } from '../services/audit.service';
-import { AuditAction } from '@prisma/client';
+import { AuditAction } from '../generated/prisma/client';
 
 const router = Router();
 

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { AuditAction, ProjectStatus, TaskType } from '@prisma/client';
+import { AuditAction, ProjectStatus, TaskType } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import {

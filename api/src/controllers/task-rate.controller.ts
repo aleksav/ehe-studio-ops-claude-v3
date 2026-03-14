@@ -9,7 +9,7 @@ import {
   TaskRateValidationError,
 } from '../services/task-rate.service';
 import { z } from 'zod';
-import { TaskType } from '@prisma/client';
+import { TaskType } from '../generated/prisma/client';
 
 const createTaskRateSchema = z.object({
   task_type: z.nativeEnum(TaskType),

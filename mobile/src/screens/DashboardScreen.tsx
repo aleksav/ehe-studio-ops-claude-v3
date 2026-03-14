@@ -107,6 +107,7 @@ export default function DashboardScreen() {
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [myProjectsLoading, setMyProjectsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [noHolidaysForYear, setNoHolidaysForYear] = useState(false);
 
   const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
   const myOpenTasks = useMemo(
@@ -149,6 +150,13 @@ export default function DashboardScreen() {
       setMyProjectsLoading(false);
     }
 
+    fetches.push(
+      api
+        .get<{ id: string }[]>(`/api/public-holidays?year=${new Date().getFullYear()}`)
+        .then((data) => setNoHolidaysForYear(data.length === 0))
+        .catch(() => {}),
+    );
+
     await Promise.all(fetches);
   };
 
@@ -177,6 +185,16 @@ export default function DashboardScreen() {
           <Text style={styles.logoutText}>Sign out</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Public holidays warning */}
+      {noHolidaysForYear && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>
+            No public holidays configured for {new Date().getFullYear()}. Weekly grid calculations
+            may be inaccurate. Add holidays in Admin.
+          </Text>
+        </View>
+      )}
 
       {/* Studio Overview */}
       <Text style={styles.sectionTitle}>Studio Overview</Text>
@@ -401,5 +419,17 @@ const styles = StyleSheet.create({
   budgetPct: {
     fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
+  },
+  warningBanner: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  warningText: {
+    fontSize: typography.sizes.body2,
+    color: '#E65100',
   },
 });

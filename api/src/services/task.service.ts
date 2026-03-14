@@ -1,4 +1,4 @@
-import { AuditAction, TaskStatus } from '@prisma/client';
+import { AuditAction, TaskStatus } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import {
   writeAudit,

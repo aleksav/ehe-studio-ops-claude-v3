@@ -1,4 +1,4 @@
-import { ProjectStatus, Prisma } from '@prisma/client';
+import { ProjectStatus, Prisma } from '../generated/prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
 export function findAllProjects(where: Record<string, unknown>) {

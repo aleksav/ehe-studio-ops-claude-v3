@@ -1,4 +1,4 @@
-import { Prisma, TaskStatus } from '@prisma/client';
+import { Prisma, TaskStatus } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import { TransactionClient } from '../utils/prisma';
 

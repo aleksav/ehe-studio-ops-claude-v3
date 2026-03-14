@@ -8,7 +8,7 @@ import {
   archiveProjectService,
 } from '../services/project.service';
 import { z } from 'zod';
-import { BudgetType, ProjectStatus } from '@prisma/client';
+import { BudgetType, ProjectStatus } from '../generated/prisma/client';
 
 const createProjectSchema = z.object({
   name: z.string().min(1),

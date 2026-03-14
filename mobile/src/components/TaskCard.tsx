@@ -73,8 +73,7 @@ const styles = StyleSheet.create({
     borderColor: colors.divider,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    height: 88,
-    justifyContent: 'space-between' as const,
+    minHeight: 104,
   },
   title: {
     fontSize: 14,
@@ -83,10 +82,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   footer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'row' as const,
     gap: spacing.xs,
     alignItems: 'center',
+    marginTop: spacing.sm,
   },
   statusChip: {
     paddingHorizontal: spacing.sm,

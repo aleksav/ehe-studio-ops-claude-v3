@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { startOfISOWeek, endOfISOWeek, format, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -238,6 +239,9 @@ export default function DashboardPage() {
   // Missing time warning
   const [missingTime, setMissingTime] = useState<MissingTimeData | null>(null);
 
+  // Public holidays warning
+  const [noHolidaysForYear, setNoHolidaysForYear] = useState(false);
+
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [logTimeProjectId, setLogTimeProjectId] = useState('');
@@ -453,6 +457,23 @@ export default function DashboardPage() {
     };
   }, [teamMemberId]);
 
+  // ---- Check public holidays for current year ----
+  useEffect(() => {
+    let cancelled = false;
+    const year = new Date().getFullYear();
+    (async () => {
+      try {
+        const data = await api.get<{ id: string }[]>(`/api/public-holidays?year=${year}`);
+        if (!cancelled) setNoHolidaysForYear(data.length === 0);
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ---- Fetch tasks when project selected ----
   useEffect(() => {
     if (!selectedProjectId) {
@@ -517,6 +538,28 @@ export default function DashboardPage() {
           You have {missingTime.total_missing_hours}h unlogged across{' '}
           {missingTime.missing_days.length} {missingTime.missing_days.length === 1 ? 'day' : 'days'}{' '}
           this month. Keeping your timesheet up to date helps the studio plan ahead.
+        </Alert>
+      )}
+
+      {/* ---- Public holidays warning ---- */}
+      {noHolidaysForYear && (
+        <Alert
+          severity="info"
+          icon={<WarningAmberIcon />}
+          sx={{ mb: 3, borderRadius: 2 }}
+          action={
+            <Button
+              color="info"
+              size="small"
+              onClick={() => navigate('/admin?tab=4')}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Add holidays
+            </Button>
+          }
+        >
+          No public holidays configured for {new Date().getFullYear()}. Weekly grid calculations may
+          be inaccurate.
         </Alert>
       )}
 

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { TaskStatus } from '@prisma/client';
+import { TaskStatus } from '../generated/prisma/client';
 import { AuthenticatedRequest } from '../middleware/auth';
 import {
   listTasks,

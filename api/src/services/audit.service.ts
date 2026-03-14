@@ -1,4 +1,4 @@
-import { AuditAction, Prisma } from '@prisma/client';
+import { AuditAction, Prisma } from '../generated/prisma/client';
 import { TransactionClient } from '../utils/prisma';
 
 interface AuditChangedFields {

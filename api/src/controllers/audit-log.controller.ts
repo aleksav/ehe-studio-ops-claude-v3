@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
-import { AuditAction } from '@prisma/client';
+import { AuditAction } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 
 export async function list(req: AuthenticatedRequest, res: Response) {

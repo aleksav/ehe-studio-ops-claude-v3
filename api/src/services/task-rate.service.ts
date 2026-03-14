@@ -1,4 +1,4 @@
-import { AuditAction, TaskType } from '@prisma/client';
+import { AuditAction, TaskType } from '../generated/prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 import {
   findAllTaskRates,

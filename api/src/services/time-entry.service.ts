@@ -1,5 +1,5 @@
 import prisma from '../utils/prisma';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 
 export async function getDailyHoursTotal(
   teamMemberId: string,

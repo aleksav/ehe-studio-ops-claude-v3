@@ -1,4 +1,4 @@
-import { BudgetType } from '@prisma/client';
+import { BudgetType } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 
 interface AnomalyEntry {

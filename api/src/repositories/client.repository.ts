@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import prisma, { TransactionClient } from '../utils/prisma';
 
 export function findAllClients() {
