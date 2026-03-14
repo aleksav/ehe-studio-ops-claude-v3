@@ -13,7 +13,10 @@ interface MenuItem {
   screen: keyof MoreStackParamList;
 }
 
-const MENU_ITEMS: MenuItem[] = [{ label: 'Admin', icon: 'settings-outline', screen: 'Admin' }];
+const MENU_ITEMS: MenuItem[] = [
+  { label: 'Team Calendar', icon: 'calendar-outline', screen: 'TeamCalendar' },
+  { label: 'Admin', icon: 'settings-outline', screen: 'Admin' },
+];
 
 export default function MoreScreen({ navigation }: Props) {
   return (

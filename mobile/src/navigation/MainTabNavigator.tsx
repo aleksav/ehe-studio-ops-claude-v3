@@ -11,6 +11,7 @@ import TimeLoggingScreen from '../screens/TimeLoggingScreen';
 import StandupScreen from '../screens/StandupScreen';
 import MoreScreen from '../screens/MoreScreen';
 import AdminScreen from '../screens/AdminScreen';
+import TeamCalendarScreen from '../screens/TeamCalendarScreen';
 
 import type { MainTabParamList, ProjectsStackParamList, MoreStackParamList } from './types';
 
@@ -42,6 +43,7 @@ function MoreStackNavigator() {
     <MoreStack.Navigator>
       <MoreStack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More' }} />
       <MoreStack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin' }} />
+      <MoreStack.Screen name="TeamCalendar" component={TeamCalendarScreen} options={{ title: 'Team Calendar' }} />
     </MoreStack.Navigator>
   );
 }

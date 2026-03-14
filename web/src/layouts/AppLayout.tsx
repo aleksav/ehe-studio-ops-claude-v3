@@ -23,6 +23,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ForumIcon from '@mui/icons-material/Forum';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Projects', path: '/projects', icon: <FolderIcon /> },
   { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
   { label: 'Standup', path: '/standup', icon: <ForumIcon /> },
+  { label: 'Team Calendar', path: '/team-calendar', icon: <CalendarMonthIcon /> },
   { label: 'Admin', path: '/admin', icon: <AdminPanelSettingsIcon /> },
 ];
 
