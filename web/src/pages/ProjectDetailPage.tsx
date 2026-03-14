@@ -18,12 +18,16 @@ import {
   MenuItem,
   Select,
   Snackbar,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import { api, ApiError } from '../lib/api';
 import type { Assignment } from '../components/AssigneeAvatars';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
@@ -210,6 +214,17 @@ export default function ProjectDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingMilestone, setDeletingMilestone] = useState<BoardMilestone | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // Page tab
+  const [activeTab, setActiveTab] = useState<number>(() => {
+    const stored = localStorage.getItem('project-detail-tab');
+    return stored === '1' ? 1 : 0;
+  });
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+    localStorage.setItem('project-detail-tab', String(newValue));
+  };
 
   // Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -472,269 +487,325 @@ export default function ProjectDetailPage() {
         />
       </Box>
 
-      {/* ---- Project Description ---- */}
-      {project.description && (
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          {project.description}
-        </Typography>
-      )}
-
-      {/* ---- Stats row ---- */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr 1fr',
-            sm: '1fr 1fr 1fr 1fr',
-            md: budgetLabel ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
-          },
-          gap: 2,
-          mb: 4,
-        }}
-      >
-        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              TODO
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {todoCount}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              In Progress
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
-              {inProgressCount}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              Done
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
-              {doneCount}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              Total Hours
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
-              {totalHours > 0 ? totalHours.toFixed(1) : '0'}
-            </Typography>
-          </CardContent>
-        </Card>
-        {budgetLabel && (
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Budget
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                {budgetLabel}
-                {project.budget_amount != null &&
-                  ` - ${project.currency_code ?? 'GBP'} ${Number(project.budget_amount).toLocaleString()}`}
-              </Typography>
-            </CardContent>
-          </Card>
-        )}
+      {/* ---- Page Tabs ---- */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab icon={<DashboardIcon />} iconPosition="start" label="Overview" />
+          <Tab icon={<AssignmentIcon />} iconPosition="start" label="Tasks" />
+        </Tabs>
       </Box>
 
-      {/* ---- Budget Summary ---- */}
-      {budgetSummary && (
-        <Card
-          elevation={0}
-          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              Budget Summary
+      {/* ---- Overview Tab ---- */}
+      {activeTab === 0 && (
+        <>
+          {/* ---- Project Description ---- */}
+          {project.description && (
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              {project.description}
             </Typography>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr 1fr' },
-                gap: 2,
-                mb: budgetSummary.budget_type === 'CAPPED' && budgetSummary.budget_amount ? 2 : 0,
-              }}
+          )}
+
+          {/* ---- Stats row ---- */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr 1fr',
+                sm: '1fr 1fr 1fr 1fr',
+                md: budgetLabel ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+              },
+              gap: 2,
+              mb: 4,
+            }}
+          >
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
             >
-              {budgetSummary.budget_amount != null && (
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  TODO
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {todoCount}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+            >
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  In Progress
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
+                  {inProgressCount}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+            >
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  Done
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                  {doneCount}
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+            >
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  Total Hours
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  {totalHours > 0 ? totalHours.toFixed(1) : '0'}
+                </Typography>
+              </CardContent>
+            </Card>
+            {budgetLabel && (
+              <Card
+                elevation={0}
+                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+              >
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Budget
                   </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {budgetSummary.currency_code}{' '}
-                    {budgetSummary.budget_amount.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {budgetLabel}
+                    {project.budget_amount != null &&
+                      ` - ${project.currency_code ?? 'GBP'} ${Number(project.budget_amount).toLocaleString()}`}
                   </Typography>
-                </Box>
-              )}
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Actual Spend
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+
+          {/* ---- Budget Summary ---- */}
+          {budgetSummary && (
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Budget Summary
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {budgetSummary.currency_code}{' '}
-                  {budgetSummary.actual_spend.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </Typography>
-              </Box>
-              {budgetSummary.budget_remaining != null && (
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Remaining
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {budgetSummary.currency_code}{' '}
-                    {budgetSummary.budget_remaining.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Typography>
-                </Box>
-              )}
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Hours Logged
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {budgetSummary.hours_logged.toFixed(1)}
-                </Typography>
-              </Box>
-            </Box>
-            {budgetSummary.budget_type === 'CAPPED' &&
-              budgetSummary.budget_amount != null &&
-              budgetSummary.budget_amount > 0 &&
-              (() => {
-                const spendPercent = Math.min(
-                  (budgetSummary.actual_spend / budgetSummary.budget_amount) * 100,
-                  100,
-                );
-                const barColor =
-                  spendPercent > 90 ? 'error' : spendPercent > 75 ? 'warning' : 'primary';
-                return (
-                  <Box>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        mb: 0.5,
-                      }}
-                    >
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr 1fr' },
+                    gap: 2,
+                    mb:
+                      budgetSummary.budget_type === 'CAPPED' && budgetSummary.budget_amount ? 2 : 0,
+                  }}
+                >
+                  {budgetSummary.budget_amount != null && (
+                    <Box>
                       <Typography variant="body2" color="text.secondary">
-                        Spend vs Budget
+                        Budget
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {spendPercent.toFixed(1)}%
+                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        {budgetSummary.currency_code}{' '}
+                        {budgetSummary.budget_amount.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </Typography>
                     </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={spendPercent}
-                      color={barColor}
-                      sx={{ height: 8, borderRadius: 4 }}
-                    />
+                  )}
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Actual Spend
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {budgetSummary.currency_code}{' '}
+                      {budgetSummary.actual_spend.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </Typography>
                   </Box>
-                );
-              })()}
-            {budgetSummary.anomalies && budgetSummary.anomalies.length > 0 && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                {budgetSummary.anomalies.length} time{' '}
-                {budgetSummary.anomalies.length === 1 ? 'entry has' : 'entries have'} no matching
-                task rate and could not be costed.
-              </Alert>
+                  {budgetSummary.budget_remaining != null && (
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Remaining
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        {budgetSummary.currency_code}{' '}
+                        {budgetSummary.budget_remaining.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </Typography>
+                    </Box>
+                  )}
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Hours Logged
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {budgetSummary.hours_logged.toFixed(1)}
+                    </Typography>
+                  </Box>
+                </Box>
+                {budgetSummary.budget_type === 'CAPPED' &&
+                  budgetSummary.budget_amount != null &&
+                  budgetSummary.budget_amount > 0 &&
+                  (() => {
+                    const spendPercent = Math.min(
+                      (budgetSummary.actual_spend / budgetSummary.budget_amount) * 100,
+                      100,
+                    );
+                    const barColor =
+                      spendPercent > 90 ? 'error' : spendPercent > 75 ? 'warning' : 'primary';
+                    return (
+                      <Box>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            Spend vs Budget
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {spendPercent.toFixed(1)}%
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={spendPercent}
+                          color={barColor}
+                          sx={{ height: 8, borderRadius: 4 }}
+                        />
+                      </Box>
+                    );
+                  })()}
+                {budgetSummary.anomalies && budgetSummary.anomalies.length > 0 && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    {budgetSummary.anomalies.length} time{' '}
+                    {budgetSummary.anomalies.length === 1 ? 'entry has' : 'entries have'} no
+                    matching task rate and could not be costed.
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ---- Milestones (Overview) ---- */}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                Milestones
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleOpenCreateMilestone}
+              >
+                Add Milestone
+              </Button>
+            </Box>
+            {milestones.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                {milestones.map((m) => (
+                  <Chip
+                    key={m.id}
+                    label={
+                      m.is_overdue
+                        ? `${m.name} — Overdue`
+                        : m.due_date
+                          ? `${m.name} — ${new Date(m.due_date).toLocaleDateString()}`
+                          : m.name
+                    }
+                    color={m.is_overdue ? 'error' : 'default'}
+                    variant={m.is_overdue ? 'filled' : 'outlined'}
+                    sx={{ fontSize: 13, height: 30 }}
+                  />
+                ))}
+              </Box>
             )}
-          </CardContent>
-        </Card>
+          </Box>
+
+          {/* ---- Task Summary (Overview) ---- */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+              Tasks
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {tasks.length} total — {todoCount} to do, {inProgressCount} in progress, {doneCount}{' '}
+              done{cancelledCount > 0 ? `, ${cancelledCount} cancelled` : ''}
+            </Typography>
+          </Box>
+        </>
       )}
 
-      {/* ---- Milestones ---- */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Milestones
-          </Typography>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={handleOpenCreateMilestone}
+      {/* ---- Tasks Tab ---- */}
+      {activeTab === 1 && (
+        <>
+          {/* ---- Tasks Header ---- */}
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 2,
+              mb: 3,
+            }}
           >
-            Add Milestone
-          </Button>
-        </Box>
-        {milestones.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            {milestones.map((m) => (
-              <Chip
-                key={m.id}
-                label={
-                  m.is_overdue
-                    ? `${m.name} — Overdue`
-                    : m.due_date
-                      ? `${m.name} — ${new Date(m.due_date).toLocaleDateString()}`
-                      : m.name
-                }
-                color={m.is_overdue ? 'error' : 'default'}
-                variant={m.is_overdue ? 'filled' : 'outlined'}
-                sx={{ fontSize: 13, height: 30 }}
-              />
-            ))}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleOpenCreateMilestone}
+              >
+                Add Milestone
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setDialogOpen(true)}
+              >
+                Add Task
+              </Button>
+            </Box>
           </Box>
-        )}
-      </Box>
 
-      {/* ---- Tasks Header ---- */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          Tasks
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
-          Add Task
-        </Button>
-      </Box>
-
-      {/* ---- Task Board ---- */}
-      <ProjectTaskBoard
-        tasks={tasks}
-        milestones={milestones}
-        loading={tasksLoading}
-        weeklyHoursMap={weeklyHoursMap}
-        initialViewMode={initialViewMode}
-        onViewModeChange={handleViewChange}
-        initialHideEmpty={initialHideEmpty}
-        onHideEmptyChange={handleHideEmptyChange}
-        onAssignmentsChange={handleAssignmentsChange}
-        onMilestoneChange={handleMilestoneChange}
-        onEditMilestone={handleOpenEditMilestone}
-        onDeleteMilestone={handleOpenDeleteMilestone}
-        hiddenMilestoneIds={hiddenMilestoneIds}
-        onToggleMilestoneVisibility={toggleMilestoneVisibility}
-        onShowAllMilestones={showAllMilestones}
-        cancelledCount={cancelledCount}
-      />
+          {/* ---- Task Board ---- */}
+          <ProjectTaskBoard
+            tasks={tasks}
+            milestones={milestones}
+            loading={tasksLoading}
+            weeklyHoursMap={weeklyHoursMap}
+            initialViewMode={initialViewMode}
+            onViewModeChange={handleViewChange}
+            initialHideEmpty={initialHideEmpty}
+            onHideEmptyChange={handleHideEmptyChange}
+            onAssignmentsChange={handleAssignmentsChange}
+            onMilestoneChange={handleMilestoneChange}
+            onEditMilestone={handleOpenEditMilestone}
+            onDeleteMilestone={handleOpenDeleteMilestone}
+            hiddenMilestoneIds={hiddenMilestoneIds}
+            onToggleMilestoneVisibility={toggleMilestoneVisibility}
+            onShowAllMilestones={showAllMilestones}
+            cancelledCount={cancelledCount}
+          />
+        </>
+      )}
 
       {/* ---- Add Task Dialog ---- */}
       <Dialog
