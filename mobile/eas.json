@@ -4,7 +4,7 @@
   },
   "build": {
     "base": {
-      "node": "20.19.4"
+      "node": "24.0.2"
     },
     "development": {
       "extends": "base",
