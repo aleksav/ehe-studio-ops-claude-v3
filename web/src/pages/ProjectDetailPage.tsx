@@ -461,34 +461,68 @@ export default function ProjectDetailPage() {
   const budgetLabel = formatBudgetType(project.budget_type);
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 4 } }}>
-      {/* ---- Back button ---- */}
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/projects')} sx={{ mb: 2 }}>
-        Back to Projects
-      </Button>
-
-      {/* ---- Project Header ---- */}
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+      {/* ---- Compact Header Row ---- */}
       <Box
         sx={{
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          gap: 2,
-          mb: 3,
+          gap: 1,
+          mb: 1,
         }}
       >
-        <Typography variant="h3" sx={{ fontWeight: 600 }}>
+        <Button
+          size="small"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/projects')}
+          sx={{ minWidth: 'auto', mr: 0.5 }}
+        >
+          Back
+        </Button>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
           {formatProjectName(project)}
         </Typography>
         <Chip
           label={PROJECT_STATUS_LABEL[project.status] ?? project.status}
           color={PROJECT_STATUS_COLOR[project.status] ?? 'default'}
-          sx={{ fontSize: 13, height: 28 }}
+          size="small"
+          sx={{ fontSize: 12, height: 24 }}
         />
+        {/* Inline summary stats */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            ml: { xs: 0, sm: 'auto' },
+            flexWrap: 'wrap',
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {todoCount} to do
+          </Typography>
+          <Typography variant="body2" color="info.main" sx={{ fontWeight: 600 }}>
+            {inProgressCount} in progress
+          </Typography>
+          <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+            {doneCount} done
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {totalHours > 0 ? `${totalHours.toFixed(1)}h logged` : '0h logged'}
+          </Typography>
+          {budgetLabel && (
+            <Typography variant="body2" color="text.secondary">
+              {budgetLabel}
+              {project.budget_amount != null &&
+                ` - ${project.currency_code ?? 'GBP'} ${Number(project.budget_amount).toLocaleString()}`}
+            </Typography>
+          )}
+        </Box>
       </Box>
 
       {/* ---- Page Tabs ---- */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab icon={<DashboardIcon />} iconPosition="start" label="Overview" />
           <Tab icon={<AssignmentIcon />} iconPosition="start" label="Tasks" />
@@ -500,72 +534,72 @@ export default function ProjectDetailPage() {
         <>
           {/* ---- Project Description ---- */}
           {project.description && (
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
               {project.description}
             </Typography>
           )}
 
-          {/* ---- Stats row ---- */}
+          {/* ---- Compact Stats Row ---- */}
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: {
-                xs: '1fr 1fr',
-                sm: '1fr 1fr 1fr 1fr',
-                md: budgetLabel ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr',
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(4, 1fr)',
+                md: budgetLabel ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)',
               },
-              gap: 2,
-              mb: 4,
+              gap: 1.5,
+              mb: 2,
             }}
           >
             <Card
               elevation={0}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             >
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">
                   TODO
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   {todoCount}
                 </Typography>
               </CardContent>
             </Card>
             <Card
               elevation={0}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             >
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">
                   In Progress
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
                   {inProgressCount}
                 </Typography>
               </CardContent>
             </Card>
             <Card
               elevation={0}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             >
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">
                   Done
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
                   {doneCount}
                 </Typography>
               </CardContent>
             </Card>
             <Card
               elevation={0}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             >
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="caption" color="text.secondary">
                   Total Hours
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
                   {totalHours > 0 ? totalHours.toFixed(1) : '0'}
                 </Typography>
               </CardContent>
@@ -573,13 +607,13 @@ export default function ProjectDetailPage() {
             {budgetLabel && (
               <Card
                 elevation={0}
-                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+                sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
               >
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography variant="caption" color="text.secondary">
                     Budget
                   </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {budgetLabel}
                     {project.budget_amount != null &&
                       ` - ${project.currency_code ?? 'GBP'} ${Number(project.budget_amount).toLocaleString()}`}
@@ -593,10 +627,10 @@ export default function ProjectDetailPage() {
           {budgetSummary && (
             <Card
               elevation={0}
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, mb: 4 }}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
             >
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
                   Budget Summary
                 </Typography>
                 <Box
@@ -704,9 +738,9 @@ export default function ProjectDetailPage() {
           )}
 
           {/* ---- Milestones (Overview) ---- */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
                 Milestones
               </Typography>
               <Button
@@ -740,8 +774,8 @@ export default function ProjectDetailPage() {
           </Box>
 
           {/* ---- Task Summary (Overview) ---- */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+          <Box sx={{ mb: 1.5 }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
               Tasks
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -762,8 +796,8 @@ export default function ProjectDetailPage() {
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: 2,
-              mb: 3,
+              gap: 1,
+              mb: 1.5,
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

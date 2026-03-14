@@ -99,14 +99,19 @@ export default function ProjectDetailScreen({ route, navigation }: Props) {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* Project Header */}
+      {/* Compact Project Header */}
       <View style={styles.projectHeader}>
-        {project.client && <Text style={styles.clientName}>{project.client.name}</Text>}
-        <Text style={styles.projectName}>{project.name}</Text>
-        <View style={[styles.statusChip, { backgroundColor: statusColor + '20' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {STATUS_LABELS[project.status] ?? project.status}
-          </Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitle}>
+            <Text style={styles.projectName} numberOfLines={1}>
+              {project.client ? `${project.client.name} — ${project.name}` : project.name}
+            </Text>
+          </View>
+          <View style={[styles.statusChip, { backgroundColor: statusColor + '20' }]}>
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {STATUS_LABELS[project.status] ?? project.status}
+            </Text>
+          </View>
         </View>
         {project.description && <Text style={styles.description}>{project.description}</Text>}
       </View>
@@ -133,26 +138,25 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   projectHeader: {
-    marginBottom: spacing.lg,
-  },
-  clientName: {
-    fontSize: typography.sizes.caption,
-    color: '#666',
-    fontWeight: typography.weights.medium,
-    marginBottom: 2,
-  },
-  projectName: {
-    fontSize: typography.sizes.h2,
-    fontWeight: typography.weights.bold,
-    color: colors.text,
     marginBottom: spacing.sm,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerTitle: {
+    flex: 1,
+  },
+  projectName: {
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
   statusChip: {
-    alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.chip,
-    marginBottom: spacing.sm,
   },
   statusText: {
     fontSize: 11,
@@ -161,7 +165,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: typography.sizes.body2,
     color: '#666',
-    marginTop: spacing.sm,
+    marginTop: 4,
   },
   emptyText: {
     fontSize: typography.sizes.body2,
