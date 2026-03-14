@@ -28,7 +28,7 @@ interface Client {
   contact_email: string | null;
 }
 
-export default function ClientsPage() {
+export default function ClientsPage({ embedded = false }: { embedded?: boolean }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -138,18 +138,31 @@ export default function ClientsPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 4 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="h3" sx={{ fontWeight: 600 }}>
-          Clients
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate} size="small">
-          New Client
-        </Button>
-      </Box>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Manage your studio clients.
-      </Typography>
+    <Box sx={embedded ? undefined : { p: { xs: 2, sm: 4 } }}>
+      {!embedded && (
+        <>
+          <Box
+            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
+          >
+            <Typography variant="h3" sx={{ fontWeight: 600 }}>
+              Clients
+            </Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate} size="small">
+              New Client
+            </Button>
+          </Box>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+            Manage your studio clients.
+          </Typography>
+        </>
+      )}
+      {embedded && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate} size="small">
+            New Client
+          </Button>
+        </Box>
+      )}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>

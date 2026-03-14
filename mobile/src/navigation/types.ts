@@ -15,10 +15,7 @@ export type MainTabParamList = {
 
 export type MoreStackParamList = {
   MoreMenu: undefined;
-  Clients: undefined;
-  Team: undefined;
-  AuditLog: undefined;
-  WeeklyGrid: undefined;
+  Admin: undefined;
 };
 
 export type ProjectsStackParamList = {

@@ -59,7 +59,7 @@ const ACTION_COLORS: Record<string, 'success' | 'warning' | 'error'> = {
 const ENTITY_TYPES = ['PROJECT', 'TASK', 'MILESTONE', 'TEAM_MEMBER', 'CLIENT', 'TIME_ENTRY'];
 const ACTIONS = ['CREATE', 'UPDATE', 'DELETE'];
 
-export default function AuditLogPage() {
+export default function AuditLogPage({ embedded = false }: { embedded?: boolean }) {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [pagination, setPagination] = useState({ page: 1, per_page: 25, total: 0, total_pages: 0 });
   const [loading, setLoading] = useState(true);
@@ -118,10 +118,15 @@ export default function AuditLogPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 4 } }}>
-      <Typography variant="h5" sx={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 700, mb: 3 }}>
-        Audit Log
-      </Typography>
+    <Box sx={embedded ? undefined : { p: { xs: 2, sm: 4 } }}>
+      {!embedded && (
+        <Typography
+          variant="h5"
+          sx={{ fontFamily: '"DM Sans", sans-serif', fontWeight: 700, mb: 3 }}
+        >
+          Audit Log
+        </Typography>
+      )}
 
       {/* Filter bar */}
       <Box

@@ -10,10 +10,7 @@ import ProjectDetailScreen from '../screens/ProjectDetailScreen';
 import TimeLoggingScreen from '../screens/TimeLoggingScreen';
 import StandupScreen from '../screens/StandupScreen';
 import MoreScreen from '../screens/MoreScreen';
-import ClientsScreen from '../screens/ClientsScreen';
-import TeamScreen from '../screens/TeamScreen';
-import AuditLogScreen from '../screens/AuditLogScreen';
-import WeeklyGridScreen from '../screens/WeeklyGridScreen';
+import AdminScreen from '../screens/AdminScreen';
 
 import type { MainTabParamList, ProjectsStackParamList, MoreStackParamList } from './types';
 
@@ -44,18 +41,7 @@ function MoreStackNavigator() {
   return (
     <MoreStack.Navigator>
       <MoreStack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More' }} />
-      <MoreStack.Screen name="Clients" component={ClientsScreen} />
-      <MoreStack.Screen name="Team" component={TeamScreen} />
-      <MoreStack.Screen
-        name="AuditLog"
-        component={AuditLogScreen}
-        options={{ title: 'Audit Log' }}
-      />
-      <MoreStack.Screen
-        name="WeeklyGrid"
-        component={WeeklyGridScreen}
-        options={{ title: 'Weekly Grid' }}
-      />
+      <MoreStack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin' }} />
     </MoreStack.Navigator>
   );
 }

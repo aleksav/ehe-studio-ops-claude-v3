@@ -21,12 +21,9 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
-import GroupIcon from '@mui/icons-material/Group';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ForumIcon from '@mui/icons-material/Forum';
-import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
-import BusinessIcon from '@mui/icons-material/Business';
-import HistoryIcon from '@mui/icons-material/History';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -40,13 +37,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-  { label: 'Clients', path: '/clients', icon: <BusinessIcon /> },
   { label: 'Projects', path: '/projects', icon: <FolderIcon /> },
-  { label: 'Team', path: '/team', icon: <GroupIcon /> },
   { label: 'Time Logging', path: '/time-logging', icon: <AccessTimeIcon /> },
-  { label: 'Weekly Grid', path: '/weekly-grid', icon: <CalendarViewWeekIcon /> },
   { label: 'Standup', path: '/standup', icon: <ForumIcon /> },
-  { label: 'Audit Log', path: '/audit-log', icon: <HistoryIcon /> },
+  { label: 'Admin', path: '/admin', icon: <AdminPanelSettingsIcon /> },
 ];
 
 export default function AppLayout() {

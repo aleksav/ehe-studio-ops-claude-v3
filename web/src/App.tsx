@@ -5,12 +5,9 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import TimeLoggingPage from './pages/TimeLoggingPage';
-import WeeklyGridPage from './pages/WeeklyGridPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
-import ClientsPage from './pages/ClientsPage';
-import TeamPage from './pages/TeamPage';
-import AuditLogPage from './pages/AuditLogPage';
+import AdminPage from './pages/AdminPage';
 import StandupPage from './pages/StandupPage';
 import { Box, CircularProgress } from '@mui/material';
 
@@ -116,14 +113,15 @@ export default function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/clients" element={<Navigate to="/admin?tab=clients" replace />} />
+          <Route path="/team" element={<Navigate to="/admin?tab=team" replace />} />
+          <Route path="/audit-log" element={<Navigate to="/admin?tab=audit-log" replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
-          <Route path="/team" element={<TeamPage />} />
           <Route path="/time-logging" element={<TimeLoggingPage />} />
-          <Route path="/weekly-grid" element={<WeeklyGridPage />} />
+          <Route path="/weekly-grid" element={<Navigate to="/time-logging" replace />} />
           <Route path="/standup" element={<StandupPage />} />
-          <Route path="/audit-log" element={<AuditLogPage />} />
         </Route>
 
         {/* Catch-all */}

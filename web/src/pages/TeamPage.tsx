@@ -89,7 +89,7 @@ function getInitials(name: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function TeamPage() {
+export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -263,25 +263,36 @@ export default function TeamPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 4 } }}>
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          mb: 1,
-        }}
-      >
-        <Typography variant="h3" sx={{ fontWeight: 600 }}>
-          Team
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
-          Add Team Member
-        </Button>
-      </Box>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Studio team members.
-      </Typography>
+    <Box sx={embedded ? undefined : { p: { xs: 2, sm: 4 } }}>
+      {!embedded && (
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              mb: 1,
+            }}
+          >
+            <Typography variant="h3" sx={{ fontWeight: 600 }}>
+              Team
+            </Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
+              Add Team Member
+            </Button>
+          </Box>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+            Studio team members.
+          </Typography>
+        </>
+      )}
+      {embedded && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate}>
+            Add Team Member
+          </Button>
+        </Box>
+      )}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
