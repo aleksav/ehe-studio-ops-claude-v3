@@ -290,6 +290,25 @@ export default function TimeLoggingScreen() {
 
   const weekLabel = `Week of ${formatShort(weekStart)}`;
 
+  const [jumpDateText, setJumpDateText] = useState('');
+  const [jumpDateVisible, setJumpDateVisible] = useState(false);
+
+  const handleJumpToDate = () => {
+    const match = jumpDateText.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const picked = new Date(
+        parseInt(match[1], 10),
+        parseInt(match[2], 10) - 1,
+        parseInt(match[3], 10),
+      );
+      if (!isNaN(picked.getTime())) {
+        setWeekStart(getWeekStart(picked));
+        setJumpDateVisible(false);
+        setJumpDateText('');
+      }
+    }
+  };
+
   // =====================================================================
   // QUICK ENTRY STATE
   // =====================================================================
@@ -410,7 +429,39 @@ export default function TimeLoggingScreen() {
             >
               <Text style={styles.todayText}>This Week</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.todayButton}
+              onPress={() => setJumpDateVisible(!jumpDateVisible)}
+            >
+              <Ionicons name="calendar-outline" size={16} color={colors.text} />
+            </TouchableOpacity>
           </View>
+
+          {/* Jump to date input */}
+          {jumpDateVisible && (
+            <View style={styles.jumpDateRow}>
+              <TextInput
+                style={styles.jumpDateInput}
+                value={jumpDateText}
+                onChangeText={setJumpDateText}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#999"
+                keyboardType="numbers-and-punctuation"
+                returnKeyType="go"
+                onSubmitEditing={handleJumpToDate}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.jumpDateGoButton,
+                  !jumpDateText.match(/^\d{4}-\d{2}-\d{2}$/) && styles.buttonDisabled,
+                ]}
+                onPress={handleJumpToDate}
+                disabled={!jumpDateText.match(/^\d{4}-\d{2}-\d{2}$/)}
+              >
+                <Text style={styles.jumpDateGoText}>Go</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Add Project */}
           <TouchableOpacity
@@ -778,6 +829,33 @@ const styles = StyleSheet.create({
   todayText: {
     fontSize: typography.sizes.caption,
     color: colors.text,
+  },
+  jumpDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  jumpDateInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: borderRadius.input,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    fontSize: typography.sizes.body2,
+    color: colors.text,
+  },
+  jumpDateGoButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.button,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  jumpDateGoText: {
+    color: '#fff',
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
   },
   addButton: {
     borderWidth: 1,
