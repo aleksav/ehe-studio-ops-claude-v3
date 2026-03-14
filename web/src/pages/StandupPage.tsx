@@ -6,7 +6,6 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Collapse,
   Fade,
   IconButton,
   LinearProgress,
@@ -19,8 +18,6 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
 import AssigneeAvatars from '../components/AssigneeAvatars';
@@ -319,9 +316,6 @@ export default function StandupPage() {
   const [milestonesByProject, setMilestonesByProject] = useState<Record<string, Milestone[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
-  // Planned section collapsed state
-  const [plannedExpanded, setPlannedExpanded] = useState(false);
-
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [logTimeProjectId, setLogTimeProjectId] = useState('');
@@ -352,7 +346,18 @@ export default function StandupPage() {
     [allProjects],
   );
 
-  const currentProject = activeProjects[currentIndex] ?? null;
+  // Build carousel items: active projects + a "Planned" summary slide at the end
+  const carouselItems = useMemo(() => {
+    const items: Array<{ type: 'active'; project: Project } | { type: 'planned' }> =
+      activeProjects.map((p) => ({ type: 'active' as const, project: p }));
+    if (plannedProjects.length > 0) {
+      items.push({ type: 'planned' as const });
+    }
+    return items;
+  }, [activeProjects, plannedProjects]);
+
+  const currentItem = carouselItems[currentIndex] ?? null;
+  const currentProject = currentItem?.type === 'active' ? currentItem.project : null;
 
   // ---- Daily standup prompt ----
   const standupPrompt = useMemo(() => {
@@ -431,11 +436,11 @@ export default function StandupPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, activeProjects.length]);
+  }, [currentIndex, carouselItems.length]);
 
   // ---- Navigation handlers ----
   const goNext = useCallback(() => {
-    if (currentIndex >= activeProjects.length - 1) return;
+    if (currentIndex >= carouselItems.length - 1) return;
     setSlideDirection('left');
     setVisible(false);
     setTimeout(() => {
@@ -443,7 +448,7 @@ export default function StandupPage() {
       setSlideDirection('right');
       setVisible(true);
     }, 200);
-  }, [currentIndex, activeProjects.length]);
+  }, [currentIndex, carouselItems.length]);
 
   const goPrev = useCallback(() => {
     if (currentIndex <= 0) return;
@@ -532,9 +537,8 @@ export default function StandupPage() {
     setLogTimeOpen(true);
   }, [currentProject]);
 
-  // ---- Next project name for "up next" teaser ----
-  const nextProject =
-    currentIndex < activeProjects.length - 1 ? activeProjects[currentIndex + 1] : null;
+  // ---- Next item for "up next" teaser ----
+  const nextItem = currentIndex < carouselItems.length - 1 ? carouselItems[currentIndex + 1] : null;
 
   // ---- Loading state ----
   if (projectsLoading) {
@@ -588,14 +592,19 @@ export default function StandupPage() {
           mb: 3,
         }}
       >
-        {activeProjects.map((_, idx) => (
+        {carouselItems.map((item, idx) => (
           <Box
             key={idx}
             sx={{
               width: idx === currentIndex ? 24 : 8,
               height: 8,
               borderRadius: 4,
-              bgcolor: idx === currentIndex ? 'primary.main' : 'grey.300',
+              bgcolor:
+                idx === currentIndex
+                  ? item.type === 'planned'
+                    ? 'grey.500'
+                    : 'primary.main'
+                  : 'grey.300',
               transition: 'all 0.3s ease',
               cursor: 'pointer',
             }}
@@ -613,7 +622,9 @@ export default function StandupPage() {
         ))}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 3 }}>
-        Project {currentIndex + 1} of {activeProjects.length}
+        {currentItem?.type === 'planned'
+          ? 'Coming Up Next'
+          : `Project ${currentIndex + 1} of ${activeProjects.length}`}
       </Typography>
 
       {/* ---- Carousel Area ---- */}
@@ -628,31 +639,99 @@ export default function StandupPage() {
         <Box
           sx={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            pt: 15,
+            pt: 12,
+            gap: 1,
+            minWidth: 80,
           }}
         >
           <IconButton
             onClick={goPrev}
             disabled={currentIndex === 0}
             sx={{
-              width: 48,
-              height: 48,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'grey.100' },
-              '&.Mui-disabled': { opacity: 0.3 },
+              width: 56,
+              height: 56,
+              bgcolor: 'primary.main',
+              color: '#fff',
+              boxShadow: 2,
+              '&:hover': { bgcolor: 'primary.dark' },
+              '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.400', boxShadow: 0 },
             }}
           >
-            <ArrowBackIosNewIcon />
+            <ArrowBackIosNewIcon sx={{ fontSize: 24 }} />
           </IconButton>
+          {currentIndex > 0 && (
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', fontSize: 11, textAlign: 'center' }}
+            >
+              Previous
+            </Typography>
+          )}
         </Box>
 
         {/* ---- Project Spotlight ---- */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Fade in={visible} timeout={200}>
             <Box>
+              {/* ---- Planned Projects Slide ---- */}
+              {currentItem?.type === 'planned' && (
+                <Box>
+                  <Box sx={{ textAlign: 'center', mb: 4 }}>
+                    <Typography
+                      variant="overline"
+                      sx={{ color: 'text.secondary', letterSpacing: 2, fontSize: 13 }}
+                    >
+                      Coming Up
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      Planned Projects
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {plannedProjects.length} project
+                      {plannedProjects.length !== 1 ? 's' : ''} in the pipeline
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {plannedProjects.map((project) => (
+                      <Card
+                        key={project.id}
+                        elevation={0}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <CardContent
+                          sx={{
+                            p: 2.5,
+                            '&:last-child': { pb: 2.5 },
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <Box>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {project.name}
+                            </Typography>
+                            {project.client && (
+                              <Typography variant="caption" color="text.secondary">
+                                {project.client.name}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Chip label="Planned" size="small" variant="outlined" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* ---- Active Project Slide ---- */}
               {currentProject && (
                 <>
                   {/* ---- Project Header ---- */}
@@ -803,29 +882,32 @@ export default function StandupPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            pt: 15,
-            gap: 2,
-            minWidth: 100,
+            pt: 12,
+            gap: 1,
+            minWidth: 80,
           }}
         >
           <IconButton
             onClick={goNext}
-            disabled={currentIndex >= activeProjects.length - 1}
+            disabled={currentIndex >= carouselItems.length - 1}
             sx={{
-              width: 48,
-              height: 48,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'grey.100' },
-              '&.Mui-disabled': { opacity: 0.3 },
+              width: 56,
+              height: 56,
+              bgcolor: 'primary.main',
+              color: '#fff',
+              boxShadow: 2,
+              '&:hover': { bgcolor: 'primary.dark' },
+              '&.Mui-disabled': { bgcolor: 'grey.200', color: 'grey.400', boxShadow: 0 },
             }}
           >
-            <ArrowForwardIosIcon />
+            <ArrowForwardIosIcon sx={{ fontSize: 24 }} />
           </IconButton>
-          {nextProject && (
-            <Box sx={{ textAlign: 'center', opacity: 0.55 }}>
-              <Typography variant="caption" sx={{ fontSize: 11, display: 'block' }}>
+          {nextItem && (
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', fontSize: 11, display: 'block' }}
+              >
                 Up next
               </Typography>
               <Typography
@@ -836,79 +918,15 @@ export default function StandupPage() {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
+                  color: 'text.secondary',
                 }}
               >
-                {nextProject.name}
+                {nextItem.type === 'planned' ? 'Planned' : nextItem.project.name}
               </Typography>
             </Box>
           )}
         </Box>
       </Box>
-
-      {/* ---- Planned Projects Section ---- */}
-      {plannedProjects.length > 0 && (
-        <Box sx={{ mt: 6 }}>
-          <Box
-            onClick={() => setPlannedExpanded(!plannedExpanded)}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              cursor: 'pointer',
-              userSelect: 'none',
-              '&:hover': { opacity: 0.8 },
-            }}
-          >
-            {plannedExpanded ? (
-              <ExpandLessIcon sx={{ color: 'text.secondary' }} />
-            ) : (
-              <ExpandMoreIcon sx={{ color: 'text.secondary' }} />
-            )}
-            <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-              Planned Projects
-            </Typography>
-            <Chip label={plannedProjects.length} size="small" sx={{ fontSize: 12, height: 22 }} />
-          </Box>
-          <Collapse in={plannedExpanded}>
-            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {plannedProjects.map((project) => (
-                <Card
-                  key={project.id}
-                  elevation={0}
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    opacity: 0.75,
-                  }}
-                >
-                  <CardContent
-                    sx={{
-                      p: 2,
-                      '&:last-child': { pb: 2 },
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {project.name}
-                      </Typography>
-                      {project.client && (
-                        <Typography variant="caption" color="text.secondary">
-                          {project.client.name}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Chip label="Planned" size="small" variant="outlined" />
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
-          </Collapse>
-        </Box>
-      )}
 
       {/* ---- Log Time Modal ---- */}
       <LogTimeModal

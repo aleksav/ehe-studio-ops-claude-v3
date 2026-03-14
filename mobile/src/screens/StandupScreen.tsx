@@ -113,7 +113,23 @@ export default function StandupScreen() {
     return seededShuffle(active, todaySeed());
   }, [allProjects]);
 
-  const currentProject = activeProjects[currentIndex] ?? null;
+  const plannedProjects = useMemo(
+    () => allProjects.filter((p) => p.status === 'PLANNED'),
+    [allProjects],
+  );
+
+  // Carousel items: active projects + planned summary slide at the end
+  const carouselItems = useMemo(() => {
+    const items: Array<{ type: 'active'; project: Project } | { type: 'planned' }> =
+      activeProjects.map((p) => ({ type: 'active' as const, project: p }));
+    if (plannedProjects.length > 0) {
+      items.push({ type: 'planned' as const });
+    }
+    return items;
+  }, [activeProjects, plannedProjects]);
+
+  const currentItem = carouselItems[currentIndex] ?? null;
+  const currentProject = currentItem?.type === 'active' ? currentItem.project : null;
 
   const standupPrompt = useMemo(() => STANDUP_PROMPTS[dayOfYear() % STANDUP_PROMPTS.length], []);
 
@@ -163,7 +179,7 @@ export default function StandupScreen() {
   }, [currentIndex, activeProjects, fetchProjectTasks]);
 
   const goNext = () => {
-    if (currentIndex < activeProjects.length - 1) {
+    if (currentIndex < carouselItems.length - 1) {
       setCurrentIndex((i) => i + 1);
     }
   };
@@ -214,12 +230,23 @@ export default function StandupScreen() {
 
       {/* Progress Dots */}
       <View style={styles.dotsRow}>
-        {activeProjects.map((_, idx) => (
-          <View key={idx} style={[styles.dot, idx === currentIndex && styles.dotActive]} />
+        {carouselItems.map((item, idx) => (
+          <View
+            key={idx}
+            style={[
+              styles.dot,
+              idx === currentIndex && [
+                styles.dotActive,
+                item.type === 'planned' && styles.dotPlanned,
+              ],
+            ]}
+          />
         ))}
       </View>
       <Text style={styles.counter}>
-        Project {currentIndex + 1} of {activeProjects.length}
+        {currentItem?.type === 'planned'
+          ? 'Coming Up Next'
+          : `Project ${currentIndex + 1} of ${activeProjects.length}`}
       </Text>
 
       {/* Navigation + Project */}
@@ -231,12 +258,38 @@ export default function StandupScreen() {
         >
           <Ionicons
             name="chevron-back"
-            size={24}
-            color={currentIndex === 0 ? '#ccc' : colors.text}
+            size={28}
+            color={currentIndex === 0 ? '#ccc' : '#fff'}
           />
         </TouchableOpacity>
 
         <View style={styles.projectSpotlight}>
+          {/* Planned Projects Slide */}
+          {currentItem?.type === 'planned' && (
+            <>
+              <Text style={styles.spotlightClient}>COMING UP</Text>
+              <Text style={styles.spotlightName}>Planned Projects</Text>
+              <Text style={styles.plannedSubtitle}>
+                {plannedProjects.length} project{plannedProjects.length !== 1 ? 's' : ''} in the
+                pipeline
+              </Text>
+              {plannedProjects.map((project) => (
+                <View key={project.id} style={styles.plannedCard}>
+                  <View>
+                    <Text style={styles.plannedCardName}>{project.name}</Text>
+                    {project.client && (
+                      <Text style={styles.plannedCardClient}>{project.client.name}</Text>
+                    )}
+                  </View>
+                  <View style={styles.plannedChip}>
+                    <Text style={styles.plannedChipText}>Planned</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* Active Project Slide */}
           {currentProject && (
             <>
               {currentProject.client && (
@@ -303,16 +356,16 @@ export default function StandupScreen() {
 
         <TouchableOpacity
           onPress={goNext}
-          disabled={currentIndex >= activeProjects.length - 1}
+          disabled={currentIndex >= carouselItems.length - 1}
           style={[
             styles.navButton,
-            currentIndex >= activeProjects.length - 1 && styles.navButtonDisabled,
+            currentIndex >= carouselItems.length - 1 && styles.navButtonDisabled,
           ]}
         >
           <Ionicons
             name="chevron-forward"
-            size={24}
-            color={currentIndex >= activeProjects.length - 1 ? '#ccc' : colors.text}
+            size={28}
+            color={currentIndex >= carouselItems.length - 1 ? '#ccc' : '#fff'}
           />
         </TouchableOpacity>
       </View>
@@ -378,6 +431,9 @@ const styles = StyleSheet.create({
     width: 24,
     backgroundColor: colors.primary,
   },
+  dotPlanned: {
+    backgroundColor: '#757575',
+  },
   counter: {
     fontSize: typography.sizes.body2,
     color: '#666',
@@ -389,11 +445,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   navButton: {
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.xs,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xxl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   navButtonDisabled: {
-    opacity: 0.3,
+    backgroundColor: '#E0E0E0',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   projectSpotlight: {
     flex: 1,
@@ -476,5 +544,43 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     paddingVertical: spacing.lg,
+  },
+  plannedSubtitle: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  plannedCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: '#fff',
+    borderRadius: borderRadius.card,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    marginBottom: spacing.sm,
+  },
+  plannedCardName: {
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.medium,
+    color: colors.text,
+  },
+  plannedCardClient: {
+    fontSize: typography.sizes.caption,
+    color: '#666',
+    marginTop: 2,
+  },
+  plannedChip: {
+    borderWidth: 1,
+    borderColor: '#999',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  plannedChipText: {
+    fontSize: typography.sizes.caption,
+    color: '#666',
   },
 });
