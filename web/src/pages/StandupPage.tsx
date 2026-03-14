@@ -1,15 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Alert,
+  Avatar,
   Box,
   Card,
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Fade,
   IconButton,
   LinearProgress,
   Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -18,6 +22,11 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import FlagIcon from '@mui/icons-material/Flag';
+import PeopleIcon from '@mui/icons-material/People';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
 import AssigneeAvatars from '../components/AssigneeAvatars';
@@ -67,6 +76,22 @@ interface Milestone {
   name: string;
   due_date: string | null;
   is_overdue?: boolean;
+}
+
+type StandupViewMode = 'board' | 'milestones' | 'people';
+
+interface SwimlaneData {
+  id: string | null;
+  name: string;
+  due_date: string | null;
+  is_overdue?: boolean;
+  tasks: Task[];
+}
+
+interface PersonRow {
+  memberId: string | null;
+  memberName: string;
+  tasks: Task[];
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +176,220 @@ function dayOfYear(): number {
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = now.getTime() - start.getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+// ---------------------------------------------------------------------------
+// Milestone Swimlane Component (read-only for standup)
+// ---------------------------------------------------------------------------
+
+function StandupMilestoneSwimlane({ swimlane }: { swimlane: SwimlaneData }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const todoTasks = swimlane.tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = swimlane.tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = swimlane.tasks.filter((t) => t.status === 'DONE');
+  const totalCount = todoTasks.length + inProgressTasks.length + doneTasks.length;
+
+  return (
+    <Box sx={{ mb: 2.5 }}>
+      <Box
+        onClick={() => setExpanded(!expanded)}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          p: 1.5,
+          borderLeft: swimlane.is_overdue
+            ? '4px solid #f44336'
+            : swimlane.id
+              ? '4px solid #1976d2'
+              : '4px solid #E91E63',
+          borderRadius: 1,
+          bgcolor: swimlane.is_overdue ? '#FFEBEE' : 'grey.50',
+          cursor: 'pointer',
+          userSelect: 'none',
+          '&:hover': { bgcolor: 'grey.100' },
+        }}
+      >
+        {expanded ? (
+          <ExpandLessIcon fontSize="small" color="action" />
+        ) : (
+          <ExpandMoreIcon fontSize="small" color="action" />
+        )}
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {swimlane.name}
+        </Typography>
+        {swimlane.due_date && (
+          <Typography variant="caption" color="text.secondary">
+            Due {new Date(swimlane.due_date).toLocaleDateString()}
+          </Typography>
+        )}
+        {swimlane.is_overdue && (
+          <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
+        )}
+        <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
+      </Box>
+      <Collapse in={expanded}>
+        <Box sx={{ pl: 2, mt: 1.5 }}>
+          {totalCount === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+              No tasks
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {[...todoTasks, ...inProgressTasks, ...doneTasks].map((task) => (
+                <Box
+                  key={task.id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1,
+                    bgcolor: '#fff',
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Chip
+                    label={TASK_STATUS_LABEL[task.status] ?? task.status}
+                    size="small"
+                    color={TASK_STATUS_COLOR[task.status] ?? 'default'}
+                    sx={{ fontSize: 10, height: 20 }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {task.description}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// People Board Row Component (read-only for standup)
+// ---------------------------------------------------------------------------
+
+function StandupPeopleRow({ row }: { row: PersonRow }) {
+  const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
+  const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
+  const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
+  const initial = row.memberName.charAt(0).toUpperCase();
+
+  return (
+    <Box sx={{ mb: 2.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, px: 0.5 }}>
+        <Avatar
+          sx={{
+            width: 28,
+            height: 28,
+            fontSize: 13,
+            fontWeight: 700,
+            bgcolor: row.memberId ? '#1565C0' : '#757575',
+            color: '#fff',
+          }}
+        >
+          {initial}
+        </Avatar>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {row.memberName}
+        </Typography>
+        <Chip
+          label={`${row.tasks.length} task${row.tasks.length === 1 ? '' : 's'}`}
+          size="small"
+          sx={{ fontSize: 11, height: 22 }}
+        />
+      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2,
+          pl: 1,
+        }}
+      >
+        {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
+          const statusTasks =
+            status === 'TODO' ? todoTasks : status === 'IN_PROGRESS' ? inProgressTasks : doneTasks;
+          const bgColor =
+            status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
+          const label =
+            status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
+
+          return (
+            <Box key={status} sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, px: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                  {label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  ({statusTasks.length})
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  bgcolor: bgColor,
+                  borderRadius: 1.5,
+                  p: 1,
+                  minHeight: 40,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.75,
+                }}
+              >
+                {statusTasks.length === 0 ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ textAlign: 'center', py: 1 }}
+                  >
+                    --
+                  </Typography>
+                ) : (
+                  statusTasks.map((task) => (
+                    <Box
+                      key={task.id}
+                      sx={{
+                        p: 1,
+                        bgcolor: '#fff',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: 13,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {task.description}
+                      </Typography>
+                    </Box>
+                  ))
+                )}
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +555,9 @@ export default function StandupPage() {
   const [milestonesByProject, setMilestonesByProject] = useState<Record<string, Milestone[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
+  // View mode
+  const [viewMode, setViewMode] = useState<StandupViewMode>('board');
+
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
   const [logTimeProjectId, setLogTimeProjectId] = useState('');
@@ -472,6 +714,77 @@ export default function StandupPage() {
   const todoTasks = currentTasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = currentTasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = currentTasks.filter((t) => t.status === 'DONE' && isRecentlyCompleted(t));
+
+  // ---- Milestone swimlanes ----
+  const swimlanes = useMemo<SwimlaneData[]>(() => {
+    if (!currentProject) return [];
+    const sorted = [...currentMilestones].sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
+
+    const activeTasks = currentTasks.filter((t) => t.status !== 'CANCELLED');
+    const lanes: SwimlaneData[] = sorted.map((m) => ({
+      id: m.id,
+      name: m.name,
+      due_date: m.due_date,
+      is_overdue: m.is_overdue,
+      tasks: activeTasks.filter(
+        (t) => (t as Task & { milestone_id?: string | null }).milestone_id === m.id,
+      ),
+    }));
+
+    const unassigned = activeTasks.filter(
+      (t) => !(t as Task & { milestone_id?: string | null }).milestone_id,
+    );
+    if (unassigned.length > 0 || lanes.length > 0) {
+      lanes.push({
+        id: null,
+        name: 'No Milestone',
+        due_date: null,
+        is_overdue: false,
+        tasks: unassigned,
+      });
+    }
+    return lanes;
+  }, [currentProject, currentTasks, currentMilestones]);
+
+  // ---- People rows ----
+  const personRows = useMemo<PersonRow[]>(() => {
+    if (!currentProject) return [];
+    const memberMap = new Map<string, { member: TeamMemberRef; tasks: Task[] }>();
+    const unassignedTasks: Task[] = [];
+
+    for (const task of currentTasks) {
+      if (task.status === 'CANCELLED') continue;
+      const assignments = task.assignments ?? [];
+      if (assignments.length === 0) {
+        unassignedTasks.push(task);
+      } else {
+        for (const assignment of assignments) {
+          const memberId = assignment.team_member.id;
+          if (!memberMap.has(memberId)) {
+            memberMap.set(memberId, { member: assignment.team_member, tasks: [] });
+          }
+          memberMap.get(memberId)!.tasks.push(task);
+        }
+      }
+    }
+
+    const rows: PersonRow[] = [];
+    const sortedMembers = Array.from(memberMap.entries()).sort((a, b) =>
+      a[1].member.full_name.localeCompare(b[1].member.full_name),
+    );
+    for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
+      rows.push({ memberId, memberName: member.full_name, tasks: memberTasks });
+    }
+    if (unassignedTasks.length > 0) {
+      rows.push({ memberId: null, memberName: 'Unassigned', tasks: unassignedTasks });
+    }
+    return rows;
+  }, [currentProject, currentTasks]);
 
   // ---- Completion stats ----
   const totalNonCancelled = currentTasks.filter((t) => t.status !== 'CANCELLED').length;
@@ -831,12 +1144,37 @@ export default function StandupPage() {
                     </Box>
                   )}
 
-                  {/* ---- Kanban Board ---- */}
+                  {/* ---- View Toggle ---- */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                    <ToggleButtonGroup
+                      value={viewMode}
+                      exclusive
+                      onChange={(_: React.MouseEvent<HTMLElement>, v: StandupViewMode | null) => {
+                        if (v !== null) setViewMode(v);
+                      }}
+                      size="small"
+                    >
+                      <ToggleButton value="board" aria-label="Board view">
+                        <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                        Board
+                      </ToggleButton>
+                      <ToggleButton value="milestones" aria-label="Milestones view">
+                        <FlagIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                        Milestones
+                      </ToggleButton>
+                      <ToggleButton value="people" aria-label="People view">
+                        <PeopleIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                        People
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
+                  {/* ---- Task Views ---- */}
                   {isCurrentLoading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                       <CircularProgress size={24} />
                     </Box>
-                  ) : (
+                  ) : viewMode === 'board' ? (
                     <Box
                       sx={{
                         display: 'flex',
@@ -869,6 +1207,38 @@ export default function StandupPage() {
                         onAssignmentsChange={handleAssignmentsChange}
                       />
                     </Box>
+                  ) : viewMode === 'milestones' ? (
+                    <>
+                      {swimlanes.length === 0 ? (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ py: 4, textAlign: 'center' }}
+                        >
+                          No milestones or tasks to display.
+                        </Typography>
+                      ) : (
+                        swimlanes.map((lane) => (
+                          <StandupMilestoneSwimlane key={lane.id ?? '__none__'} swimlane={lane} />
+                        ))
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {personRows.length === 0 ? (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ py: 4, textAlign: 'center' }}
+                        >
+                          No tasks to display.
+                        </Typography>
+                      ) : (
+                        personRows.map((row) => (
+                          <StandupPeopleRow key={row.memberId ?? 'unassigned'} row={row} />
+                        ))
+                      )}
+                    </>
                   )}
                 </>
               )}
