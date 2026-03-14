@@ -56,7 +56,17 @@ const ACTION_COLORS: Record<string, 'success' | 'warning' | 'error'> = {
   DELETE: 'error',
 };
 
-const ENTITY_TYPES = ['PROJECT', 'TASK', 'MILESTONE', 'TEAM_MEMBER', 'CLIENT', 'TIME_ENTRY'];
+const ENTITY_TYPES = [
+  'Client',
+  'Milestone',
+  'Project',
+  'Task',
+  'TaskAssignment',
+  'TaskRate',
+  'TeamMember',
+  'TimeEntry',
+  'User',
+];
 const ACTIONS = ['CREATE', 'UPDATE', 'DELETE'];
 
 export default function AuditLogPage({ embedded = false }: { embedded?: boolean }) {
