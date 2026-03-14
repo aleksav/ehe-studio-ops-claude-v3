@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -17,6 +18,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { startOfISOWeek, endOfISOWeek, format, subDays } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
@@ -81,6 +83,12 @@ interface MyProject {
   actual_spend: number;
   budget_spend_pct: number | null;
   hours_this_week: number;
+}
+
+interface MissingTimeData {
+  missing_days: { date: string; expected: number; logged: number }[];
+  total_missing_hours: number;
+  oldest_incomplete_week_start: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +208,7 @@ function SummaryCard({
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const displayName = user?.team_member?.full_name ?? user?.email ?? 'there';
   const teamMemberId = user?.team_member?.id ?? null;
 
@@ -225,6 +234,9 @@ export default function DashboardPage() {
   const [myTimeEntriesLoading, setMyTimeEntriesLoading] = useState(true);
   const [myProjects, setMyProjects] = useState<MyProject[]>([]);
   const [myProjectsLoading, setMyProjectsLoading] = useState(true);
+
+  // Missing time warning
+  const [missingTime, setMissingTime] = useState<MissingTimeData | null>(null);
 
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
@@ -424,6 +436,23 @@ export default function DashboardPage() {
     };
   }, [teamMemberId]);
 
+  // ---- Fetch Missing Time (via /api/me/missing-time) ----
+  useEffect(() => {
+    if (!teamMemberId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<MissingTimeData>('/api/me/missing-time');
+        if (!cancelled) setMissingTime(data);
+      } catch {
+        // silently fail — warning simply won't show
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamMemberId]);
+
   // ---- Fetch tasks when project selected ----
   useEffect(() => {
     if (!selectedProjectId) {
@@ -464,6 +493,32 @@ export default function DashboardPage() {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         Here&apos;s your studio at a glance.
       </Typography>
+
+      {/* ---- Missing time warning banner ---- */}
+      {missingTime && missingTime.missing_days.length > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3, borderRadius: 2 }}
+          action={
+            missingTime.oldest_incomplete_week_start ? (
+              <Button
+                color="warning"
+                size="small"
+                onClick={() =>
+                  navigate(`/weekly-grid?week=${missingTime.oldest_incomplete_week_start}`)
+                }
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Fill timesheet
+              </Button>
+            ) : undefined
+          }
+        >
+          You have {missingTime.total_missing_hours}h unlogged across{' '}
+          {missingTime.missing_days.length} {missingTime.missing_days.length === 1 ? 'day' : 'days'}{' '}
+          this month. Keeping your timesheet up to date helps the studio plan ahead.
+        </Alert>
+      )}
 
       {/* ================================================================== */}
       {/* Section 1: Studio Overview                                         */}

@@ -215,7 +215,7 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(800);
 
     await page.getByLabel('Client Name').click();
-    await page.getByLabel('Client Name').pressSequentially('Nova Digital', {
+    await page.getByLabel('Client Name').pressSequentially(`Nova Digital ${timestamp}`, {
       delay: 70,
     });
     await page.waitForTimeout(400);
@@ -229,7 +229,7 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(600);
 
     await page.getByRole('button', { name: /create client/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------

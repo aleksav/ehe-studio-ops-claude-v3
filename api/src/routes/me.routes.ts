@@ -284,4 +284,142 @@ router.get('/projects', authMiddleware, async (req: AuthenticatedRequest, res: R
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/me/missing-time?month=3&year=2026
+// Returns working days in the given month where logged hours are below the
+// expected threshold AND the day is more than 48 hours in the past.
+// ---------------------------------------------------------------------------
+
+const missingTimeQuerySchema = z.object({
+  month: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      const n = parseInt(val, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 12 ? n : undefined;
+    }),
+  year: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      const n = parseInt(val, 10);
+      return Number.isFinite(n) && n >= 2000 && n <= 2100 ? n : undefined;
+    }),
+});
+
+/** Format a Date as YYYY-MM-DD (UTC). */
+function formatDateUTC(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+/** Expected hours for a weekday (0=Sun, 1=Mon, ..., 6=Sat). */
+function expectedHoursForDay(dayOfWeek: number): number {
+  // Mon-Thu = 8h, Fri = 4h, Sat/Sun = 0
+  if (dayOfWeek >= 1 && dayOfWeek <= 4) return 8;
+  if (dayOfWeek === 5) return 4;
+  return 0;
+}
+
+router.get('/missing-time', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const teamMemberId = req.user?.teamMemberId;
+    if (!teamMemberId) {
+      res.status(400).json({ error: 'User is not linked to a team member' });
+      return;
+    }
+
+    const parsed = missingTimeQuerySchema.safeParse(req.query);
+    const now = new Date();
+    const month =
+      parsed.success && parsed.data.month !== undefined ? parsed.data.month : now.getUTCMonth() + 1;
+    const year =
+      parsed.success && parsed.data.year !== undefined ? parsed.data.year : now.getUTCFullYear();
+
+    // Range: 1st of month to (now - 48h), only check working days in the past
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const cutoff = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    cutoff.setUTCHours(0, 0, 0, 0);
+
+    // If cutoff is before month start, there are no checkable days
+    if (cutoff < monthStart) {
+      res.json({ missing_days: [], total_missing_hours: 0, oldest_incomplete_week_start: null });
+      return;
+    }
+
+    // Build list of working days (Mon-Fri) in range [monthStart, cutoff]
+    const workingDays: { date: Date; expected: number }[] = [];
+    const cursor = new Date(monthStart);
+    while (cursor <= cutoff) {
+      const dow = cursor.getUTCDay();
+      const expected = expectedHoursForDay(dow);
+      if (expected > 0) {
+        workingDays.push({ date: new Date(cursor), expected });
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    if (workingDays.length === 0) {
+      res.json({ missing_days: [], total_missing_hours: 0, oldest_incomplete_week_start: null });
+      return;
+    }
+
+    // Fetch all time entries for this team member in the date range
+    const entries = await prisma.timeEntry.findMany({
+      where: {
+        team_member_id: teamMemberId,
+        date: {
+          gte: monthStart,
+          lte: cutoff,
+        },
+      },
+      select: {
+        date: true,
+        hours_worked: true,
+      },
+    });
+
+    // Sum hours by date
+    const hoursMap = new Map<string, number>();
+    for (const e of entries) {
+      const key = formatDateUTC(e.date);
+      hoursMap.set(key, (hoursMap.get(key) ?? 0) + Number(e.hours_worked));
+    }
+
+    // Find days under the expected threshold
+    const missingDays: { date: string; expected: number; logged: number }[] = [];
+    for (const wd of workingDays) {
+      const key = formatDateUTC(wd.date);
+      const logged = hoursMap.get(key) ?? 0;
+      if (logged < wd.expected) {
+        missingDays.push({
+          date: key,
+          expected: wd.expected,
+          logged: Math.round(logged * 100) / 100,
+        });
+      }
+    }
+
+    const totalMissingHours = missingDays.reduce((sum, d) => sum + (d.expected - d.logged), 0);
+
+    // Oldest incomplete week start (Monday of the week containing the oldest missing day)
+    let oldestIncompleteWeekStart: string | null = null;
+    if (missingDays.length > 0) {
+      const oldestDate = new Date(missingDays[0].date + 'T00:00:00Z');
+      const monday = getISOWeekStart(oldestDate);
+      oldestIncompleteWeekStart = formatDateUTC(monday);
+    }
+
+    res.json({
+      missing_days: missingDays,
+      total_missing_hours: Math.round(totalMissingHours * 100) / 100,
+      oldest_incomplete_week_start: oldestIncompleteWeekStart,
+    });
+  } catch (error) {
+    console.error('GET /api/me/missing-time error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
