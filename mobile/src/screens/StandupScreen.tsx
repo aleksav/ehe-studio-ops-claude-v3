@@ -6,6 +6,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,6 +85,13 @@ export default function StandupScreen() {
     setHideEmptyMilestones(checked);
     AsyncStorage.setItem('standup-hide-empty-milestones', String(checked));
   };
+
+  // Add task modal
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskStatus, setNewTaskStatus] = useState<string>('TODO');
+  const [newTaskMilestoneId, setNewTaskMilestoneId] = useState<string>('');
+  const [addTaskSubmitting, setAddTaskSubmitting] = useState(false);
 
   const activeProjects = useMemo(() => {
     const active = allProjects.filter((p) => p.status === 'ACTIVE');
@@ -167,6 +177,35 @@ export default function StandupScreen() {
   const goPrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex((i) => i - 1);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!currentProject || !newTaskDescription.trim() || addTaskSubmitting) return;
+    const projectId = currentProject.id;
+    setAddTaskSubmitting(true);
+    try {
+      const body: Record<string, string> = {
+        description: newTaskDescription.trim(),
+        status: newTaskStatus,
+      };
+      if (newTaskMilestoneId) body.milestone_id = newTaskMilestoneId;
+      await api.post(`/api/projects/${projectId}/tasks`, body);
+      setAddTaskOpen(false);
+      setNewTaskDescription('');
+      setNewTaskStatus('TODO');
+      setNewTaskMilestoneId('');
+      // Refresh tasks
+      const [updatedTasks, updatedMilestones] = await Promise.all([
+        api.get<BoardTask[]>(`/api/projects/${projectId}/tasks`),
+        api.get<BoardMilestone[]>(`/api/projects/${projectId}/milestones`),
+      ]);
+      setTasksByProject((prev) => ({ ...prev, [projectId]: updatedTasks }));
+      setMilestonesByProject((prev) => ({ ...prev, [projectId]: updatedMilestones }));
+    } catch {
+      Alert.alert('Error', 'Failed to create task.');
+    } finally {
+      setAddTaskSubmitting(false);
     }
   };
 
@@ -285,6 +324,12 @@ export default function StandupScreen() {
                 />
               </View>
 
+              {/* Add Task Button */}
+              <TouchableOpacity style={styles.addTaskButton} onPress={() => setAddTaskOpen(true)}>
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.addTaskButtonText}>Add Task</Text>
+              </TouchableOpacity>
+
               {/* Task Board */}
               {isCurrentLoading ? (
                 <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
@@ -316,6 +361,109 @@ export default function StandupScreen() {
           />
         </TouchableOpacity>
       </View>
+      {/* Add Task Modal */}
+      <Modal visible={addTaskOpen} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>New Task — {currentProject?.name ?? ''}</Text>
+
+            <Text style={styles.fieldLabel}>Description</Text>
+            <TextInput
+              style={styles.textInput}
+              value={newTaskDescription}
+              onChangeText={setNewTaskDescription}
+              placeholder="Task description"
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.fieldLabel}>Status</Text>
+            <View style={styles.statusRow}>
+              {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.statusChip, newTaskStatus === s && styles.statusChipActive]}
+                  onPress={() => setNewTaskStatus(s)}
+                >
+                  <Text
+                    style={[
+                      styles.statusChipText,
+                      newTaskStatus === s && styles.statusChipTextActive,
+                    ]}
+                  >
+                    {s === 'TODO' ? 'To Do' : s === 'IN_PROGRESS' ? 'In Progress' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Milestone</Text>
+            <ScrollView
+              horizontal
+              style={styles.milestoneScroll}
+              showsHorizontalScrollIndicator={false}
+            >
+              <TouchableOpacity
+                style={[styles.statusChip, newTaskMilestoneId === '' && styles.statusChipActive]}
+                onPress={() => setNewTaskMilestoneId('')}
+              >
+                <Text
+                  style={[
+                    styles.statusChipText,
+                    newTaskMilestoneId === '' && styles.statusChipTextActive,
+                  ]}
+                >
+                  None
+                </Text>
+              </TouchableOpacity>
+              {(currentProject ? (milestonesByProject[currentProject.id] ?? []) : []).map((m) => (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[
+                    styles.statusChip,
+                    newTaskMilestoneId === m.id && styles.statusChipActive,
+                  ]}
+                  onPress={() => setNewTaskMilestoneId(m.id)}
+                >
+                  <Text
+                    style={[
+                      styles.statusChipText,
+                      newTaskMilestoneId === m.id && styles.statusChipTextActive,
+                    ]}
+                  >
+                    {m.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setAddTaskOpen(false)}
+                disabled={addTaskSubmitting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.createButton,
+                  (!newTaskDescription.trim() || addTaskSubmitting) && styles.createButtonDisabled,
+                ]}
+                onPress={handleCreateTask}
+                disabled={!newTaskDescription.trim() || addTaskSubmitting}
+              >
+                {addTaskSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create Task</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -492,5 +640,112 @@ const styles = StyleSheet.create({
   plannedChipText: {
     fontSize: typography.sizes.caption,
     color: '#666',
+  },
+  addTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.button,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignSelf: 'flex-end',
+    marginBottom: spacing.md,
+    gap: 4,
+  },
+  addTaskButtonText: {
+    color: '#fff',
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: borderRadius.card,
+    padding: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.sizes.h4,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  fieldLabel: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.medium,
+    color: '#666',
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.input,
+    padding: spacing.sm,
+    fontSize: typography.sizes.body1,
+    minHeight: 80,
+    color: colors.text,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  milestoneScroll: {
+    flexGrow: 0,
+    marginBottom: spacing.sm,
+  },
+  statusChip: {
+    borderWidth: 1,
+    borderColor: '#CCC',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: spacing.xs,
+  },
+  statusChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  statusChipText: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+  },
+  statusChipTextActive: {
+    color: '#fff',
+    fontWeight: typography.weights.semibold,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  cancelButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  cancelButtonText: {
+    fontSize: typography.sizes.body1,
+    color: '#666',
+  },
+  createButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.button,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  createButtonDisabled: {
+    opacity: 0.5,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.semibold,
   },
 });

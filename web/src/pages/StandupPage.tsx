@@ -2,16 +2,28 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Fade,
+  FormControl,
   IconButton,
+  InputLabel,
   LinearProgress,
+  MenuItem,
+  Select,
   Snackbar,
+  TextField,
   Typography,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -52,6 +64,8 @@ interface TaskAssignment {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 
 const TASK_STATUS_LABEL: Record<string, string> = {
   TODO: 'To Do',
@@ -139,6 +153,13 @@ export default function StandupPage() {
   const handleHideEmptyChange = (checked: boolean) => {
     localStorage.setItem(HIDE_EMPTY_KEY, String(checked));
   };
+
+  // Add task dialog
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskStatus, setNewTaskStatus] = useState<string>('TODO');
+  const [newTaskMilestoneId, setNewTaskMilestoneId] = useState<string>('');
+  const [addTaskSubmitting, setAddTaskSubmitting] = useState(false);
 
   // Ref to track if keyboard listener is attached
   const containerRef = useRef<HTMLDivElement>(null);
@@ -348,6 +369,45 @@ export default function StandupPage() {
       handleLogTime();
     },
     [handleLogTime],
+  );
+
+  // ---- Create task handler ----
+  const handleCreateTask = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!currentProject || !newTaskDescription.trim() || addTaskSubmitting) return;
+
+      const projectId = currentProject.id;
+      setAddTaskSubmitting(true);
+      try {
+        const body: Record<string, string> = {
+          description: newTaskDescription.trim(),
+          status: newTaskStatus,
+        };
+        if (newTaskMilestoneId) {
+          body.milestone_id = newTaskMilestoneId;
+        }
+        await api.post(`/api/projects/${projectId}/tasks`, body);
+        showSnackbar('Task created');
+        setAddTaskOpen(false);
+        setNewTaskDescription('');
+        setNewTaskStatus('TODO');
+        setNewTaskMilestoneId('');
+        // Refresh tasks for this project
+        const [updatedTasks, updatedMilestones] = await Promise.all([
+          api.get<BoardTask[]>(`/api/projects/${projectId}/tasks`),
+          api.get<BoardMilestone[]>(`/api/projects/${projectId}/milestones`),
+        ]);
+        setTasksByProject((prev) => ({ ...prev, [projectId]: updatedTasks }));
+        setMilestonesByProject((prev) => ({ ...prev, [projectId]: updatedMilestones }));
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : 'Failed to create task.';
+        showSnackbar(message, 'error');
+      } finally {
+        setAddTaskSubmitting(false);
+      }
+    },
+    [currentProject, newTaskDescription, newTaskStatus, newTaskMilestoneId, addTaskSubmitting],
   );
 
   // ---- Drag-and-drop: Board view (status columns) ----
@@ -725,6 +785,14 @@ export default function StandupPage() {
                               sx={{ fontSize: 12 }}
                             />
                           ))}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => setAddTaskOpen(true)}
+                      >
+                        Add Task
+                      </Button>
                     </Box>
                   </Box>
 
@@ -800,6 +868,85 @@ export default function StandupPage() {
           )}
         </Box>
       </Box>
+
+      {/* ---- Add Task Dialog ---- */}
+      <Dialog
+        open={addTaskOpen}
+        onClose={() => !addTaskSubmitting && setAddTaskOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>New Task — {currentProject?.name}</DialogTitle>
+        <Box component="form" onSubmit={handleCreateTask}>
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="Description"
+                value={newTaskDescription}
+                onChange={(e) => setNewTaskDescription(e.target.value)}
+                required
+                fullWidth
+                autoFocus
+                multiline
+                minRows={2}
+                maxRows={4}
+              />
+              <FormControl fullWidth>
+                <InputLabel id="standup-task-status-label">Status</InputLabel>
+                <Select
+                  labelId="standup-task-status-label"
+                  value={newTaskStatus}
+                  label="Status"
+                  onChange={(e: SelectChangeEvent) => setNewTaskStatus(e.target.value)}
+                >
+                  {TASK_STATUSES.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {TASK_STATUS_LABEL[s]}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="standup-task-milestone-label">Milestone</InputLabel>
+                <Select
+                  labelId="standup-task-milestone-label"
+                  value={newTaskMilestoneId}
+                  label="Milestone"
+                  onChange={(e: SelectChangeEvent) => setNewTaskMilestoneId(e.target.value)}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {currentMilestones.map((m) => (
+                    <MenuItem key={m.id} value={m.id}>
+                      {m.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              onClick={() => setAddTaskOpen(false)}
+              color="inherit"
+              disabled={addTaskSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!newTaskDescription.trim() || addTaskSubmitting}
+              endIcon={
+                addTaskSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined
+              }
+              sx={{ px: 3 }}
+            >
+              {addTaskSubmitting ? 'Creating...' : 'Create Task'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
 
       {/* ---- Log Time Modal ---- */}
       <LogTimeModal
