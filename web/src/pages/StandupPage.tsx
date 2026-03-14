@@ -731,7 +731,9 @@ export default function StandupPage() {
       name: m.name,
       due_date: m.due_date,
       is_overdue: m.is_overdue,
-      tasks: activeTasks.filter((t) => (t as Task & { milestone_id?: string | null }).milestone_id === m.id),
+      tasks: activeTasks.filter(
+        (t) => (t as Task & { milestone_id?: string | null }).milestone_id === m.id,
+      ),
     }));
 
     const unassigned = activeTasks.filter(
@@ -1208,7 +1210,11 @@ export default function StandupPage() {
                   ) : viewMode === 'milestones' ? (
                     <>
                       {swimlanes.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ py: 4, textAlign: 'center' }}
+                        >
                           No milestones or tasks to display.
                         </Typography>
                       ) : (
@@ -1220,7 +1226,11 @@ export default function StandupPage() {
                   ) : (
                     <>
                       {personRows.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ py: 4, textAlign: 'center' }}
+                        >
                           No tasks to display.
                         </Typography>
                       ) : (

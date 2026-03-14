@@ -270,7 +270,13 @@ export default function StandupScreen() {
     }));
     const unassigned = activeTasks.filter((t) => !t.milestone_id);
     if (unassigned.length > 0 || lanes.length > 0) {
-      lanes.push({ id: null, name: 'No Milestone', due_date: null, is_overdue: false, tasks: unassigned });
+      lanes.push({
+        id: null,
+        name: 'No Milestone',
+        due_date: null,
+        is_overdue: false,
+        tasks: unassigned,
+      });
     }
     return lanes;
   }, [currentProject, currentTasks, currentMilestones]);
@@ -359,11 +365,7 @@ export default function StandupScreen() {
           disabled={currentIndex === 0}
           style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
         >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color={currentIndex === 0 ? '#ccc' : '#fff'}
-          />
+          <Ionicons name="chevron-back" size={28} color={currentIndex === 0 ? '#ccc' : '#fff'} />
         </TouchableOpacity>
 
         <View style={styles.projectSpotlight}>
@@ -480,10 +482,7 @@ export default function StandupScreen() {
                     swimlanes.map((lane) => (
                       <View
                         key={lane.id ?? '__none__'}
-                        style={[
-                          styles.swimlane,
-                          lane.is_overdue && styles.swimlaneOverdue,
-                        ]}
+                        style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
                       >
                         <View style={styles.swimlaneHeader}>
                           <Text style={styles.swimlaneName}>{lane.name}</Text>
