@@ -298,6 +298,10 @@ function StandupMilestoneSwimlane({
   onDragOver,
   onDragLeave,
   onDragStartTask,
+  onDropTaskStatus,
+  dragOverStatus,
+  onDragOverStatus,
+  onDragLeaveStatus,
 }: {
   swimlane: SwimlaneData;
   onStatusChange: (task: Task) => void;
@@ -308,6 +312,10 @@ function StandupMilestoneSwimlane({
   onDragOver: (e: React.DragEvent, milestoneId: string | null) => void;
   onDragLeave: () => void;
   onDragStartTask: (e: React.DragEvent, task: Task) => void;
+  onDropTaskStatus: (e: React.DragEvent, targetStatus: string) => void;
+  dragOverStatus: string | null;
+  onDragOverStatus: (e: React.DragEvent, status: string) => void;
+  onDragLeaveStatus: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -367,8 +375,11 @@ function StandupMilestoneSwimlane({
       <Collapse in={expanded}>
         <Box
           sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 3,
+            mt: 2,
             pl: 2,
-            mt: 1.5,
             minHeight: 40,
             border: isDragOver ? '2px dashed' : '2px dashed transparent',
             borderColor: isDragOver ? 'primary.main' : 'transparent',
@@ -376,24 +387,88 @@ function StandupMilestoneSwimlane({
             transition: 'border-color 0.2s',
           }}
         >
-          {totalCount === 0 ? (
+          {totalCount === 0 && !isDragOver ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-              {isDragOver ? 'Drop here to move task' : 'No tasks'}
+              No tasks
             </Typography>
           ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {[...todoTasks, ...inProgressTasks, ...doneTasks].map((task) => (
-                <StandupTaskCard
-                  key={task.id}
-                  task={task}
-                  onStatusChange={onStatusChange}
-                  onLogTime={onLogTime}
-                  onAssignmentsChange={onAssignmentsChange}
-                  draggable
-                  onDragStart={onDragStartTask}
-                />
-              ))}
-            </Box>
+            (['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
+              const statusTasks =
+                status === 'TODO'
+                  ? todoTasks
+                  : status === 'IN_PROGRESS'
+                    ? inProgressTasks
+                    : doneTasks;
+              const bgColor =
+                status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
+              const label =
+                status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
+              const isStatusDragOver = dragOverStatus === status;
+
+              return (
+                <Box
+                  key={status}
+                  sx={{ flex: 1, minWidth: 0 }}
+                  onDragOver={(e) => {
+                    e.stopPropagation();
+                    onDragOverStatus(e, status);
+                  }}
+                  onDragLeave={(e) => {
+                    e.stopPropagation();
+                    onDragLeaveStatus();
+                  }}
+                  onDrop={(e) => {
+                    e.stopPropagation();
+                    onDropTaskStatus(e, status);
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, px: 0.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                      {label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      ({statusTasks.length})
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      bgcolor: bgColor,
+                      borderRadius: 1.5,
+                      p: 1,
+                      minHeight: 60,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      border: isStatusDragOver ? '2px dashed' : '2px dashed transparent',
+                      borderColor: isStatusDragOver ? 'primary.main' : 'transparent',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    {statusTasks.length === 0 ? (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ textAlign: 'center', py: 1 }}
+                      >
+                        {isStatusDragOver ? 'Drop here' : '--'}
+                      </Typography>
+                    ) : (
+                      statusTasks.map((task) => (
+                        <StandupTaskCard
+                          key={task.id}
+                          task={task}
+                          onStatusChange={onStatusChange}
+                          onLogTime={onLogTime}
+                          onAssignmentsChange={onAssignmentsChange}
+                          draggable
+                          onDragStart={onDragStartTask}
+                        />
+                      ))
+                    )}
+                  </Box>
+                </Box>
+              );
+            })
           )}
         </Box>
       </Collapse>
@@ -410,20 +485,58 @@ function StandupPeopleRow({
   onStatusChange,
   onLogTime,
   onAssignmentsChange,
+  onDropTask,
+  dragOverRowId,
+  onDragOver,
+  onDragLeave,
+  onDragStartTask,
+  onDropTaskStatus,
+  dragOverStatus,
+  onDragOverStatus,
+  onDragLeaveStatus,
 }: {
   row: PersonRow;
   onStatusChange: (task: Task) => void;
   onLogTime: (task: Task) => void;
   onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
+  onDropTask: (e: React.DragEvent, targetMemberId: string | null) => void;
+  dragOverRowId: string | null | undefined;
+  onDragOver: (e: React.DragEvent, memberId: string | null) => void;
+  onDragLeave: () => void;
+  onDragStartTask: (e: React.DragEvent, task: Task) => void;
+  onDropTaskStatus: (e: React.DragEvent, targetStatus: string) => void;
+  dragOverStatus: string | null;
+  onDragOverStatus: (e: React.DragEvent, status: string) => void;
+  onDragLeaveStatus: () => void;
 }) {
   const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
   const initial = row.memberName.charAt(0).toUpperCase();
 
+  const rowKey = row.memberId ?? '__unassigned__';
+  const isDragOver = dragOverRowId === rowKey;
+
   return (
-    <Box sx={{ mb: 2.5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, px: 0.5 }}>
+    <Box
+      sx={{ mb: 2.5 }}
+      onDragOver={(e) => onDragOver(e, row.memberId)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDropTask(e, row.memberId)}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 1,
+          px: 0.5,
+          p: 1,
+          borderRadius: 1,
+          bgcolor: isDragOver ? 'action.hover' : 'transparent',
+          transition: 'background-color 0.2s',
+        }}
+      >
         <Avatar
           sx={{
             width: 28,
@@ -451,6 +564,10 @@ function StandupPeopleRow({
           flexDirection: { xs: 'column', md: 'row' },
           gap: 2,
           pl: 1,
+          border: isDragOver ? '2px dashed' : '2px dashed transparent',
+          borderColor: isDragOver ? 'primary.main' : 'transparent',
+          borderRadius: 1,
+          transition: 'border-color 0.2s',
         }}
       >
         {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
@@ -460,9 +577,25 @@ function StandupPeopleRow({
             status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
           const label =
             status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
+          const isStatusDragOver = dragOverStatus === status;
 
           return (
-            <Box key={status} sx={{ flex: 1, minWidth: 0 }}>
+            <Box
+              key={status}
+              sx={{ flex: 1, minWidth: 0 }}
+              onDragOver={(e) => {
+                e.stopPropagation();
+                onDragOverStatus(e, status);
+              }}
+              onDragLeave={(e) => {
+                e.stopPropagation();
+                onDragLeaveStatus();
+              }}
+              onDrop={(e) => {
+                e.stopPropagation();
+                onDropTaskStatus(e, status);
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, px: 0.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                   {label}
@@ -480,6 +613,9 @@ function StandupPeopleRow({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 1,
+                  border: isStatusDragOver ? '2px dashed' : '2px dashed transparent',
+                  borderColor: isStatusDragOver ? 'primary.main' : 'transparent',
+                  transition: 'border-color 0.2s',
                 }}
               >
                 {statusTasks.length === 0 ? (
@@ -488,7 +624,7 @@ function StandupPeopleRow({
                     color="text.secondary"
                     sx={{ textAlign: 'center', py: 1 }}
                   >
-                    --
+                    {isStatusDragOver ? 'Drop here' : '--'}
                   </Typography>
                 ) : (
                   statusTasks.map((task) => (
@@ -498,6 +634,8 @@ function StandupPeopleRow({
                       onStatusChange={onStatusChange}
                       onLogTime={onLogTime}
                       onAssignmentsChange={onAssignmentsChange}
+                      draggable
+                      onDragStart={onDragStartTask}
                     />
                   ))
                 )}
@@ -642,6 +780,7 @@ export default function StandupPage() {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const [dragOverMilestone, setDragOverMilestone] = useState<string | null | undefined>(undefined);
+  const [dragOverPerson, setDragOverPerson] = useState<string | null | undefined>(undefined);
 
   // Hide empty milestones toggle (persisted in localStorage)
   const HIDE_EMPTY_KEY = 'standup-hide-empty-milestones';
@@ -1058,6 +1197,138 @@ export default function StandupPage() {
       }
     },
     [draggedTask, currentProject, tasksByProject, currentMilestones],
+  );
+
+  // ---- Drag-and-drop: People view ----
+  const handlePeopleDragStart = useCallback((e: React.DragEvent, task: Task) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', task.id);
+  }, []);
+
+  const handlePeopleDragOver = useCallback((e: React.DragEvent, memberId: string | null) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverPerson(memberId ?? '__unassigned__');
+  }, []);
+
+  const handlePeopleDragLeave = useCallback(() => {
+    setDragOverPerson(undefined);
+  }, []);
+
+  const handlePeopleDrop = useCallback(
+    async (e: React.DragEvent, targetMemberId: string | null) => {
+      e.preventDefault();
+      setDragOverPerson(undefined);
+      if (!draggedTask || !currentProject) return;
+
+      const taskId = draggedTask.id;
+      const projectId = currentProject.id;
+      const previousTasks = tasksByProject[projectId] ?? [];
+
+      // Find current assignments
+      const currentAssignments = draggedTask.assignments ?? [];
+      const currentMemberIds = currentAssignments.map((a) => a.team_member_id);
+
+      // Skip if already assigned to the target (or if unassigned and target is null)
+      if (targetMemberId === null && currentAssignments.length === 0) {
+        setDraggedTask(null);
+        return;
+      }
+      if (targetMemberId && currentMemberIds.includes(targetMemberId)) {
+        setDraggedTask(null);
+        return;
+      }
+
+      setDraggedTask(null);
+
+      try {
+        if (targetMemberId === null) {
+          // Remove all assignments
+          for (const assignment of currentAssignments) {
+            await api.delete(`/api/tasks/${taskId}/assignments/${assignment.id}`);
+          }
+          // Update local state
+          setTasksByProject((prev) => ({
+            ...prev,
+            [projectId]: (prev[projectId] ?? []).map((t) =>
+              t.id === taskId ? { ...t, assignments: [] } : t,
+            ),
+          }));
+          showSnackbar('Task unassigned');
+        } else {
+          // Add new assignment
+          const result = await api.post<TaskAssignment>(`/api/tasks/${taskId}/assignments`, {
+            team_member_id: targetMemberId,
+          });
+          setTasksByProject((prev) => ({
+            ...prev,
+            [projectId]: (prev[projectId] ?? []).map((t) =>
+              t.id === taskId ? { ...t, assignments: [...(t.assignments ?? []), result] } : t,
+            ),
+          }));
+          showSnackbar('Task reassigned');
+        }
+      } catch (err) {
+        setTasksByProject((prev) => ({
+          ...prev,
+          [projectId]: previousTasks,
+        }));
+        const message = err instanceof ApiError ? err.message : 'Failed to reassign task.';
+        showSnackbar(message, 'error');
+      }
+    },
+    [draggedTask, currentProject, tasksByProject],
+  );
+
+  // ---- Drag-and-drop: Status change (shared for milestones/people views) ----
+  const handleSwimlaneStatusDragOver = useCallback((e: React.DragEvent, status: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStatus(status);
+  }, []);
+
+  const handleSwimlaneStatusDragLeave = useCallback(() => {
+    setDragOverStatus(null);
+  }, []);
+
+  const handleSwimlaneStatusDrop = useCallback(
+    async (e: React.DragEvent, targetStatus: string) => {
+      e.preventDefault();
+      setDragOverStatus(null);
+      if (!draggedTask || !currentProject) return;
+      if (draggedTask.status === targetStatus) {
+        setDraggedTask(null);
+        return;
+      }
+
+      const projectId = currentProject.id;
+      const taskId = draggedTask.id;
+      const previousTasks = tasksByProject[projectId] ?? [];
+
+      setTasksByProject((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] ?? []).map((t) =>
+          t.id === taskId ? { ...t, status: targetStatus } : t,
+        ),
+      }));
+      setDraggedTask(null);
+
+      try {
+        await api.put(`/api/projects/${projectId}/tasks/${taskId}`, {
+          status: targetStatus,
+        });
+        showSnackbar(`Task moved to ${TASK_STATUS_LABEL[targetStatus]}`);
+      } catch (err) {
+        setTasksByProject((prev) => ({
+          ...prev,
+          [projectId]: previousTasks,
+        }));
+        const message = err instanceof ApiError ? err.message : 'Failed to update task status.';
+        showSnackbar(message, 'error');
+      }
+    },
+    [draggedTask, currentProject, tasksByProject],
   );
 
   // ---- Filtered swimlanes (hide empty milestones) ----
@@ -1501,6 +1772,10 @@ export default function StandupPage() {
                             onDragOver={handleMilestoneDragOver}
                             onDragLeave={handleMilestoneDragLeave}
                             onDragStartTask={handleMilestoneDragStart}
+                            onDropTaskStatus={handleSwimlaneStatusDrop}
+                            dragOverStatus={dragOverStatus}
+                            onDragOverStatus={handleSwimlaneStatusDragOver}
+                            onDragLeaveStatus={handleSwimlaneStatusDragLeave}
                           />
                         ))
                       )}
@@ -1523,6 +1798,15 @@ export default function StandupPage() {
                             onStatusChange={handleStatusChange}
                             onLogTime={handleLogTimeTask}
                             onAssignmentsChange={handleAssignmentsChange}
+                            onDropTask={handlePeopleDrop}
+                            dragOverRowId={dragOverPerson}
+                            onDragOver={handlePeopleDragOver}
+                            onDragLeave={handlePeopleDragLeave}
+                            onDragStartTask={handlePeopleDragStart}
+                            onDropTaskStatus={handleSwimlaneStatusDrop}
+                            dragOverStatus={dragOverStatus}
+                            onDragOverStatus={handleSwimlaneStatusDragOver}
+                            onDragLeaveStatus={handleSwimlaneStatusDragLeave}
                           />
                         ))
                       )}

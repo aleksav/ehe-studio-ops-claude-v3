@@ -516,41 +516,75 @@ export default function StandupScreen() {
                   {filteredSwimlanes.length === 0 ? (
                     <Text style={styles.noTasksText}>No milestones or tasks to display.</Text>
                   ) : (
-                    filteredSwimlanes.map((lane) => (
-                      <View
-                        key={lane.id ?? '__none__'}
-                        style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
-                      >
-                        <View style={styles.swimlaneHeader}>
-                          <Text style={styles.swimlaneName}>{lane.name}</Text>
-                          {lane.due_date && (
-                            <Text style={styles.swimlaneDue}>
-                              Due {new Date(lane.due_date).toLocaleDateString()}
-                            </Text>
-                          )}
-                          {lane.is_overdue && (
-                            <View style={styles.overdueChip}>
-                              <Text style={styles.overdueChipText}>Overdue</Text>
+                    filteredSwimlanes.map((lane) => {
+                      const laneTodo = lane.tasks.filter((t) => t.status === 'TODO');
+                      const laneInProgress = lane.tasks.filter((t) => t.status === 'IN_PROGRESS');
+                      const laneDone = lane.tasks.filter((t) => t.status === 'DONE');
+                      const laneTotal = laneTodo.length + laneInProgress.length + laneDone.length;
+                      return (
+                        <View
+                          key={lane.id ?? '__none__'}
+                          style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
+                        >
+                          <View style={styles.swimlaneHeader}>
+                            <Text style={styles.swimlaneName}>{lane.name}</Text>
+                            {lane.due_date && (
+                              <Text style={styles.swimlaneDue}>
+                                Due {new Date(lane.due_date).toLocaleDateString()}
+                              </Text>
+                            )}
+                            {lane.is_overdue && (
+                              <View style={styles.overdueChip}>
+                                <Text style={styles.overdueChipText}>Overdue</Text>
+                              </View>
+                            )}
+                            <View style={styles.countChip}>
+                              <Text style={styles.countChipText}>{laneTotal}</Text>
                             </View>
-                          )}
-                          <View style={styles.countChip}>
-                            <Text style={styles.countChipText}>{lane.tasks.length}</Text>
                           </View>
+                          {laneTotal === 0 ? (
+                            <Text style={styles.noTasksText}>No tasks</Text>
+                          ) : (
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              style={styles.columnsScroll}
+                            >
+                              {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((col) => {
+                                const colTasks =
+                                  col === 'TODO'
+                                    ? laneTodo
+                                    : col === 'IN_PROGRESS'
+                                      ? laneInProgress
+                                      : laneDone;
+                                return (
+                                  <View
+                                    key={col}
+                                    style={[styles.column, { backgroundColor: COLUMN_COLORS[col] }]}
+                                  >
+                                    <View style={styles.columnHeader}>
+                                      <Text style={styles.columnTitle}>{COLUMN_LABELS[col]}</Text>
+                                      <Text style={styles.columnCount}>{colTasks.length}</Text>
+                                    </View>
+                                    {colTasks.map((task) => (
+                                      <TaskCard
+                                        key={task.id}
+                                        title={task.description}
+                                        status={task.status}
+                                        assignments={task.assignments}
+                                      />
+                                    ))}
+                                    {colTasks.length === 0 && (
+                                      <Text style={styles.noTasksText}>No tasks</Text>
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </ScrollView>
+                          )}
                         </View>
-                        {lane.tasks.length === 0 ? (
-                          <Text style={styles.noTasksText}>No tasks</Text>
-                        ) : (
-                          lane.tasks.map((task) => (
-                            <TaskCard
-                              key={task.id}
-                              title={task.description}
-                              status={task.status}
-                              assignments={task.assignments}
-                            />
-                          ))
-                        )}
-                      </View>
-                    ))
+                      );
+                    })
                   )}
                 </View>
               ) : (
@@ -558,34 +592,67 @@ export default function StandupScreen() {
                   {personRows.length === 0 ? (
                     <Text style={styles.noTasksText}>No tasks to display.</Text>
                   ) : (
-                    personRows.map((row) => (
-                      <View key={row.memberId ?? 'unassigned'} style={styles.personSection}>
-                        <View style={styles.personHeader}>
-                          <View
-                            style={[
-                              styles.personAvatar,
-                              { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
-                            ]}
+                    personRows.map((row) => {
+                      const rowTodo = row.tasks.filter((t) => t.status === 'TODO');
+                      const rowInProgress = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
+                      const rowDone = row.tasks.filter((t) => t.status === 'DONE');
+                      return (
+                        <View key={row.memberId ?? 'unassigned'} style={styles.personSection}>
+                          <View style={styles.personHeader}>
+                            <View
+                              style={[
+                                styles.personAvatar,
+                                { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
+                              ]}
+                            >
+                              <Text style={styles.personAvatarText}>
+                                {row.memberName.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                            <Text style={styles.personName}>{row.memberName}</Text>
+                            <View style={styles.countChip}>
+                              <Text style={styles.countChipText}>{row.tasks.length}</Text>
+                            </View>
+                          </View>
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.columnsScroll}
                           >
-                            <Text style={styles.personAvatarText}>
-                              {row.memberName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                          <Text style={styles.personName}>{row.memberName}</Text>
-                          <View style={styles.countChip}>
-                            <Text style={styles.countChipText}>{row.tasks.length}</Text>
-                          </View>
+                            {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((col) => {
+                              const colTasks =
+                                col === 'TODO'
+                                  ? rowTodo
+                                  : col === 'IN_PROGRESS'
+                                    ? rowInProgress
+                                    : rowDone;
+                              return (
+                                <View
+                                  key={col}
+                                  style={[styles.column, { backgroundColor: COLUMN_COLORS[col] }]}
+                                >
+                                  <View style={styles.columnHeader}>
+                                    <Text style={styles.columnTitle}>{COLUMN_LABELS[col]}</Text>
+                                    <Text style={styles.columnCount}>{colTasks.length}</Text>
+                                  </View>
+                                  {colTasks.map((task) => (
+                                    <TaskCard
+                                      key={task.id}
+                                      title={task.description}
+                                      status={task.status}
+                                      assignments={task.assignments}
+                                    />
+                                  ))}
+                                  {colTasks.length === 0 && (
+                                    <Text style={styles.noTasksText}>No tasks</Text>
+                                  )}
+                                </View>
+                              );
+                            })}
+                          </ScrollView>
                         </View>
-                        {row.tasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            title={task.description}
-                            status={task.status}
-                            assignments={task.assignments}
-                          />
-                        ))}
-                      </View>
-                    ))
+                      );
+                    })
                   )}
                 </View>
               )}
