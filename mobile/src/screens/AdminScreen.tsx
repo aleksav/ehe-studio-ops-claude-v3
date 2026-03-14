@@ -6,8 +6,9 @@ import ClientsScreen from './ClientsScreen';
 import TeamScreen from './TeamScreen';
 import AuditLogScreen from './AuditLogScreen';
 import TaskRatesScreen from './TaskRatesScreen';
+import PublicHolidaysScreen from './PublicHolidaysScreen';
 
-const TABS = ['Clients', 'Team', 'Audit Log', 'Task Rates'] as const;
+const TABS = ['Clients', 'Team', 'Audit Log', 'Task Rates', 'Holidays'] as const;
 type TabKey = (typeof TABS)[number];
 
 const STORAGE_KEY = 'admin-active-tab';
@@ -51,6 +52,7 @@ export default function AdminScreen() {
         {activeTab === 1 && <TeamScreen />}
         {activeTab === 2 && <AuditLogScreen />}
         {activeTab === 3 && <TaskRatesScreen />}
+        {activeTab === 4 && <PublicHolidaysScreen />}
       </View>
     </View>
   );

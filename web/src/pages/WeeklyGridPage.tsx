@@ -109,41 +109,15 @@ const LS_KEY_TASK_TYPES = 'weeklyGrid:taskTypes';
 const DAILY_WARN_THRESHOLD = 8;
 const DAILY_BLOCK_THRESHOLD = 12;
 
-// ---------------------------------------------------------------------------
-// UK Bank Holidays (England & Wales)
-// TODO: fetch from https://www.gov.uk/bank-holidays.json
-// ---------------------------------------------------------------------------
-
-const UK_BANK_HOLIDAYS: Set<string> = new Set([
-  // 2025
-  '2025-01-01', // New Year's Day
-  '2025-04-18', // Good Friday
-  '2025-04-21', // Easter Monday
-  '2025-05-05', // Early May bank holiday
-  '2025-05-26', // Spring bank holiday
-  '2025-08-25', // Summer bank holiday
-  '2025-12-25', // Christmas Day
-  '2025-12-26', // Boxing Day
-  // 2026
-  '2026-01-01', // New Year's Day
-  '2026-04-03', // Good Friday
-  '2026-04-06', // Easter Monday
-  '2026-05-04', // Early May bank holiday
-  '2026-05-25', // Spring bank holiday
-  '2026-08-31', // Summer bank holiday
-  '2026-12-25', // Christmas Day
-  '2026-12-28', // Boxing Day (substitute)
-]);
-
 /**
  * Returns 'weekend' | 'holiday' | null indicating whether the given ISO date
  * string falls on a blocked date.
  */
-function isBlockedDate(dateStr: string): 'weekend' | 'holiday' | null {
+function isBlockedDate(dateStr: string, holidayDates: Set<string>): 'weekend' | 'holiday' | null {
   const d = parseISO(dateStr);
   const day = d.getDay();
   if (day === 0 || day === 6) return 'weekend';
-  if (UK_BANK_HOLIDAYS.has(dateStr)) return 'holiday';
+  if (holidayDates.has(dateStr)) return 'holiday';
   return null;
 }
 
@@ -269,6 +243,26 @@ export default function WeeklyGridPage() {
   const [cells, setCells] = useState<Record<string, CellData>>({});
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ---- Public holidays ----
+  const [holidayDates, setHolidayDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ date: string }[]>('/api/public-holidays');
+        if (!cancelled) {
+          setHolidayDates(new Set(data.map((h) => h.date.substring(0, 10))));
+        }
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ---- Weekend / holiday override state ----
   const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
@@ -426,7 +420,7 @@ export default function WeeklyGridPage() {
       }
 
       // Check weekend / bank holiday block before daily threshold
-      const blockReason = isBlockedDate(dateStr);
+      const blockReason = isBlockedDate(dateStr, holidayDates);
       if (blockReason && !unblockedDates.has(dateStr)) return;
 
       // Check daily limit
@@ -498,7 +492,7 @@ export default function WeeklyGridPage() {
    */
   const interceptBlockedFocus = useCallback(
     (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
-      const blockReason = isBlockedDate(dateStr);
+      const blockReason = isBlockedDate(dateStr, holidayDates);
       if (blockReason && !unblockedDates.has(dateStr)) {
         e.preventDefault();
         (e.target as HTMLElement).blur?.();
@@ -683,7 +677,7 @@ export default function WeeklyGridPage() {
                 {weekDates.map((d, i) => {
                   const ds = dateKey(d);
                   const dt = computeDailyTotal(ds);
-                  const blockReason = isBlockedDate(ds);
+                  const blockReason = isBlockedDate(ds, holidayDates);
                   const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                   return (
                     <TableCell
@@ -746,7 +740,7 @@ export default function WeeklyGridPage() {
                       const cell = cells[ck];
                       const dt = computeDailyTotal(ds);
                       const dailyBlocked = dt >= DAILY_BLOCK_THRESHOLD;
-                      const blockReason = isBlockedDate(ds);
+                      const blockReason = isBlockedDate(ds, holidayDates);
                       const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
                       const hasValue = parseFloat(cell?.hours ?? '0') > 0;
                       const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
@@ -878,7 +872,7 @@ export default function WeeklyGridPage() {
                 {weekDates.map((d) => {
                   const ds = dateKey(d);
                   const dt = computeDailyTotal(ds);
-                  const footerBlockReason = isBlockedDate(ds);
+                  const footerBlockReason = isBlockedDate(ds, holidayDates);
                   const footerDateBlocked = footerBlockReason !== null && !unblockedDates.has(ds);
                   return (
                     <TableCell

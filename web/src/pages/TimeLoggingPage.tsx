@@ -168,32 +168,11 @@ const LS_KEY_TASK_TYPES = 'weeklyGrid:taskTypes';
 const DAILY_WARN_THRESHOLD = 8;
 const DAILY_BLOCK_THRESHOLD = 12;
 
-const UK_BANK_HOLIDAYS: Set<string> = new Set([
-  // 2025
-  '2025-01-01',
-  '2025-04-18',
-  '2025-04-21',
-  '2025-05-05',
-  '2025-05-26',
-  '2025-08-25',
-  '2025-12-25',
-  '2025-12-26',
-  // 2026
-  '2026-01-01',
-  '2026-04-03',
-  '2026-04-06',
-  '2026-05-04',
-  '2026-05-25',
-  '2026-08-31',
-  '2026-12-25',
-  '2026-12-28',
-]);
-
-function isBlockedDate(dateStr: string): 'weekend' | 'holiday' | null {
+function isBlockedDate(dateStr: string, holidayDates: Set<string>): 'weekend' | 'holiday' | null {
   const d = parseISO(dateStr);
   const day = d.getDay();
   if (day === 0 || day === 6) return 'weekend';
-  if (UK_BANK_HOLIDAYS.has(dateStr)) return 'holiday';
+  if (holidayDates.has(dateStr)) return 'holiday';
   return null;
 }
 
@@ -316,6 +295,26 @@ export default function TimeLoggingPage() {
         // silently fail
       } finally {
         if (!cancelled) setProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---- Public holidays ----
+  const [holidayDates, setHolidayDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ date: string }[]>('/api/public-holidays');
+        if (!cancelled) {
+          setHolidayDates(new Set(data.map((h) => h.date.substring(0, 10))));
+        }
+      } catch {
+        // silently fail — holidays will just not be blocked
       }
     })();
     return () => {
@@ -510,7 +509,7 @@ export default function TimeLoggingPage() {
       const hoursNum = parseFloat(cell.hours);
       if (!cell.hours || isNaN(hoursNum) || hoursNum <= 0) return;
 
-      const blockReason = isBlockedDate(dateStr);
+      const blockReason = isBlockedDate(dateStr, holidayDates);
       if (blockReason && !unblockedDates.has(dateStr)) return;
 
       const dailyTotal = computeDailyTotal(dateStr);
@@ -574,7 +573,7 @@ export default function TimeLoggingPage() {
 
   const interceptBlockedFocus = useCallback(
     (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
-      const blockReason = isBlockedDate(dateStr);
+      const blockReason = isBlockedDate(dateStr, holidayDates);
       if (blockReason && !unblockedDates.has(dateStr)) {
         e.preventDefault();
         (e.target as HTMLElement).blur?.();
@@ -800,6 +799,22 @@ export default function TimeLoggingPage() {
             <IconButton onClick={() => navigateWeek(1)} size="small">
               <ChevronRightIcon />
             </IconButton>
+            <TextField
+              type="date"
+              size="small"
+              value={format(currentWeekStart, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                const picked = parseISO(e.target.value);
+                if (!isNaN(picked.getTime())) {
+                  setSearchParams(
+                    { week: toISOWeekString(startOfISOWeek(picked)) },
+                    { replace: true },
+                  );
+                }
+              }}
+              sx={{ ml: 1, width: 160 }}
+              InputProps={{ sx: { height: 32, fontSize: '0.85rem' } }}
+            />
             <Button variant="outlined" size="small" onClick={goToThisWeek} sx={{ ml: 1 }}>
               This Week
             </Button>
@@ -870,7 +885,7 @@ export default function TimeLoggingPage() {
                     {weekDates.map((d, i) => {
                       const ds = dateKey(d);
                       const dt = computeDailyTotal(ds);
-                      const blockReason = isBlockedDate(ds);
+                      const blockReason = isBlockedDate(ds, holidayDates);
                       const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                       return (
                         <TableCell
@@ -933,7 +948,7 @@ export default function TimeLoggingPage() {
                           const cell = cells[ck];
                           const dt = computeDailyTotal(ds);
                           const dailyBlocked = dt >= DAILY_BLOCK_THRESHOLD;
-                          const blockReason = isBlockedDate(ds);
+                          const blockReason = isBlockedDate(ds, holidayDates);
                           const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
                           const hasValue = parseFloat(cell?.hours ?? '0') > 0;
                           const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
@@ -1065,7 +1080,7 @@ export default function TimeLoggingPage() {
                     {weekDates.map((d) => {
                       const ds = dateKey(d);
                       const dt = computeDailyTotal(ds);
-                      const footerBlockReason = isBlockedDate(ds);
+                      const footerBlockReason = isBlockedDate(ds, holidayDates);
                       const footerDateBlocked =
                         footerBlockReason !== null && !unblockedDates.has(ds);
                       return (

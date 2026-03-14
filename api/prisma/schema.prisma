@@ -195,6 +195,16 @@ model TaskRate {
   @@map("task_rates")
 }
 
+model PublicHoliday {
+  id         String   @id @default(uuid())
+  date       DateTime @unique @db.Date
+  name       String
+  created_at DateTime @default(now())
+
+  @@index([date])
+  @@map("public_holidays")
+}
+
 model AuditLog {
   id             String      @id @default(uuid())
   entity_type    String
