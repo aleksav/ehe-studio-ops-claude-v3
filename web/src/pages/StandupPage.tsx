@@ -66,17 +66,6 @@ const NEXT_STATUS: Record<string, string> = {
   DONE: 'TODO',
 };
 
-const STANDUP_PROMPTS = [
-  'What did you accomplish yesterday?',
-  'Any blockers the team can help with?',
-  'What wins are we celebrating today?',
-  "What's your focus for today?",
-  'Anyone need a pair of fresh eyes?',
-  'Any risks or concerns to flag?',
-  'What are you most excited about?',
-  'How can the team support you today?',
-];
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -110,14 +99,6 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 function todaySeed(): number {
   const now = new Date();
   return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-}
-
-/** Get the day-of-year (0-based) for prompt selection. */
-function dayOfYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const diff = now.getTime() - start.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
 // ---------------------------------------------------------------------------
@@ -191,11 +172,6 @@ export default function StandupPage() {
 
   const currentItem = carouselItems[currentIndex] ?? null;
   const currentProject = currentItem?.type === 'active' ? currentItem.project : null;
-
-  // ---- Daily standup prompt ----
-  const standupPrompt = useMemo(() => {
-    return STANDUP_PROMPTS[dayOfYear() % STANDUP_PROMPTS.length];
-  }, []);
 
   // ---- Fetch projects on mount ----
   useEffect(() => {
@@ -522,61 +498,49 @@ export default function StandupPage() {
 
   return (
     <Box ref={containerRef} sx={{ p: { xs: 1.5, sm: 3 }, maxWidth: 1200, mx: 'auto' }}>
-      {/* ---- Compact Header: Title + Dots + Counter ---- */}
+      {/* ---- Progress dots + Counter ---- */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           mb: 1,
+          gap: 1,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-            Standup
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{ color: 'primary.main', fontStyle: 'italic', opacity: 0.85 }}
-          >
-            {standupPrompt}
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {carouselItems.map((item, idx) => (
-            <Box
-              key={idx}
-              sx={{
-                width: idx === currentIndex ? 20 : 7,
-                height: 7,
-                borderRadius: 4,
-                bgcolor:
-                  idx === currentIndex
-                    ? item.type === 'planned'
-                      ? 'grey.500'
-                      : 'primary.main'
-                    : 'grey.300',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer',
-              }}
-              onClick={() => {
-                if (idx === currentIndex) return;
-                setSlideDirection(idx > currentIndex ? 'left' : 'right');
-                setVisible(false);
-                setTimeout(() => {
-                  setCurrentIndex(idx);
-                  setSlideDirection(idx > currentIndex ? 'right' : 'left');
-                  setVisible(true);
-                }, 200);
-              }}
-            />
-          ))}
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-            {currentItem?.type === 'planned'
-              ? 'Coming Up'
-              : `${currentIndex + 1}/${activeProjects.length}`}
-          </Typography>
-        </Box>
+        {carouselItems.map((item, idx) => (
+          <Box
+            key={idx}
+            sx={{
+              width: idx === currentIndex ? 20 : 7,
+              height: 7,
+              borderRadius: 4,
+              bgcolor:
+                idx === currentIndex
+                  ? item.type === 'planned'
+                    ? 'grey.500'
+                    : 'primary.main'
+                  : 'grey.300',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+            }}
+            onClick={() => {
+              if (idx === currentIndex) return;
+              setSlideDirection(idx > currentIndex ? 'left' : 'right');
+              setVisible(false);
+              setTimeout(() => {
+                setCurrentIndex(idx);
+                setSlideDirection(idx > currentIndex ? 'right' : 'left');
+                setVisible(true);
+              }, 200);
+            }}
+          />
+        ))}
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+          {currentItem?.type === 'planned'
+            ? 'Coming Up'
+            : `${currentIndex + 1}/${activeProjects.length}`}
+        </Typography>
       </Box>
 
       {/* ---- Carousel Area ---- */}
