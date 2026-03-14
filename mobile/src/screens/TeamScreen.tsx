@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 
 interface TeamMember {
   id: string;
@@ -28,10 +39,25 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
+function validatePassword(password: string): string {
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Must contain uppercase, lowercase, and a number';
+  }
+  return '';
+}
+
 export default function TeamScreen() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Password modal state
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordMember, setPasswordMember] = useState<TeamMember | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -52,6 +78,44 @@ export default function TeamScreen() {
     setRefreshing(true);
     await fetchMembers();
     setRefreshing(false);
+  };
+
+  const handleOpenPasswordModal = (member: TeamMember) => {
+    setPasswordMember(member);
+    setNewPassword('');
+    setPasswordError('');
+    setPasswordModalVisible(true);
+  };
+
+  const handleClosePasswordModal = () => {
+    if (passwordSubmitting) return;
+    setPasswordModalVisible(false);
+    setPasswordMember(null);
+  };
+
+  const handlePasswordSubmit = async () => {
+    const error = validatePassword(newPassword);
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+    if (!passwordMember || passwordSubmitting) return;
+
+    setPasswordSubmitting(true);
+    try {
+      await api.put(`/api/team-members/${passwordMember.id}/password`, {
+        new_password: newPassword,
+      });
+      Alert.alert('Success', `Password updated for "${passwordMember.full_name}".`);
+      setPasswordModalVisible(false);
+      setPasswordMember(null);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      Alert.alert('Error', message);
+    } finally {
+      setPasswordSubmitting(false);
+    }
   };
 
   const renderMember = ({ item }: { item: TeamMember }) => (
@@ -88,6 +152,9 @@ export default function TeamScreen() {
           </View>
         )}
       </View>
+      <TouchableOpacity style={styles.passwordButton} onPress={() => handleOpenPasswordModal(item)}>
+        <Text style={styles.passwordButtonText}>Change Password</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -100,18 +167,77 @@ export default function TeamScreen() {
   }
 
   return (
-    <FlatList
-      data={members}
-      keyExtractor={(item) => item.id}
-      renderItem={renderMember}
-      contentContainerStyle={styles.list}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No team members found.</Text>
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={members}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMember}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No team members found.</Text>
+          </View>
+        }
+      />
+
+      {/* Change Password Modal */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={handleClosePasswordModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Change Password{passwordMember ? ` — ${passwordMember.full_name}` : ''}
+            </Text>
+            <TextInput
+              style={[styles.modalInput, passwordError ? styles.modalInputError : undefined]}
+              placeholder="New password"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={(text) => {
+                setNewPassword(text);
+                if (passwordError) setPasswordError(validatePassword(text));
+              }}
+              autoFocus
+            />
+            {passwordError ? (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            ) : (
+              <Text style={styles.hintText}>
+                Min 8 characters with uppercase, lowercase, and a number
+              </Text>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleClosePasswordModal}
+                disabled={passwordSubmitting}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitButton,
+                  (!newPassword || passwordSubmitting) && styles.modalSubmitDisabled,
+                ]}
+                onPress={handlePasswordSubmit}
+                disabled={!newPassword || passwordSubmitting}
+              >
+                {passwordSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      }
-    />
+      </Modal>
+    </View>
   );
 }
 
@@ -198,5 +324,90 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.sizes.body2,
     color: '#999',
+  },
+  passwordButton: {
+    marginTop: spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    alignSelf: 'flex-start',
+    borderRadius: borderRadius.chip,
+    backgroundColor: '#F0F0F0',
+  },
+  passwordButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: borderRadius.card,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: typography.sizes.body1,
+    color: colors.text,
+  },
+  modalInputError: {
+    borderColor: '#D32F2F',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#D32F2F',
+    marginTop: 4,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  modalCancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+  },
+  modalCancelText: {
+    fontSize: typography.sizes.body1,
+    color: '#666',
+    fontWeight: '600',
+  },
+  modalSubmitButton: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  modalSubmitDisabled: {
+    opacity: 0.5,
+  },
+  modalSubmitText: {
+    fontSize: typography.sizes.body1,
+    color: '#fff',
+    fontWeight: '600',
   },
 });

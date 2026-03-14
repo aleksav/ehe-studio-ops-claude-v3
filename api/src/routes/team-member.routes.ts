@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { AuditAction, TaskType } from '@prisma/client';
 import prisma from '../utils/prisma';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
@@ -182,6 +183,69 @@ router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Res
     res.json(teamMember);
   } catch (error) {
     console.error('Delete team member error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/team-members/:id/password
+router.put('/:id/password', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { new_password } = req.body;
+
+    if (!new_password || typeof new_password !== 'string') {
+      res.status(400).json({ error: 'new_password is required' });
+      return;
+    }
+
+    if (new_password.length < 8) {
+      res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return;
+    }
+
+    if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password)) {
+      res.status(400).json({
+        error:
+          'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+      });
+      return;
+    }
+
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { id: req.params.id },
+      include: { user: true },
+    });
+
+    if (!teamMember) {
+      res.status(404).json({ error: 'Team member not found' });
+      return;
+    }
+
+    if (!teamMember.user) {
+      res.status(404).json({ error: 'No user account linked to this team member' });
+      return;
+    }
+
+    const actorId = req.user?.teamMemberId ?? null;
+    const password_hash = await bcrypt.hash(new_password, 10);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: teamMember.user!.id },
+        data: { password_hash },
+      });
+
+      await writeAudit(tx, {
+        entityType: 'User',
+        entityId: teamMember.user!.id,
+        action: AuditAction.UPDATE,
+        actorId,
+        changedFields: { password: { before: '***', after: '***' } },
+      });
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Update team member password error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
