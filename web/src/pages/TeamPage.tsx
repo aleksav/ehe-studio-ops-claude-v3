@@ -23,6 +23,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import LockResetIcon from '@mui/icons-material/LockReset';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import PersonIcon from '@mui/icons-material/Person';
 import { api, ApiError } from '../lib/api';
@@ -97,6 +98,13 @@ export default function TeamPage() {
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [form, setForm] = useState<MemberFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+
+  // Password dialog state
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordMember, setPasswordMember] = useState<TeamMember | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   // Snackbar state
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -200,6 +208,57 @@ export default function TeamPage() {
       const message =
         err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
       showSnackbar(message, 'error');
+    }
+  };
+
+  // ---- Open password dialog ----
+  const handleOpenPasswordDialog = (member: TeamMember) => {
+    setPasswordMember(member);
+    setNewPassword('');
+    setPasswordError('');
+    setPasswordDialogOpen(true);
+  };
+
+  // ---- Close password dialog ----
+  const handleClosePasswordDialog = () => {
+    if (passwordSubmitting) return;
+    setPasswordDialogOpen(false);
+    setPasswordMember(null);
+  };
+
+  // ---- Validate password ----
+  const validatePassword = (password: string): string => {
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return 'Must contain uppercase, lowercase, and a number';
+    }
+    return '';
+  };
+
+  // ---- Submit password change ----
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const error = validatePassword(newPassword);
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+    if (!passwordMember || passwordSubmitting) return;
+
+    setPasswordSubmitting(true);
+    try {
+      await api.put(`/api/team-members/${passwordMember.id}/password`, {
+        new_password: newPassword,
+      });
+      showSnackbar(`Password updated for "${passwordMember.full_name}".`);
+      setPasswordDialogOpen(false);
+      setPasswordMember(null);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.';
+      showSnackbar(message, 'error');
+    } finally {
+      setPasswordSubmitting(false);
     }
   };
 
@@ -317,6 +376,13 @@ export default function TeamPage() {
                   </Button>
                   <Button
                     size="small"
+                    startIcon={<LockResetIcon />}
+                    onClick={() => handleOpenPasswordDialog(member)}
+                  >
+                    Password
+                  </Button>
+                  <Button
+                    size="small"
                     color={member.is_active ? 'warning' : 'success'}
                     startIcon={member.is_active ? <PersonOffIcon /> : <PersonIcon />}
                     onClick={() => handleToggleActive(member)}
@@ -394,6 +460,61 @@ export default function TeamPage() {
               sx={{ px: 3 }}
             >
               {submitting ? 'Saving...' : editingMember ? 'Save Changes' : 'Add Member'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog
+        open={passwordDialogOpen}
+        onClose={handleClosePasswordDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+          Change Password{passwordMember ? ` — ${passwordMember.full_name}` : ''}
+        </DialogTitle>
+        <Box component="form" onSubmit={handlePasswordSubmit}>
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  if (passwordError) setPasswordError(validatePassword(e.target.value));
+                }}
+                required
+                fullWidth
+                autoFocus
+                error={!!passwordError}
+                helperText={
+                  passwordError || 'Min 8 characters with uppercase, lowercase, and a number'
+                }
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              onClick={handleClosePasswordDialog}
+              color="inherit"
+              disabled={passwordSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!newPassword || passwordSubmitting}
+              endIcon={
+                passwordSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined
+              }
+              sx={{ px: 3 }}
+            >
+              {passwordSubmitting ? 'Saving...' : 'Update Password'}
             </Button>
           </DialogActions>
         </Box>
