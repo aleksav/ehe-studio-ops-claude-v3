@@ -521,64 +521,63 @@ export default function StandupPage() {
   }
 
   return (
-    <Box ref={containerRef} sx={{ p: { xs: 2, sm: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      {/* ---- Page Header & Daily Prompt (compact) ---- */}
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Standup
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{ color: 'primary.main', fontStyle: 'italic', opacity: 0.85 }}
-        >
-          {standupPrompt}
-        </Typography>
-      </Box>
-
-      {/* ---- Progress indicator ---- */}
+    <Box ref={containerRef} sx={{ p: { xs: 1.5, sm: 3 }, maxWidth: 1200, mx: 'auto' }}>
+      {/* ---- Compact Header: Title + Dots + Counter ---- */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 1,
-          mb: 2,
+          justifyContent: 'space-between',
+          mb: 1,
         }}
       >
-        {carouselItems.map((item, idx) => (
-          <Box
-            key={idx}
-            sx={{
-              width: idx === currentIndex ? 24 : 8,
-              height: 8,
-              borderRadius: 4,
-              bgcolor:
-                idx === currentIndex
-                  ? item.type === 'planned'
-                    ? 'grey.500'
-                    : 'primary.main'
-                  : 'grey.300',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer',
-            }}
-            onClick={() => {
-              if (idx === currentIndex) return;
-              setSlideDirection(idx > currentIndex ? 'left' : 'right');
-              setVisible(false);
-              setTimeout(() => {
-                setCurrentIndex(idx);
-                setSlideDirection(idx > currentIndex ? 'right' : 'left');
-                setVisible(true);
-              }, 200);
-            }}
-          />
-        ))}
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+            Standup
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{ color: 'primary.main', fontStyle: 'italic', opacity: 0.85 }}
+          >
+            {standupPrompt}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {carouselItems.map((item, idx) => (
+            <Box
+              key={idx}
+              sx={{
+                width: idx === currentIndex ? 20 : 7,
+                height: 7,
+                borderRadius: 4,
+                bgcolor:
+                  idx === currentIndex
+                    ? item.type === 'planned'
+                      ? 'grey.500'
+                      : 'primary.main'
+                    : 'grey.300',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                if (idx === currentIndex) return;
+                setSlideDirection(idx > currentIndex ? 'left' : 'right');
+                setVisible(false);
+                setTimeout(() => {
+                  setCurrentIndex(idx);
+                  setSlideDirection(idx > currentIndex ? 'right' : 'left');
+                  setVisible(true);
+                }, 200);
+              }}
+            />
+          ))}
+          <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+            {currentItem?.type === 'planned'
+              ? 'Coming Up'
+              : `${currentIndex + 1}/${activeProjects.length}`}
+          </Typography>
+        </Box>
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 2 }}>
-        {currentItem?.type === 'planned'
-          ? 'Coming Up Next'
-          : `Project ${currentIndex + 1} of ${activeProjects.length}`}
-      </Typography>
 
       {/* ---- Carousel Area ---- */}
       <Box
@@ -594,17 +593,17 @@ export default function StandupPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            pt: 6,
-            gap: 1,
-            minWidth: 80,
+            pt: 2,
+            gap: 0.5,
+            minWidth: 72,
           }}
         >
           <IconButton
             onClick={goPrev}
             disabled={currentIndex === 0}
             sx={{
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               bgcolor: 'primary.main',
               color: '#fff',
               boxShadow: 2,
@@ -631,17 +630,11 @@ export default function StandupPage() {
               {/* ---- Planned Projects Slide ---- */}
               {currentItem?.type === 'planned' && (
                 <Box>
-                  <Box sx={{ textAlign: 'center', mb: 4 }}>
-                    <Typography
-                      variant="overline"
-                      sx={{ color: 'text.secondary', letterSpacing: 2, fontSize: 13 }}
-                    >
-                      Coming Up
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
                       Planned Projects
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
                       {plannedProjects.length} project
                       {plannedProjects.length !== 1 ? 's' : ''} in the pipeline
                     </Typography>
@@ -687,102 +680,89 @@ export default function StandupPage() {
               {/* ---- Active Project Slide ---- */}
               {currentProject && (
                 <>
-                  {/* ---- Project Header ---- */}
-                  <Box sx={{ textAlign: 'center', mb: 3 }}>
-                    {currentProject.client && (
+                  {/* ---- Project Header + Progress (compact inline) ---- */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      mb: 1.5,
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      {currentProject.client && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: 'text.secondary',
+                            letterSpacing: 1,
+                            textTransform: 'uppercase',
+                            fontSize: 11,
+                          }}
+                        >
+                          {currentProject.client.name}
+                        </Typography>
+                      )}
                       <Typography
-                        variant="overline"
+                        variant="h5"
                         sx={{
-                          color: 'text.secondary',
-                          letterSpacing: 2,
-                          fontSize: 13,
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {currentProject.client.name}
-                      </Typography>
-                    )}
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {currentProject.name}
-                    </Typography>
-                  </Box>
-
-                  {/* ---- Completion Progress ---- */}
-                  <Box sx={{ mb: 3, px: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        mb: 0.5,
-                      }}
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        Completion
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {Math.round(completionPercent)}%
+                        {currentProject.name}
                       </Typography>
                     </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={completionPercent}
-                      sx={{
-                        height: 8,
-                        borderRadius: 4,
-                        bgcolor: 'grey.200',
-                        '& .MuiLinearProgress-bar': {
-                          borderRadius: 4,
-                          bgcolor: allCaughtUp ? 'success.main' : 'primary.main',
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  {/* ---- All Caught Up Message ---- */}
-                  {allCaughtUp && (
-                    <Fade in timeout={500}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 1,
-                          mb: 3,
-                          py: 2,
-                          px: 3,
-                          bgcolor: '#E8F5E9',
-                          borderRadius: 2,
-                          border: '1px solid #A5D6A7',
-                        }}
-                      >
-                        <CheckCircleIcon sx={{ color: 'success.main', fontSize: 28 }} />
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: 'success.dark' }}>
-                          All caught up!
-                        </Typography>
-                      </Box>
-                    </Fade>
-                  )}
-
-                  {/* ---- Overdue Milestones ---- */}
-                  {currentMilestones.filter((m) => m.is_overdue).length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        Overdue Milestones
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {currentMilestones
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                      {allCaughtUp ? (
+                        <Chip
+                          icon={<CheckCircleIcon />}
+                          label="All caught up"
+                          color="success"
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      ) : (
+                        <>
+                          <LinearProgress
+                            variant="determinate"
+                            value={completionPercent}
+                            sx={{
+                              width: 120,
+                              height: 6,
+                              borderRadius: 3,
+                              bgcolor: 'grey.200',
+                              '& .MuiLinearProgress-bar': {
+                                borderRadius: 3,
+                                bgcolor: 'primary.main',
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="caption"
+                            sx={{ fontWeight: 600, color: 'text.secondary' }}
+                          >
+                            {Math.round(completionPercent)}%
+                          </Typography>
+                        </>
+                      )}
+                      {currentMilestones.filter((m) => m.is_overdue).length > 0 &&
+                        currentMilestones
                           .filter((m) => m.is_overdue)
                           .map((m) => (
                             <Chip
                               key={m.id}
                               label={`${m.name} — Overdue`}
                               color="error"
-                              variant="filled"
-                              sx={{ fontSize: 13, height: 30 }}
+                              size="small"
+                              sx={{ fontSize: 12 }}
                             />
                           ))}
-                      </Box>
                     </Box>
-                  )}
+                  </Box>
 
                   {/* ---- Task Board ---- */}
                   <ProjectTaskBoard
@@ -811,17 +791,17 @@ export default function StandupPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            pt: 6,
-            gap: 1,
-            minWidth: 80,
+            pt: 2,
+            gap: 0.5,
+            minWidth: 72,
           }}
         >
           <IconButton
             onClick={goNext}
             disabled={currentIndex >= carouselItems.length - 1}
             sx={{
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               bgcolor: 'primary.main',
               color: '#fff',
               boxShadow: 2,
