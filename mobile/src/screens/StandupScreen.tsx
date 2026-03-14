@@ -109,8 +109,8 @@ export default function StandupScreen() {
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
   const activeProjects = useMemo(() => {
-    const inProgress = allProjects.filter((p) => p.status === 'ACTIVE');
-    return seededShuffle(inProgress, todaySeed());
+    const active = allProjects.filter((p) => p.status === 'ACTIVE');
+    return seededShuffle(active, todaySeed());
   }, [allProjects]);
 
   const currentProject = activeProjects[currentIndex] ?? null;
