@@ -1,37 +1,24 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Alert,
-  Avatar,
   Box,
   Card,
   CardContent,
   Chip,
   CircularProgress,
-  Collapse,
   Fade,
-  FormControlLabel,
   IconButton,
   LinearProgress,
   Snackbar,
-  Switch,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import FlagIcon from '@mui/icons-material/Flag';
-import PeopleIcon from '@mui/icons-material/People';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
-import AssigneeAvatars from '../components/AssigneeAvatars';
+import ProjectTaskBoard from '../components/ProjectTaskBoard';
+import type { BoardTask, BoardMilestone } from '../components/ProjectTaskBoard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,51 +49,9 @@ interface TaskAssignment {
   team_member: TeamMemberRef;
 }
 
-interface Task {
-  id: string;
-  project_id: string;
-  description: string;
-  status: string;
-  completed_at?: string | null;
-  is_stale?: boolean;
-  milestone_id?: string | null;
-  assignments?: TaskAssignment[];
-}
-
-interface Milestone {
-  id: string;
-  project_id: string;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-}
-
-type StandupViewMode = 'board' | 'milestones' | 'people';
-
-interface SwimlaneData {
-  id: string | null;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-  tasks: Task[];
-}
-
-interface PersonRow {
-  memberId: string | null;
-  memberName: string;
-  tasks: Task[];
-}
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const TASK_STATUS_COLOR: Record<string, 'default' | 'info' | 'success' | 'warning'> = {
-  TODO: 'default',
-  IN_PROGRESS: 'info',
-  DONE: 'success',
-  CANCELLED: 'warning',
-};
 
 const TASK_STATUS_LABEL: Record<string, string> = {
   TODO: 'To Do',
@@ -119,12 +64,6 @@ const NEXT_STATUS: Record<string, string> = {
   TODO: 'IN_PROGRESS',
   IN_PROGRESS: 'DONE',
   DONE: 'TODO',
-};
-
-const NEXT_STATUS_LABEL: Record<string, string> = {
-  TODO: 'Start (move to In Progress)',
-  IN_PROGRESS: 'Complete (move to Done)',
-  DONE: 'Reopen (move to To Do)',
 };
 
 const STANDUP_PROMPTS = [
@@ -147,7 +86,7 @@ function formatProjectName(project: Project): string {
 }
 
 /** Return true if the task was completed within the last 7 days. */
-function isRecentlyCompleted(task: Task): boolean {
+function isRecentlyCompleted(task: BoardTask): boolean {
   if (!task.completed_at) return true;
   const completedDate = new Date(task.completed_at);
   const sevenDaysAgo = new Date();
@@ -182,569 +121,6 @@ function dayOfYear(): number {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Task Card Component (used across Board, Milestones, People views)
-// ---------------------------------------------------------------------------
-
-function StandupTaskCard({
-  task,
-  onStatusChange,
-  onLogTime,
-  onAssignmentsChange,
-  draggable,
-  onDragStart,
-}: {
-  task: Task;
-  onStatusChange: (task: Task) => void;
-  onLogTime: (task: Task) => void;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent, task: Task) => void;
-}) {
-  return (
-    <Card
-      elevation={0}
-      draggable={draggable}
-      onDragStart={draggable && onDragStart ? (e) => onDragStart(e, task) : undefined}
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-        cursor: draggable ? 'grab' : undefined,
-        '&:active': draggable ? { cursor: 'grabbing' } : undefined,
-        '&[draggable]:hover': draggable ? { boxShadow: 2 } : undefined,
-      }}
-    >
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 500,
-            mb: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-          }}
-        >
-          {task.description}
-        </Typography>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-            <Chip
-              label={TASK_STATUS_LABEL[task.status] ?? task.status}
-              size="small"
-              color={TASK_STATUS_COLOR[task.status] ?? 'default'}
-              sx={{ fontSize: 11, height: 22 }}
-            />
-            {task.is_stale && (
-              <Chip
-                icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
-                label="Stale"
-                size="small"
-                sx={{
-                  fontSize: 11,
-                  height: 22,
-                  bgcolor: '#FFF3E0',
-                  color: '#E65100',
-                  '& .MuiChip-icon': { color: '#E65100' },
-                }}
-              />
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {onAssignmentsChange && (
-              <AssigneeAvatars
-                taskId={task.id}
-                assignments={task.assignments ?? []}
-                onAssignmentsChange={onAssignmentsChange}
-              />
-            )}
-            <Tooltip title="Log Time">
-              <IconButton size="small" onClick={() => onLogTime(task)}>
-                <AccessTimeIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={NEXT_STATUS_LABEL[task.status] ?? 'Change status'}>
-              <IconButton size="small" onClick={() => onStatusChange(task)} color="primary">
-                <ArrowForwardIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Milestone Swimlane Component (with drag-and-drop support)
-// ---------------------------------------------------------------------------
-
-function StandupMilestoneSwimlane({
-  swimlane,
-  onStatusChange,
-  onLogTime,
-  onAssignmentsChange,
-  onDropTask,
-  dragOverLaneId,
-  onDragOver,
-  onDragLeave,
-  onDragStartTask,
-  onDropTaskStatus,
-  dragOverStatus,
-  onDragOverStatus,
-  onDragLeaveStatus,
-}: {
-  swimlane: SwimlaneData;
-  onStatusChange: (task: Task) => void;
-  onLogTime: (task: Task) => void;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
-  onDropTask: (e: React.DragEvent, targetMilestoneId: string | null) => void;
-  dragOverLaneId: string | null | undefined;
-  onDragOver: (e: React.DragEvent, milestoneId: string | null) => void;
-  onDragLeave: () => void;
-  onDragStartTask: (e: React.DragEvent, task: Task) => void;
-  onDropTaskStatus: (e: React.DragEvent, targetStatus: string) => void;
-  dragOverStatus: string | null;
-  onDragOverStatus: (e: React.DragEvent, status: string) => void;
-  onDragLeaveStatus: () => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-
-  const todoTasks = swimlane.tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = swimlane.tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = swimlane.tasks.filter((t) => t.status === 'DONE');
-  const totalCount = todoTasks.length + inProgressTasks.length + doneTasks.length;
-
-  const laneKey = swimlane.id ?? '__none__';
-  const isDragOver = dragOverLaneId === laneKey;
-
-  return (
-    <Box
-      sx={{ mb: 2.5 }}
-      onDragOver={(e) => onDragOver(e, swimlane.id)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDropTask(e, swimlane.id)}
-    >
-      <Box
-        onClick={() => setExpanded(!expanded)}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          p: 1.5,
-          borderLeft: swimlane.is_overdue
-            ? '4px solid #f44336'
-            : swimlane.id
-              ? '4px solid #1976d2'
-              : '4px solid #E91E63',
-          borderRadius: 1,
-          bgcolor: isDragOver ? 'action.hover' : swimlane.is_overdue ? '#FFEBEE' : 'grey.50',
-          cursor: 'pointer',
-          userSelect: 'none',
-          transition: 'background-color 0.2s',
-          '&:hover': { bgcolor: 'grey.100' },
-        }}
-      >
-        {expanded ? (
-          <ExpandLessIcon fontSize="small" color="action" />
-        ) : (
-          <ExpandMoreIcon fontSize="small" color="action" />
-        )}
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {swimlane.name}
-        </Typography>
-        {swimlane.due_date && (
-          <Typography variant="caption" color="text.secondary">
-            Due {new Date(swimlane.due_date).toLocaleDateString()}
-          </Typography>
-        )}
-        {swimlane.is_overdue && (
-          <Chip label="Overdue" size="small" color="error" sx={{ fontSize: 11, height: 22 }} />
-        )}
-        <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
-      </Box>
-      <Collapse in={expanded}>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 3,
-            mt: 2,
-            pl: 2,
-            minHeight: 40,
-            border: isDragOver ? '2px dashed' : '2px dashed transparent',
-            borderColor: isDragOver ? 'primary.main' : 'transparent',
-            borderRadius: 1,
-            transition: 'border-color 0.2s',
-          }}
-        >
-          {totalCount === 0 && !isDragOver ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-              No tasks
-            </Typography>
-          ) : (
-            (['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
-              const statusTasks =
-                status === 'TODO'
-                  ? todoTasks
-                  : status === 'IN_PROGRESS'
-                    ? inProgressTasks
-                    : doneTasks;
-              const bgColor =
-                status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
-              const label =
-                status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
-              const isStatusDragOver = dragOverStatus === status;
-
-              return (
-                <Box
-                  key={status}
-                  sx={{ flex: 1, minWidth: 0 }}
-                  onDragOver={(e) => {
-                    e.stopPropagation();
-                    onDragOverStatus(e, status);
-                  }}
-                  onDragLeave={(e) => {
-                    e.stopPropagation();
-                    onDragLeaveStatus();
-                  }}
-                  onDrop={(e) => {
-                    e.stopPropagation();
-                    onDropTaskStatus(e, status);
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, px: 0.5 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                      {label}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      ({statusTasks.length})
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      bgcolor: bgColor,
-                      borderRadius: 1.5,
-                      p: 1,
-                      minHeight: 60,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                      border: isStatusDragOver ? '2px dashed' : '2px dashed transparent',
-                      borderColor: isStatusDragOver ? 'primary.main' : 'transparent',
-                      transition: 'border-color 0.2s',
-                    }}
-                  >
-                    {statusTasks.length === 0 ? (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ textAlign: 'center', py: 1 }}
-                      >
-                        {isStatusDragOver ? 'Drop here' : '--'}
-                      </Typography>
-                    ) : (
-                      statusTasks.map((task) => (
-                        <StandupTaskCard
-                          key={task.id}
-                          task={task}
-                          onStatusChange={onStatusChange}
-                          onLogTime={onLogTime}
-                          onAssignmentsChange={onAssignmentsChange}
-                          draggable
-                          onDragStart={onDragStartTask}
-                        />
-                      ))
-                    )}
-                  </Box>
-                </Box>
-              );
-            })
-          )}
-        </Box>
-      </Collapse>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// People Board Row Component (uses consistent task cards)
-// ---------------------------------------------------------------------------
-
-function StandupPeopleRow({
-  row,
-  onStatusChange,
-  onLogTime,
-  onAssignmentsChange,
-  onDropTask,
-  dragOverRowId,
-  onDragOver,
-  onDragLeave,
-  onDragStartTask,
-  onDropTaskStatus,
-  dragOverStatus,
-  onDragOverStatus,
-  onDragLeaveStatus,
-}: {
-  row: PersonRow;
-  onStatusChange: (task: Task) => void;
-  onLogTime: (task: Task) => void;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
-  onDropTask: (e: React.DragEvent, targetMemberId: string | null) => void;
-  dragOverRowId: string | null | undefined;
-  onDragOver: (e: React.DragEvent, memberId: string | null) => void;
-  onDragLeave: () => void;
-  onDragStartTask: (e: React.DragEvent, task: Task) => void;
-  onDropTaskStatus: (e: React.DragEvent, targetStatus: string) => void;
-  dragOverStatus: string | null;
-  onDragOverStatus: (e: React.DragEvent, status: string) => void;
-  onDragLeaveStatus: () => void;
-}) {
-  const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
-  const initial = row.memberName.charAt(0).toUpperCase();
-
-  const rowKey = row.memberId ?? '__unassigned__';
-  const isDragOver = dragOverRowId === rowKey;
-
-  return (
-    <Box
-      sx={{ mb: 2.5 }}
-      onDragOver={(e) => onDragOver(e, row.memberId)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDropTask(e, row.memberId)}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          mb: 1,
-          px: 0.5,
-          p: 1,
-          borderRadius: 1,
-          bgcolor: isDragOver ? 'action.hover' : 'transparent',
-          transition: 'background-color 0.2s',
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 28,
-            height: 28,
-            fontSize: 13,
-            fontWeight: 700,
-            bgcolor: row.memberId ? '#1565C0' : '#757575',
-            color: '#fff',
-          }}
-        >
-          {initial}
-        </Avatar>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {row.memberName}
-        </Typography>
-        <Chip
-          label={`${row.tasks.length} task${row.tasks.length === 1 ? '' : 's'}`}
-          size="small"
-          sx={{ fontSize: 11, height: 22 }}
-        />
-      </Box>
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          gap: 2,
-          pl: 1,
-          border: isDragOver ? '2px dashed' : '2px dashed transparent',
-          borderColor: isDragOver ? 'primary.main' : 'transparent',
-          borderRadius: 1,
-          transition: 'border-color 0.2s',
-        }}
-      >
-        {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
-          const statusTasks =
-            status === 'TODO' ? todoTasks : status === 'IN_PROGRESS' ? inProgressTasks : doneTasks;
-          const bgColor =
-            status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
-          const label =
-            status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
-          const isStatusDragOver = dragOverStatus === status;
-
-          return (
-            <Box
-              key={status}
-              sx={{ flex: 1, minWidth: 0 }}
-              onDragOver={(e) => {
-                e.stopPropagation();
-                onDragOverStatus(e, status);
-              }}
-              onDragLeave={(e) => {
-                e.stopPropagation();
-                onDragLeaveStatus();
-              }}
-              onDrop={(e) => {
-                e.stopPropagation();
-                onDropTaskStatus(e, status);
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5, px: 0.5 }}>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                  {label}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  ({statusTasks.length})
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  bgcolor: bgColor,
-                  borderRadius: 1.5,
-                  p: 1,
-                  minHeight: 40,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                  border: isStatusDragOver ? '2px dashed' : '2px dashed transparent',
-                  borderColor: isStatusDragOver ? 'primary.main' : 'transparent',
-                  transition: 'border-color 0.2s',
-                }}
-              >
-                {statusTasks.length === 0 ? (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textAlign: 'center', py: 1 }}
-                  >
-                    {isStatusDragOver ? 'Drop here' : '--'}
-                  </Typography>
-                ) : (
-                  statusTasks.map((task) => (
-                    <StandupTaskCard
-                      key={task.id}
-                      task={task}
-                      onStatusChange={onStatusChange}
-                      onLogTime={onLogTime}
-                      onAssignmentsChange={onAssignmentsChange}
-                      draggable
-                      onDragStart={onDragStartTask}
-                    />
-                  ))
-                )}
-              </Box>
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Kanban Column Component (with drag-and-drop between status columns)
-// ---------------------------------------------------------------------------
-
-function KanbanColumn({
-  title,
-  status,
-  tasks,
-  color,
-  onStatusChange,
-  onLogTime,
-  onAssignmentsChange,
-  onDropTask,
-  dragOverStatus,
-  onDragOver,
-  onDragLeave,
-  onDragStartTask,
-}: {
-  title: string;
-  status: string;
-  tasks: Task[];
-  color: 'default' | 'info' | 'success';
-  onStatusChange: (task: Task) => void;
-  onLogTime: (task: Task) => void;
-  onAssignmentsChange?: (taskId: string, assignments: TaskAssignment[]) => void;
-  onDropTask: (e: React.DragEvent, targetStatus: string) => void;
-  dragOverStatus: string | null;
-  onDragOver: (e: React.DragEvent, status: string) => void;
-  onDragLeave: () => void;
-  onDragStartTask: (e: React.DragEvent, task: Task) => void;
-}) {
-  const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
-  const isDragOver = dragOverStatus === status;
-
-  return (
-    <Box
-      sx={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-      onDragOver={(e) => onDragOver(e, status)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDropTask(e, status)}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          mb: 2,
-          px: 1,
-        }}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        <Chip label={tasks.length} size="small" sx={{ fontSize: 12, height: 22 }} />
-      </Box>
-      <Box
-        sx={{
-          bgcolor: bgColor,
-          borderRadius: 2,
-          p: 1.5,
-          minHeight: 120,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1.5,
-          border: isDragOver ? '2px dashed' : '2px dashed transparent',
-          borderColor: isDragOver ? 'primary.main' : 'transparent',
-          transition: 'border-color 0.2s, background-color 0.2s',
-        }}
-      >
-        {tasks.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-            {isDragOver ? 'Drop here to change status' : 'No tasks'}
-          </Typography>
-        ) : (
-          tasks.map((task) => (
-            <StandupTaskCard
-              key={task.id}
-              task={task}
-              onStatusChange={onStatusChange}
-              onLogTime={onLogTime}
-              onAssignmentsChange={onAssignmentsChange}
-              draggable
-              onDragStart={onDragStartTask}
-            />
-          ))
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -759,12 +135,11 @@ export default function StandupPage() {
   const [visible, setVisible] = useState(true);
 
   // Tasks & Milestones per project (keyed by project id)
-  const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>({});
-  const [milestonesByProject, setMilestonesByProject] = useState<Record<string, Milestone[]>>({});
+  const [tasksByProject, setTasksByProject] = useState<Record<string, BoardTask[]>>({});
+  const [milestonesByProject, setMilestonesByProject] = useState<Record<string, BoardMilestone[]>>(
+    {},
+  );
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
-
-  // View mode
-  const [viewMode, setViewMode] = useState<StandupViewMode>('board');
 
   // Log time modal
   const [logTimeOpen, setLogTimeOpen] = useState(false);
@@ -776,20 +151,11 @@ export default function StandupPage() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
-  // Drag-and-drop state
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
-  const [dragOverMilestone, setDragOverMilestone] = useState<string | null | undefined>(undefined);
-  const [dragOverPerson, setDragOverPerson] = useState<string | null | undefined>(undefined);
-
   // Hide empty milestones toggle (persisted in localStorage)
   const HIDE_EMPTY_KEY = 'standup-hide-empty-milestones';
-  const [hideEmptyMilestones, setHideEmptyMilestones] = useState<boolean>(() => {
-    return localStorage.getItem(HIDE_EMPTY_KEY) === 'true';
-  });
+  const initialHideEmpty = localStorage.getItem(HIDE_EMPTY_KEY) === 'true';
 
   const handleHideEmptyChange = (checked: boolean) => {
-    setHideEmptyMilestones(checked);
     localStorage.setItem(HIDE_EMPTY_KEY, String(checked));
   };
 
@@ -862,8 +228,8 @@ export default function StandupPage() {
       setLoadingProjects((prev) => new Set(prev).add(projectId));
       try {
         const [taskData, milestoneData] = await Promise.all([
-          api.get<Task[]>(`/api/projects/${projectId}/tasks`),
-          api.get<Milestone[]>(`/api/projects/${projectId}/milestones`),
+          api.get<BoardTask[]>(`/api/projects/${projectId}/tasks`),
+          api.get<BoardMilestone[]>(`/api/projects/${projectId}/milestones`),
         ]);
         setTasksByProject((prev) => ({ ...prev, [projectId]: taskData }));
         setMilestonesByProject((prev) => ({ ...prev, [projectId]: milestoneData }));
@@ -935,88 +301,17 @@ export default function StandupPage() {
     ? loadingProjects.has(currentProject.id) && !tasksByProject[currentProject.id]
     : false;
 
-  // ---- Derived task lists ----
-  const todoTasks = currentTasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = currentTasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = currentTasks.filter((t) => t.status === 'DONE' && isRecentlyCompleted(t));
-
-  // ---- Milestone swimlanes ----
-  const swimlanes = useMemo<SwimlaneData[]>(() => {
-    if (!currentProject) return [];
-    const sorted = [...currentMilestones].sort((a, b) => {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    });
-
-    const activeTasks = currentTasks.filter((t) => t.status !== 'CANCELLED');
-    const lanes: SwimlaneData[] = sorted.map((m) => ({
-      id: m.id,
-      name: m.name,
-      due_date: m.due_date,
-      is_overdue: m.is_overdue,
-      tasks: activeTasks.filter((t) => t.milestone_id === m.id),
-    }));
-
-    const unassigned = activeTasks.filter((t) => !t.milestone_id);
-    if (unassigned.length > 0 || lanes.length > 0) {
-      lanes.push({
-        id: null,
-        name: 'No Milestone',
-        due_date: null,
-        is_overdue: false,
-        tasks: unassigned,
-      });
-    }
-    return lanes;
-  }, [currentProject, currentTasks, currentMilestones]);
-
-  // ---- People rows ----
-  const personRows = useMemo<PersonRow[]>(() => {
-    if (!currentProject) return [];
-    const memberMap = new Map<string, { member: TeamMemberRef; tasks: Task[] }>();
-    const unassignedTasks: Task[] = [];
-
-    for (const task of currentTasks) {
-      if (task.status === 'CANCELLED') continue;
-      const assignments = task.assignments ?? [];
-      if (assignments.length === 0) {
-        unassignedTasks.push(task);
-      } else {
-        for (const assignment of assignments) {
-          const memberId = assignment.team_member.id;
-          if (!memberMap.has(memberId)) {
-            memberMap.set(memberId, { member: assignment.team_member, tasks: [] });
-          }
-          memberMap.get(memberId)!.tasks.push(task);
-        }
-      }
-    }
-
-    const rows: PersonRow[] = [];
-    const sortedMembers = Array.from(memberMap.entries()).sort((a, b) =>
-      a[1].member.full_name.localeCompare(b[1].member.full_name),
-    );
-    for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
-      rows.push({ memberId, memberName: member.full_name, tasks: memberTasks });
-    }
-    if (unassignedTasks.length > 0) {
-      rows.push({ memberId: null, memberName: 'Unassigned', tasks: unassignedTasks });
-    }
-    return rows;
-  }, [currentProject, currentTasks]);
-
   // ---- Completion stats ----
   const totalNonCancelled = currentTasks.filter((t) => t.status !== 'CANCELLED').length;
   const doneCount = currentTasks.filter((t) => t.status === 'DONE').length;
   const completionPercent = totalNonCancelled > 0 ? (doneCount / totalNonCancelled) * 100 : 0;
-  const allCaughtUp =
-    totalNonCancelled > 0 && todoTasks.length === 0 && inProgressTasks.length === 0;
+  const todoCount = currentTasks.filter((t) => t.status === 'TODO').length;
+  const inProgressCount = currentTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const allCaughtUp = totalNonCancelled > 0 && todoCount === 0 && inProgressCount === 0;
 
   // ---- Status change handler (optimistic) ----
   const handleStatusChange = useCallback(
-    async (task: Task) => {
+    async (task: BoardTask) => {
       if (!currentProject) return;
       const newStatus = NEXT_STATUS[task.status];
       if (!newStatus) return;
@@ -1073,54 +368,29 @@ export default function StandupPage() {
 
   // ---- Log time handler for individual task (opens same modal) ----
   const handleLogTimeTask = useCallback(
-    (_task: Task) => {
+    (_task: BoardTask) => {
       handleLogTime();
     },
     [handleLogTime],
   );
 
   // ---- Drag-and-drop: Board view (status columns) ----
-  const handleBoardDragStart = useCallback((e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', task.id);
-  }, []);
-
-  const handleBoardDragOver = useCallback((e: React.DragEvent, status: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverStatus(status);
-  }, []);
-
-  const handleBoardDragLeave = useCallback(() => {
-    setDragOverStatus(null);
-  }, []);
-
-  const handleBoardDrop = useCallback(
-    async (e: React.DragEvent, targetStatus: string) => {
-      e.preventDefault();
-      setDragOverStatus(null);
-      if (!draggedTask || !currentProject) return;
-      if (draggedTask.status === targetStatus) {
-        setDraggedTask(null);
-        return;
-      }
-
+  const handleDropStatus = useCallback(
+    async (task: BoardTask, targetStatus: string) => {
+      if (!currentProject) return;
       const projectId = currentProject.id;
-      const taskId = draggedTask.id;
       const previousTasks = tasksByProject[projectId] ?? [];
 
       // Optimistic update
       setTasksByProject((prev) => ({
         ...prev,
         [projectId]: (prev[projectId] ?? []).map((t) =>
-          t.id === taskId ? { ...t, status: targetStatus } : t,
+          t.id === task.id ? { ...t, status: targetStatus } : t,
         ),
       }));
-      setDraggedTask(null);
 
       try {
-        await api.put(`/api/projects/${projectId}/tasks/${taskId}`, {
+        await api.put(`/api/projects/${projectId}/tasks/${task.id}`, {
           status: targetStatus,
         });
         showSnackbar(`Task moved to ${TASK_STATUS_LABEL[targetStatus]}`);
@@ -1133,53 +403,26 @@ export default function StandupPage() {
         showSnackbar(message, 'error');
       }
     },
-    [draggedTask, currentProject, tasksByProject],
+    [currentProject, tasksByProject],
   );
 
   // ---- Drag-and-drop: Milestones view ----
-  const handleMilestoneDragStart = useCallback((e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', task.id);
-  }, []);
-
-  const handleMilestoneDragOver = useCallback((e: React.DragEvent, milestoneId: string | null) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverMilestone(milestoneId ?? '__none__');
-  }, []);
-
-  const handleMilestoneDragLeave = useCallback(() => {
-    setDragOverMilestone(undefined);
-  }, []);
-
-  const handleMilestoneDrop = useCallback(
-    async (e: React.DragEvent, targetMilestoneId: string | null) => {
-      e.preventDefault();
-      setDragOverMilestone(undefined);
-      if (!draggedTask || !currentProject) return;
-
-      const currentMilestoneId = draggedTask.milestone_id ?? null;
-      if (currentMilestoneId === targetMilestoneId) {
-        setDraggedTask(null);
-        return;
-      }
-
+  const handleDropMilestone = useCallback(
+    async (task: BoardTask, targetMilestoneId: string | null) => {
+      if (!currentProject) return;
       const projectId = currentProject.id;
-      const taskId = draggedTask.id;
       const previousTasks = tasksByProject[projectId] ?? [];
 
       // Optimistic update
       setTasksByProject((prev) => ({
         ...prev,
         [projectId]: (prev[projectId] ?? []).map((t) =>
-          t.id === taskId ? { ...t, milestone_id: targetMilestoneId } : t,
+          t.id === task.id ? { ...t, milestone_id: targetMilestoneId } : t,
         ),
       }));
-      setDraggedTask(null);
 
       try {
-        await api.put(`/api/projects/${projectId}/tasks/${taskId}`, {
+        await api.put(`/api/projects/${projectId}/tasks/${task.id}`, {
           milestone_id: targetMilestoneId,
         });
         const targetName =
@@ -1196,51 +439,22 @@ export default function StandupPage() {
         showSnackbar(message, 'error');
       }
     },
-    [draggedTask, currentProject, tasksByProject, currentMilestones],
+    [currentProject, tasksByProject, currentMilestones],
   );
 
   // ---- Drag-and-drop: People view ----
-  const handlePeopleDragStart = useCallback((e: React.DragEvent, task: Task) => {
-    setDraggedTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', task.id);
-  }, []);
-
-  const handlePeopleDragOver = useCallback((e: React.DragEvent, memberId: string | null) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverPerson(memberId ?? '__unassigned__');
-  }, []);
-
-  const handlePeopleDragLeave = useCallback(() => {
-    setDragOverPerson(undefined);
-  }, []);
-
-  const handlePeopleDrop = useCallback(
-    async (e: React.DragEvent, targetMemberId: string | null) => {
-      e.preventDefault();
-      setDragOverPerson(undefined);
-      if (!draggedTask || !currentProject) return;
-
-      const taskId = draggedTask.id;
+  const handleDropPerson = useCallback(
+    async (task: BoardTask, targetMemberId: string | null) => {
+      if (!currentProject) return;
+      const taskId = task.id;
       const projectId = currentProject.id;
       const previousTasks = tasksByProject[projectId] ?? [];
 
-      // Find current assignments
-      const currentAssignments = draggedTask.assignments ?? [];
+      const currentAssignments = task.assignments ?? [];
       const currentMemberIds = currentAssignments.map((a) => a.team_member_id);
 
-      // Skip if already assigned to the target (or if unassigned and target is null)
-      if (targetMemberId === null && currentAssignments.length === 0) {
-        setDraggedTask(null);
-        return;
-      }
-      if (targetMemberId && currentMemberIds.includes(targetMemberId)) {
-        setDraggedTask(null);
-        return;
-      }
-
-      setDraggedTask(null);
+      if (targetMemberId === null && currentAssignments.length === 0) return;
+      if (targetMemberId && currentMemberIds.includes(targetMemberId)) return;
 
       try {
         if (targetMemberId === null) {
@@ -1248,7 +462,6 @@ export default function StandupPage() {
           for (const assignment of currentAssignments) {
             await api.delete(`/api/tasks/${taskId}/assignments/${assignment.id}`);
           }
-          // Update local state
           setTasksByProject((prev) => ({
             ...prev,
             [projectId]: (prev[projectId] ?? []).map((t) =>
@@ -1278,71 +491,8 @@ export default function StandupPage() {
         showSnackbar(message, 'error');
       }
     },
-    [draggedTask, currentProject, tasksByProject],
+    [currentProject, tasksByProject],
   );
-
-  // ---- Drag-and-drop: Status change (shared for milestones/people views) ----
-  const handleSwimlaneStatusDragOver = useCallback((e: React.DragEvent, status: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverStatus(status);
-  }, []);
-
-  const handleSwimlaneStatusDragLeave = useCallback(() => {
-    setDragOverStatus(null);
-  }, []);
-
-  const handleSwimlaneStatusDrop = useCallback(
-    async (e: React.DragEvent, targetStatus: string) => {
-      e.preventDefault();
-      setDragOverStatus(null);
-      if (!draggedTask || !currentProject) return;
-      if (draggedTask.status === targetStatus) {
-        setDraggedTask(null);
-        return;
-      }
-
-      const projectId = currentProject.id;
-      const taskId = draggedTask.id;
-      const previousTasks = tasksByProject[projectId] ?? [];
-
-      setTasksByProject((prev) => ({
-        ...prev,
-        [projectId]: (prev[projectId] ?? []).map((t) =>
-          t.id === taskId ? { ...t, status: targetStatus } : t,
-        ),
-      }));
-      setDraggedTask(null);
-
-      try {
-        await api.put(`/api/projects/${projectId}/tasks/${taskId}`, {
-          status: targetStatus,
-        });
-        showSnackbar(`Task moved to ${TASK_STATUS_LABEL[targetStatus]}`);
-      } catch (err) {
-        setTasksByProject((prev) => ({
-          ...prev,
-          [projectId]: previousTasks,
-        }));
-        const message = err instanceof ApiError ? err.message : 'Failed to update task status.';
-        showSnackbar(message, 'error');
-      }
-    },
-    [draggedTask, currentProject, tasksByProject],
-  );
-
-  // ---- Filtered swimlanes (hide empty milestones) ----
-  const filteredSwimlanes = useMemo(() => {
-    if (!hideEmptyMilestones) return swimlanes;
-    return swimlanes.filter((lane) => {
-      const hasActiveTasks = lane.tasks.some(
-        (t) => t.status === 'IN_PROGRESS' || t.status === 'DONE',
-      );
-      return hasActiveTasks;
-    });
-  }, [swimlanes, hideEmptyMilestones]);
-
-  const hiddenMilestoneCount = swimlanes.length - filteredSwimlanes.length;
 
   // ---- Next item for "up next" teaser ----
   const nextItem = currentIndex < carouselItems.length - 1 ? carouselItems[currentIndex + 1] : null;
@@ -1638,180 +788,21 @@ export default function StandupPage() {
                     </Box>
                   )}
 
-                  {/* ---- View Toggle ---- */}
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-                    <ToggleButtonGroup
-                      value={viewMode}
-                      exclusive
-                      onChange={(_: React.MouseEvent<HTMLElement>, v: StandupViewMode | null) => {
-                        if (v !== null) setViewMode(v);
-                      }}
-                      size="small"
-                    >
-                      <ToggleButton value="board" aria-label="Board view">
-                        <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
-                        Board
-                      </ToggleButton>
-                      <ToggleButton value="milestones" aria-label="Milestones view">
-                        <FlagIcon sx={{ mr: 0.5, fontSize: 18 }} />
-                        Milestones
-                      </ToggleButton>
-                      <ToggleButton value="people" aria-label="People view">
-                        <PeopleIcon sx={{ mr: 0.5, fontSize: 18 }} />
-                        People
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-
-                  {/* ---- Task Views ---- */}
-                  {isCurrentLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                      <CircularProgress size={24} />
-                    </Box>
-                  ) : viewMode === 'board' ? (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', md: 'row' },
-                        gap: 3,
-                      }}
-                    >
-                      <KanbanColumn
-                        title="TODO"
-                        status="TODO"
-                        tasks={todoTasks}
-                        color="default"
-                        onStatusChange={handleStatusChange}
-                        onLogTime={handleLogTimeTask}
-                        onAssignmentsChange={handleAssignmentsChange}
-                        onDropTask={handleBoardDrop}
-                        dragOverStatus={dragOverStatus}
-                        onDragOver={handleBoardDragOver}
-                        onDragLeave={handleBoardDragLeave}
-                        onDragStartTask={handleBoardDragStart}
-                      />
-                      <KanbanColumn
-                        title="In Progress"
-                        status="IN_PROGRESS"
-                        tasks={inProgressTasks}
-                        color="info"
-                        onStatusChange={handleStatusChange}
-                        onLogTime={handleLogTimeTask}
-                        onAssignmentsChange={handleAssignmentsChange}
-                        onDropTask={handleBoardDrop}
-                        dragOverStatus={dragOverStatus}
-                        onDragOver={handleBoardDragOver}
-                        onDragLeave={handleBoardDragLeave}
-                        onDragStartTask={handleBoardDragStart}
-                      />
-                      <KanbanColumn
-                        title="Done (last 7 days)"
-                        status="DONE"
-                        tasks={doneTasks}
-                        color="success"
-                        onStatusChange={handleStatusChange}
-                        onLogTime={handleLogTimeTask}
-                        onAssignmentsChange={handleAssignmentsChange}
-                        onDropTask={handleBoardDrop}
-                        dragOverStatus={dragOverStatus}
-                        onDragOver={handleBoardDragOver}
-                        onDragLeave={handleBoardDragLeave}
-                        onDragStartTask={handleBoardDragStart}
-                      />
-                    </Box>
-                  ) : viewMode === 'milestones' ? (
-                    <>
-                      {/* Hide empty milestones toggle */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          mb: 1.5,
-                          gap: 1,
-                        }}
-                      >
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={hideEmptyMilestones}
-                              onChange={(e) => handleHideEmptyChange(e.target.checked)}
-                              size="small"
-                            />
-                          }
-                          label={
-                            <Typography variant="body2" color="text.secondary">
-                              Show only active milestones
-                            </Typography>
-                          }
-                        />
-                        {hiddenMilestoneCount > 0 && (
-                          <Typography variant="caption" color="text.secondary">
-                            ({hiddenMilestoneCount} hidden)
-                          </Typography>
-                        )}
-                      </Box>
-                      {filteredSwimlanes.length === 0 ? (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ py: 4, textAlign: 'center' }}
-                        >
-                          No milestones or tasks to display.
-                        </Typography>
-                      ) : (
-                        filteredSwimlanes.map((lane) => (
-                          <StandupMilestoneSwimlane
-                            key={lane.id ?? '__none__'}
-                            swimlane={lane}
-                            onStatusChange={handleStatusChange}
-                            onLogTime={handleLogTimeTask}
-                            onAssignmentsChange={handleAssignmentsChange}
-                            onDropTask={handleMilestoneDrop}
-                            dragOverLaneId={dragOverMilestone}
-                            onDragOver={handleMilestoneDragOver}
-                            onDragLeave={handleMilestoneDragLeave}
-                            onDragStartTask={handleMilestoneDragStart}
-                            onDropTaskStatus={handleSwimlaneStatusDrop}
-                            dragOverStatus={dragOverStatus}
-                            onDragOverStatus={handleSwimlaneStatusDragOver}
-                            onDragLeaveStatus={handleSwimlaneStatusDragLeave}
-                          />
-                        ))
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {personRows.length === 0 ? (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ py: 4, textAlign: 'center' }}
-                        >
-                          No tasks to display.
-                        </Typography>
-                      ) : (
-                        personRows.map((row) => (
-                          <StandupPeopleRow
-                            key={row.memberId ?? 'unassigned'}
-                            row={row}
-                            onStatusChange={handleStatusChange}
-                            onLogTime={handleLogTimeTask}
-                            onAssignmentsChange={handleAssignmentsChange}
-                            onDropTask={handlePeopleDrop}
-                            dragOverRowId={dragOverPerson}
-                            onDragOver={handlePeopleDragOver}
-                            onDragLeave={handlePeopleDragLeave}
-                            onDragStartTask={handlePeopleDragStart}
-                            onDropTaskStatus={handleSwimlaneStatusDrop}
-                            dragOverStatus={dragOverStatus}
-                            onDragOverStatus={handleSwimlaneStatusDragOver}
-                            onDragLeaveStatus={handleSwimlaneStatusDragLeave}
-                          />
-                        ))
-                      )}
-                    </>
-                  )}
+                  {/* ---- Task Board ---- */}
+                  <ProjectTaskBoard
+                    tasks={currentTasks}
+                    milestones={currentMilestones}
+                    loading={isCurrentLoading}
+                    filterRecentDone
+                    initialHideEmpty={initialHideEmpty}
+                    onHideEmptyChange={handleHideEmptyChange}
+                    onAssignmentsChange={handleAssignmentsChange}
+                    onStatusChange={handleStatusChange}
+                    onLogTime={handleLogTimeTask}
+                    onDropStatus={handleDropStatus}
+                    onDropMilestone={handleDropMilestone}
+                    onDropPerson={handleDropPerson}
+                  />
                 </>
               )}
             </Box>
