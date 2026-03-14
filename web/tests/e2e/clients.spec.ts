@@ -12,13 +12,15 @@ test.describe('Clients', () => {
     await page.getByRole('button', { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/dashboard/);
 
-    // Navigate to Clients via sidebar
-    await page.getByRole('button', { name: 'Clients' }).click();
-    await expect(page).toHaveURL(/\/clients/);
+    // Navigate to Admin via sidebar, then use Clients tab
+    await page.getByRole('button', { name: 'Admin' }).click();
+    await expect(page).toHaveURL(/\/admin/);
+    await expect(page.getByRole('tab', { name: /clients/i })).toBeVisible();
+    await page.getByRole('tab', { name: /clients/i }).click();
   });
 
   test('page loads with heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /clients/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /admin/i })).toBeVisible();
   });
 
   test('shows seed clients', async ({ page }) => {

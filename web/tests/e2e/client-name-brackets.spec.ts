@@ -37,6 +37,9 @@ test.describe('Client name before project name', () => {
     await page.getByRole('button', { name: 'Time Logging' }).click();
     await expect(page).toHaveURL(/\/time-logging/);
 
+    // Switch to Quick Entry tab to find the project selector
+    await page.getByRole('tab', { name: /quick entry/i }).click();
+
     await page.getByLabel('Select project').click();
     await expect(
       page.getByRole('option', { name: /acme corp.*brand refresh campaign/i }),
@@ -44,8 +47,9 @@ test.describe('Client name before project name', () => {
   });
 
   test('weekly grid dropdown shows client name before project', async ({ page }) => {
-    await page.getByRole('button', { name: 'Weekly Grid' }).click();
-    await expect(page).toHaveURL(/\/weekly-grid/);
+    await page.getByRole('button', { name: 'Time Logging' }).click();
+    await expect(page).toHaveURL(/\/time-logging/);
+    await page.getByRole('tab', { name: /weekly grid/i }).click();
 
     await page.getByLabel('Add project').click();
     await expect(

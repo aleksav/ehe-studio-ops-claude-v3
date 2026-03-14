@@ -12,13 +12,15 @@ test.describe('Weekly Grid', () => {
     await page.getByRole('button', { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/dashboard/);
 
-    // Navigate to Weekly Grid via sidebar
-    await page.getByText('Weekly Grid').click();
-    await expect(page).toHaveURL(/\/weekly-grid/);
+    // Navigate to Time Logging via sidebar, then click Weekly Grid tab
+    await page.getByRole('button', { name: 'Time Logging' }).click();
+    await expect(page).toHaveURL(/\/time-logging/);
+    await expect(page.getByRole('tab', { name: /weekly grid/i })).toBeVisible();
+    await page.getByRole('tab', { name: /weekly grid/i }).click();
   });
 
   test('page loads with heading and week label', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /weekly grid/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /time logging/i })).toBeVisible();
 
     // Should show "Week of <date>" label
     await expect(page.getByText(/week of/i)).toBeVisible();
@@ -34,7 +36,7 @@ test.describe('Weekly Grid', () => {
       localStorage.removeItem('weeklyGrid:taskTypes');
     });
     await page.reload();
-    await expect(page).toHaveURL(/\/weekly-grid/);
+    await expect(page).toHaveURL(/\/time-logging/);
 
     // Should show empty state message
     await expect(page.getByText(/add a project above to start logging time/i)).toBeVisible({
@@ -60,7 +62,7 @@ test.describe('Weekly Grid', () => {
       localStorage.removeItem('weeklyGrid:taskTypes');
     });
     await page.reload();
-    await expect(page).toHaveURL(/\/weekly-grid/);
+    await expect(page).toHaveURL(/\/time-logging/);
 
     // Select a project from the dropdown
     await page.getByLabel('Add project').click();
@@ -151,7 +153,7 @@ test.describe('Weekly Grid', () => {
       localStorage.removeItem('weeklyGrid:taskTypes');
     });
     await page.reload();
-    await expect(page).toHaveURL(/\/weekly-grid/);
+    await expect(page).toHaveURL(/\/time-logging/);
 
     await page.getByLabel('Add project').click();
     await expect(page.getByRole('option', { name: /brand refresh campaign/i })).toBeVisible({
@@ -175,6 +177,8 @@ test.describe('Weekly Grid', () => {
   });
 
   test('batch log description text is shown', async ({ page }) => {
-    await expect(page.getByText(/batch-log your time for the week/i)).toBeVisible();
+    await expect(
+      page.getByText(/track your time with the weekly grid or log individual entries/i),
+    ).toBeVisible();
   });
 });

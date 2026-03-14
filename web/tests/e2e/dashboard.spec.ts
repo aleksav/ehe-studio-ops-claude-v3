@@ -71,11 +71,9 @@ test.describe('Dashboard', () => {
 
   test('navigation sidebar shows all expected links', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Clients' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Projects' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Time Logging' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Weekly Grid' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Standup' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible();
   });
 });

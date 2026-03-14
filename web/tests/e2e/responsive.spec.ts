@@ -59,7 +59,7 @@ test.describe('Responsive layout', () => {
     // Open hamburger to verify nav items inside temporary drawer
     await menuButton.click();
     await expect(page.getByText('Dashboard')).toBeVisible();
-    await expect(page.getByText('Clients')).toBeVisible();
+    await expect(page.getByText('Admin')).toBeVisible();
 
     await context.close();
   });
@@ -80,12 +80,10 @@ test.describe('Responsive layout', () => {
 
     // Sidebar nav items should be visible directly
     await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Clients' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Projects' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Time Logging' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Weekly Grid' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Standup' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible();
 
     // Dashboard heading and summary cards
     await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();

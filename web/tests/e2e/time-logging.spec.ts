@@ -13,8 +13,12 @@ test.describe('Time Logging — Quick Entry', () => {
     await expect(page).toHaveURL(/\/dashboard/);
 
     // Navigate to time logging
-    await page.getByText('Time Logging').click();
+    await page.getByRole('button', { name: 'Time Logging' }).click();
     await expect(page).toHaveURL(/\/time-logging/);
+
+    // Click Quick Entry tab (Weekly Grid is default)
+    await expect(page.getByRole('tab', { name: /quick entry/i })).toBeVisible();
+    await page.getByRole('tab', { name: /quick entry/i }).click();
   });
 
   test('log time for a project with quick entry', async ({ page }) => {
