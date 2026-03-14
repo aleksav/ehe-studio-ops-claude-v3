@@ -343,8 +343,8 @@ export default function StandupPage() {
 
   // ---- Derived project lists ----
   const activeProjects = useMemo(() => {
-    const inProgress = allProjects.filter((p) => p.status === 'ACTIVE');
-    return seededShuffle(inProgress, todaySeed());
+    const active = allProjects.filter((p) => p.status === 'ACTIVE');
+    return seededShuffle(active, todaySeed());
   }, [allProjects]);
 
   const plannedProjects = useMemo(
