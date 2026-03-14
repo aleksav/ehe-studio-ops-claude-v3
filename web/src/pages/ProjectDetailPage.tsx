@@ -1,51 +1,33 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
-  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  FormControlLabel,
-  IconButton,
   InputLabel,
   LinearProgress,
-  Menu,
   MenuItem,
   Select,
   Snackbar,
-  Switch,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import ViewStreamIcon from '@mui/icons-material/ViewStream';
-import FlagIcon from '@mui/icons-material/Flag';
-import PeopleIcon from '@mui/icons-material/People';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { api, ApiError } from '../lib/api';
-import AssigneeAvatars, { type Assignment } from '../components/AssigneeAvatars';
+import type { Assignment } from '../components/AssigneeAvatars';
+import ProjectTaskBoard from '../components/ProjectTaskBoard';
+import type { BoardTask, BoardMilestone, ViewMode } from '../components/ProjectTaskBoard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,36 +49,6 @@ interface Project {
   client: Client | null;
 }
 
-interface TeamMemberRef {
-  id: string;
-  full_name: string;
-  email: string;
-}
-
-interface TaskMilestoneRef {
-  id: string;
-  name: string;
-}
-
-interface Task {
-  id: string;
-  project_id: string;
-  milestone_id: string | null;
-  description: string;
-  status: string;
-  is_stale?: boolean;
-  assignments?: Assignment[];
-  milestone?: TaskMilestoneRef | null;
-}
-
-interface Milestone {
-  id: string;
-  project_id: string;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-}
-
 interface TimeEntry {
   id: string;
   hours_worked: string | number;
@@ -112,8 +64,6 @@ interface BudgetSummary {
   hours_logged: number;
   anomalies?: { time_entry_id: string; date: string; task_type: string; hours_worked: number }[];
 }
-
-type ViewMode = 'board' | 'milestones' | 'people';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -133,87 +83,12 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
   ARCHIVED: 'Archived',
 };
 
-const TASK_STATUS_COLOR: Record<string, 'default' | 'info' | 'success' | 'warning'> = {
-  TODO: 'default',
-  IN_PROGRESS: 'info',
-  DONE: 'success',
-  CANCELLED: 'warning',
-};
-
 const TASK_STATUS_LABEL: Record<string, string> = {
   TODO: 'To Do',
   IN_PROGRESS: 'In Progress',
   DONE: 'Done',
   CANCELLED: 'Cancelled',
 };
-
-// ---------------------------------------------------------------------------
-// Milestone color coding based on due date proximity
-// ---------------------------------------------------------------------------
-
-function getMilestoneColor(dueDate: string | null): {
-  border: string;
-  bg: string;
-  label: string;
-} {
-  if (!dueDate) {
-    return { border: '#bdbdbd', bg: 'rgba(189,189,189,0.05)', label: '' };
-  }
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-  const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) {
-    const absDays = Math.abs(diffDays);
-    return {
-      border: '#d32f2f',
-      bg: 'rgba(211,47,47,0.05)',
-      label: `Overdue by ${absDays} day${absDays === 1 ? '' : 's'}`,
-    };
-  }
-  if (diffDays === 0) {
-    return { border: '#d32f2f', bg: 'rgba(211,47,47,0.05)', label: 'Due today' };
-  }
-  if (diffDays <= 7) {
-    return {
-      border: '#e65100',
-      bg: 'rgba(230,81,0,0.05)',
-      label: `${diffDays} day${diffDays === 1 ? '' : 's'} left`,
-    };
-  }
-  if (diffDays <= 14) {
-    return {
-      border: '#f57c00',
-      bg: 'rgba(245,124,0,0.05)',
-      label: `${diffDays} days left`,
-    };
-  }
-  if (diffDays <= 30) {
-    return {
-      border: '#ffa000',
-      bg: 'rgba(255,160,0,0.05)',
-      label: `${diffDays} days left`,
-    };
-  }
-  if (diffDays <= 60) {
-    const weeks = Math.round(diffDays / 7);
-    return {
-      border: '#7cb342',
-      bg: 'rgba(124,179,66,0.05)',
-      label: `${weeks} week${weeks === 1 ? '' : 's'} left`,
-    };
-  }
-  const months = Math.round(diffDays / 30);
-  return {
-    border: '#a5d6a7',
-    bg: 'rgba(165,214,167,0.05)',
-    label: `${months} month${months === 1 ? '' : 's'} left`,
-  };
-}
 
 const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 
@@ -224,8 +99,6 @@ const BUDGET_LABEL: Record<string, string> = {
   CAPPED: 'Capped',
   TRACKED_ONLY: 'Tracked Only',
 };
-
-const PERSON_HEADER_COLOR = '#1976D2';
 
 const VIEW_STORAGE_KEY = 'project-detail-board-view';
 const HIDE_EMPTY_MILESTONES_KEY = 'milestoneHideEmpty';
@@ -245,533 +118,6 @@ function formatBudgetType(value: string | null): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Task Card Component (shared between Board, Milestone, and People views)
-// ---------------------------------------------------------------------------
-
-function TaskCard({
-  task,
-  milestones,
-  onAssignmentsChange,
-  onMilestoneChange,
-}: {
-  task: Task;
-  milestones?: Milestone[];
-  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
-  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
-}) {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-
-  const handleMilestoneClick = (e: React.MouseEvent<HTMLElement>) => {
-    e.stopPropagation();
-    setAnchorEl(e.currentTarget);
-  };
-
-  const handleMilestoneSelect = (milestoneId: string | null) => {
-    setAnchorEl(null);
-    if (onMilestoneChange) {
-      onMilestoneChange(task.id, milestoneId);
-    }
-  };
-
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-      }}
-    >
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 500,
-            mb: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-          }}
-        >
-          {task.description}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-          <Chip
-            label={TASK_STATUS_LABEL[task.status] ?? task.status}
-            size="small"
-            color={TASK_STATUS_COLOR[task.status] ?? 'default'}
-            sx={{ fontSize: 11, height: 22 }}
-          />
-          {task.is_stale && (
-            <Chip
-              icon={<AccessTimeIcon sx={{ fontSize: 14 }} />}
-              label="Stale"
-              size="small"
-              sx={{
-                fontSize: 11,
-                height: 22,
-                bgcolor: '#FFF3E0',
-                color: '#E65100',
-                '& .MuiChip-icon': { color: '#E65100' },
-              }}
-            />
-          )}
-          {onMilestoneChange && milestones ? (
-            <>
-              <Chip
-                icon={<FlagIcon sx={{ fontSize: 13 }} />}
-                label={task.milestone ? task.milestone.name : 'No milestone'}
-                size="small"
-                variant="outlined"
-                onClick={handleMilestoneClick}
-                sx={{
-                  fontSize: 10,
-                  height: 20,
-                  cursor: 'pointer',
-                  '& .MuiChip-icon': { fontSize: 13 },
-                }}
-              />
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={() => setAnchorEl(null)}
-                slotProps={{ paper: { sx: { maxHeight: 300 } } }}
-              >
-                <MenuItem selected={!task.milestone_id} onClick={() => handleMilestoneSelect(null)}>
-                  <Typography variant="body2" color="text.secondary">
-                    No milestone
-                  </Typography>
-                </MenuItem>
-                {milestones.map((m) => (
-                  <MenuItem
-                    key={m.id}
-                    selected={task.milestone_id === m.id}
-                    onClick={() => handleMilestoneSelect(m.id)}
-                  >
-                    {m.name}
-                  </MenuItem>
-                ))}
-              </Menu>
-            </>
-          ) : (
-            task.milestone && (
-              <Chip
-                icon={<FlagIcon sx={{ fontSize: 13 }} />}
-                label={task.milestone.name}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: 10, height: 20, '& .MuiChip-icon': { fontSize: 13 } }}
-              />
-            )
-          )}
-          {onAssignmentsChange && (
-            <Box sx={{ ml: 'auto' }}>
-              <AssigneeAvatars
-                taskId={task.id}
-                assignments={task.assignments ?? []}
-                onAssignmentsChange={onAssignmentsChange}
-              />
-            </Box>
-          )}
-        </Box>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Kanban Column Component
-// ---------------------------------------------------------------------------
-
-function KanbanColumn({
-  title,
-  tasks,
-  color,
-  milestones,
-  onAssignmentsChange,
-  onMilestoneChange,
-}: {
-  title: string;
-  tasks: Task[];
-  color: 'default' | 'info' | 'success';
-  milestones?: Milestone[];
-  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
-  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
-}) {
-  const bgColor = color === 'info' ? '#E3F2FD' : color === 'success' ? '#E8F5E9' : '#F5F5F5';
-
-  return (
-    <Box
-      sx={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          mb: 2,
-          px: 1,
-        }}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        <Chip label={tasks.length} size="small" sx={{ fontSize: 12, height: 22 }} />
-      </Box>
-      <Box
-        sx={{
-          bgcolor: bgColor,
-          borderRadius: 2,
-          p: 1.5,
-          minHeight: 120,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1.5,
-        }}
-      >
-        {tasks.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-            No tasks
-          </Typography>
-        ) : (
-          tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              milestones={milestones}
-              onAssignmentsChange={onAssignmentsChange}
-              onMilestoneChange={onMilestoneChange}
-            />
-          ))
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Milestone Swimlane Component
-// ---------------------------------------------------------------------------
-
-interface SwimlaneData {
-  id: string | null;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-  tasks: Task[];
-}
-
-function MilestoneSwimlane({
-  swimlane,
-  allMilestones,
-  onAssignmentsChange,
-  onMilestoneChange,
-  onEditMilestone,
-  onDeleteMilestone,
-  isManuallyHidden,
-  onToggleVisibility,
-}: {
-  swimlane: SwimlaneData;
-  allMilestones?: Milestone[];
-  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
-  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
-  onEditMilestone?: (milestone: Milestone) => void;
-  onDeleteMilestone?: (milestone: Milestone) => void;
-  isManuallyHidden?: boolean;
-  onToggleVisibility?: (swimlaneId: string | null) => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-
-  const todoTasks = swimlane.tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = swimlane.tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = swimlane.tasks.filter((t) => t.status === 'DONE');
-  const totalCount = todoTasks.length + inProgressTasks.length + doneTasks.length;
-
-  // Find the full milestone object for edit/delete
-  const milestone =
-    swimlane.id && allMilestones ? allMilestones.find((m) => m.id === swimlane.id) : undefined;
-
-  // Color coding based on due date proximity (only for real milestones)
-  const milestoneColor = swimlane.id ? getMilestoneColor(swimlane.due_date) : null;
-
-  return (
-    <Box sx={{ mb: 3 }}>
-      {/* Swimlane Header */}
-      <Box
-        onClick={() => setExpanded(!expanded)}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          p: 1.5,
-          borderLeft: milestoneColor ? `5px solid ${milestoneColor.border}` : '4px solid #E91E63',
-          borderRadius: 1,
-          bgcolor: milestoneColor ? milestoneColor.bg : 'grey.50',
-          cursor: 'pointer',
-          userSelect: 'none',
-          '&:hover': { bgcolor: 'grey.100' },
-        }}
-      >
-        {expanded ? (
-          <ExpandLessIcon fontSize="small" color="action" />
-        ) : (
-          <ExpandMoreIcon fontSize="small" color="action" />
-        )}
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {swimlane.name}
-        </Typography>
-        {swimlane.due_date && (
-          <Typography variant="body2" color="text.secondary">
-            Due {new Date(swimlane.due_date).toLocaleDateString()}
-          </Typography>
-        )}
-        {milestoneColor && milestoneColor.label && (
-          <Chip
-            label={milestoneColor.label}
-            size="small"
-            sx={{
-              fontSize: 11,
-              height: 22,
-              bgcolor: milestoneColor.border,
-              color: '#fff',
-              fontWeight: 500,
-            }}
-          />
-        )}
-        {milestone && onEditMilestone && (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditMilestone(milestone);
-            }}
-            sx={{ ml: 0.5 }}
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-        )}
-        {milestone && onDeleteMilestone && (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteMilestone(milestone);
-            }}
-            color="error"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        )}
-        {onToggleVisibility && (
-          <Tooltip title={isManuallyHidden ? 'Show milestone' : 'Hide milestone'}>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleVisibility(swimlane.id);
-              }}
-              sx={{ ml: 0.5 }}
-            >
-              {isManuallyHidden ? (
-                <VisibilityOffIcon fontSize="small" />
-              ) : (
-                <VisibilityIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        )}
-        <Chip label={totalCount} size="small" sx={{ fontSize: 12, height: 22, ml: 'auto' }} />
-      </Box>
-
-      {/* Swimlane Content */}
-      <Collapse in={expanded}>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 3,
-            mt: 2,
-            pl: 2,
-          }}
-        >
-          <KanbanColumn
-            title="TODO"
-            tasks={todoTasks}
-            color="default"
-            milestones={allMilestones}
-            onAssignmentsChange={onAssignmentsChange}
-            onMilestoneChange={onMilestoneChange}
-          />
-          <KanbanColumn
-            title="In Progress"
-            tasks={inProgressTasks}
-            color="info"
-            milestones={allMilestones}
-            onAssignmentsChange={onAssignmentsChange}
-            onMilestoneChange={onMilestoneChange}
-          />
-          <KanbanColumn
-            title="Done"
-            tasks={doneTasks}
-            color="success"
-            milestones={allMilestones}
-            onAssignmentsChange={onAssignmentsChange}
-            onMilestoneChange={onMilestoneChange}
-          />
-        </Box>
-      </Collapse>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// People Board Row Component
-// ---------------------------------------------------------------------------
-
-interface PersonRow {
-  memberId: string | null; // null = Unassigned
-  memberName: string;
-  weeklyHours: number;
-  tasks: Task[];
-}
-
-function PeopleBoardRow({
-  row,
-  milestones,
-  onAssignmentsChange,
-  onMilestoneChange,
-}: {
-  row: PersonRow;
-  milestones?: Milestone[];
-  onAssignmentsChange?: (taskId: string, assignments: Assignment[]) => void;
-  onMilestoneChange?: (taskId: string, milestoneId: string | null) => void;
-}) {
-  const todoTasks = row.tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = row.tasks.filter((t) => t.status === 'DONE');
-
-  const initial = row.memberName.charAt(0).toUpperCase();
-
-  return (
-    <Box sx={{ mb: 3 }}>
-      {/* Row header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          mb: 1.5,
-          px: 1,
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 32,
-            height: 32,
-            fontSize: 14,
-            fontWeight: 700,
-            bgcolor: PERSON_HEADER_COLOR,
-            color: '#fff',
-          }}
-        >
-          {initial}
-        </Avatar>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: PERSON_HEADER_COLOR }}>
-          {row.memberName}
-        </Typography>
-        {row.memberId && (
-          <Chip
-            label={`${row.weeklyHours.toFixed(1)}h this week`}
-            size="small"
-            sx={{
-              fontSize: 11,
-              height: 22,
-              bgcolor: '#E3F2FD',
-              color: PERSON_HEADER_COLOR,
-              fontWeight: 600,
-            }}
-          />
-        )}
-        <Chip
-          label={`${row.tasks.length} task${row.tasks.length === 1 ? '' : 's'}`}
-          size="small"
-          sx={{ fontSize: 11, height: 22 }}
-        />
-      </Box>
-
-      {/* Three columns */}
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', md: 'row' },
-          gap: 2,
-        }}
-      >
-        {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((status) => {
-          const statusTasks =
-            status === 'TODO' ? todoTasks : status === 'IN_PROGRESS' ? inProgressTasks : doneTasks;
-          const bgColor =
-            status === 'IN_PROGRESS' ? '#E3F2FD' : status === 'DONE' ? '#E8F5E9' : '#F5F5F5';
-          const label =
-            status === 'TODO' ? 'TODO' : status === 'IN_PROGRESS' ? 'In Progress' : 'Done';
-
-          return (
-            <Box key={status} sx={{ flex: 1, minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1, px: 0.5 }}>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                  {label}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  ({statusTasks.length})
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  bgcolor: bgColor,
-                  borderRadius: 1.5,
-                  p: 1,
-                  minHeight: 60,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1,
-                }}
-              >
-                {statusTasks.length === 0 ? (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ textAlign: 'center', py: 1.5 }}
-                  >
-                    --
-                  </Typography>
-                ) : (
-                  statusTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      milestones={milestones}
-                      onAssignmentsChange={onAssignmentsChange}
-                      onMilestoneChange={onMilestoneChange}
-                    />
-                  ))
-                )}
-              </Box>
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -781,8 +127,8 @@ export default function ProjectDetailPage() {
 
   // Data state
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [tasks, setTasks] = useState<BoardTask[]>([]);
+  const [milestones, setMilestones] = useState<BoardMilestone[]>([]);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
   const [weeklyHoursMap, setWeeklyHoursMap] = useState<Record<string, number>>({});
@@ -790,26 +136,20 @@ export default function ProjectDetailPage() {
   const [tasksLoading, setTasksLoading] = useState(false);
 
   // Board view toggle with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  const initialViewMode = (() => {
     const stored = localStorage.getItem(VIEW_STORAGE_KEY);
     if (stored === 'milestones' || stored === 'people') return stored;
-    return 'board';
-  });
+    return 'board' as ViewMode;
+  })();
 
-  const handleViewChange = (_: React.MouseEvent<HTMLElement>, newView: ViewMode | null) => {
-    if (newView !== null) {
-      setViewMode(newView);
-      localStorage.setItem(VIEW_STORAGE_KEY, newView);
-    }
+  const handleViewChange = (mode: ViewMode) => {
+    localStorage.setItem(VIEW_STORAGE_KEY, mode);
   };
 
   // Milestone visibility: hide empty milestones toggle
-  const [hideEmptyMilestones, setHideEmptyMilestones] = useState<boolean>(() => {
-    return localStorage.getItem(HIDE_EMPTY_MILESTONES_KEY) === 'true';
-  });
+  const initialHideEmpty = localStorage.getItem(HIDE_EMPTY_MILESTONES_KEY) === 'true';
 
   const handleHideEmptyChange = (checked: boolean) => {
-    setHideEmptyMilestones(checked);
     localStorage.setItem(HIDE_EMPTY_MILESTONES_KEY, String(checked));
   };
 
@@ -829,7 +169,6 @@ export default function ProjectDetailPage() {
 
   const toggleMilestoneVisibility = useCallback(
     (milestoneId: string | null) => {
-      // Use '__none__' as the key for the "No Milestone" swimlane
       const key = milestoneId ?? '__none__';
       setHiddenMilestoneIds((prev) => {
         const next = new Set(prev);
@@ -862,14 +201,14 @@ export default function ProjectDetailPage() {
 
   // Milestone dialog state
   const [milestoneDialogOpen, setMilestoneDialogOpen] = useState(false);
-  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [editingMilestone, setEditingMilestone] = useState<BoardMilestone | null>(null);
   const [milestoneName, setMilestoneName] = useState('');
   const [milestoneDueDate, setMilestoneDueDate] = useState('');
   const [milestoneSubmitting, setMilestoneSubmitting] = useState(false);
 
   // Delete milestone confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingMilestone, setDeletingMilestone] = useState<Milestone | null>(null);
+  const [deletingMilestone, setDeletingMilestone] = useState<BoardMilestone | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   // Snackbar
@@ -891,8 +230,8 @@ export default function ProjectDetailPage() {
         await Promise.all([
           // TODO: use single-project endpoint when available
           api.get<Project[]>('/api/projects'),
-          api.get<Task[]>(`/api/projects/${id}/tasks`),
-          api.get<Milestone[]>(`/api/projects/${id}/milestones`),
+          api.get<BoardTask[]>(`/api/projects/${id}/tasks`),
+          api.get<BoardMilestone[]>(`/api/projects/${id}/milestones`),
           api.get<TimeEntry[]>(`/api/time-entries?project_id=${id}`),
           api.get<Record<string, number>>(`/api/projects/${id}/weekly-hours`),
         ]);
@@ -928,119 +267,10 @@ export default function ProjectDetailPage() {
   }, [fetchData]);
 
   // ---- Task counts ----
-  const todoTasks = tasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = tasks.filter((t) => t.status === 'DONE');
+  const todoCount = tasks.filter((t) => t.status === 'TODO').length;
+  const inProgressCount = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const doneCount = tasks.filter((t) => t.status === 'DONE').length;
   const cancelledCount = tasks.filter((t) => t.status === 'CANCELLED').length;
-
-  // ---- Milestone swimlane data ----
-  const swimlanes = useMemo<SwimlaneData[]>(() => {
-    // Sort milestones by due_date ASC, NULLS LAST
-    const sorted = [...milestones].sort((a, b) => {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    });
-
-    const activeTasks = tasks.filter((t) => t.status !== 'CANCELLED');
-
-    const lanes: SwimlaneData[] = sorted.map((m) => ({
-      id: m.id,
-      name: m.name,
-      due_date: m.due_date,
-      is_overdue: m.is_overdue,
-      tasks: activeTasks.filter((t) => t.milestone_id === m.id),
-    }));
-
-    // "No Milestone" swimlane at the bottom
-    const unassigned = activeTasks.filter((t) => !t.milestone_id);
-    if (unassigned.length > 0 || lanes.length > 0) {
-      lanes.push({
-        id: null,
-        name: 'No Milestone',
-        due_date: null,
-        is_overdue: false,
-        tasks: unassigned,
-      });
-    }
-
-    return lanes;
-  }, [tasks, milestones]);
-
-  // ---- Filtered swimlanes (hide empty + manually hidden) ----
-  const filteredSwimlanes = useMemo(() => {
-    return swimlanes.filter((lane) => {
-      const laneKey = lane.id ?? '__none__';
-
-      // Manually hidden
-      if (hiddenMilestoneIds.has(laneKey)) return false;
-
-      // Hide empty: milestones with no TODO or IN_PROGRESS tasks
-      if (hideEmptyMilestones) {
-        const hasActiveTasks = lane.tasks.some(
-          (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS',
-        );
-        if (!hasActiveTasks) return false;
-      }
-
-      return true;
-    });
-  }, [swimlanes, hiddenMilestoneIds, hideEmptyMilestones]);
-
-  const hiddenCount = swimlanes.length - filteredSwimlanes.length;
-  const manuallyHiddenCount = hiddenMilestoneIds.size;
-
-  // ---- People board rows ----
-  const personRows: PersonRow[] = useMemo(() => {
-    const memberMap = new Map<string, { member: TeamMemberRef; tasks: Task[] }>();
-    const unassignedTasks: Task[] = [];
-
-    for (const task of tasks) {
-      if (task.status === 'CANCELLED') continue;
-
-      const assignments = task.assignments ?? [];
-      if (assignments.length === 0) {
-        unassignedTasks.push(task);
-      } else {
-        for (const assignment of assignments) {
-          const memberId = assignment.team_member.id;
-          if (!memberMap.has(memberId)) {
-            memberMap.set(memberId, { member: assignment.team_member, tasks: [] });
-          }
-          memberMap.get(memberId)!.tasks.push(task);
-        }
-      }
-    }
-
-    const rows: PersonRow[] = [];
-
-    // Sort members alphabetically
-    const sortedMembers = Array.from(memberMap.entries()).sort((a, b) =>
-      a[1].member.full_name.localeCompare(b[1].member.full_name),
-    );
-
-    for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
-      rows.push({
-        memberId,
-        memberName: member.full_name,
-        weeklyHours: weeklyHoursMap[memberId] ?? 0,
-        tasks: memberTasks,
-      });
-    }
-
-    // Unassigned row at bottom
-    if (unassignedTasks.length > 0) {
-      rows.push({
-        memberId: null,
-        memberName: 'Unassigned',
-        weeklyHours: 0,
-        tasks: unassignedTasks,
-      });
-    }
-
-    return rows;
-  }, [tasks, weeklyHoursMap]);
 
   // ---- Assignments change handler ----
   const handleAssignmentsChange = useCallback((taskId: string, assignments: Assignment[]) => {
@@ -1065,7 +295,7 @@ export default function ProjectDetailPage() {
       // Refresh tasks
       setTasksLoading(true);
       try {
-        const updatedTasks = await api.get<Task[]>(`/api/projects/${id}/tasks`);
+        const updatedTasks = await api.get<BoardTask[]>(`/api/projects/${id}/tasks`);
         setTasks(updatedTasks);
       } finally {
         setTasksLoading(false);
@@ -1087,7 +317,7 @@ export default function ProjectDetailPage() {
     setMilestoneDialogOpen(true);
   };
 
-  const handleOpenEditMilestone = (milestone: Milestone) => {
+  const handleOpenEditMilestone = (milestone: BoardMilestone) => {
     setEditingMilestone(milestone);
     setMilestoneName(milestone.name);
     setMilestoneDueDate(milestone.due_date ? milestone.due_date.split('T')[0] : '');
@@ -1121,7 +351,7 @@ export default function ProjectDetailPage() {
       setMilestoneDialogOpen(false);
       setEditingMilestone(null);
       // Refresh milestones
-      const updatedMilestones = await api.get<Milestone[]>(`/api/projects/${id}/milestones`);
+      const updatedMilestones = await api.get<BoardMilestone[]>(`/api/projects/${id}/milestones`);
       setMilestones(updatedMilestones);
     } catch (err) {
       const message =
@@ -1132,7 +362,7 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleOpenDeleteMilestone = (milestone: Milestone) => {
+  const handleOpenDeleteMilestone = (milestone: BoardMilestone) => {
     setDeletingMilestone(milestone);
     setDeleteDialogOpen(true);
   };
@@ -1148,8 +378,8 @@ export default function ProjectDetailPage() {
       setDeletingMilestone(null);
       // Refresh milestones and tasks (tasks may have lost their milestone)
       const [updatedMilestones, updatedTasks] = await Promise.all([
-        api.get<Milestone[]>(`/api/projects/${id}/milestones`),
-        api.get<Task[]>(`/api/projects/${id}/tasks`),
+        api.get<BoardMilestone[]>(`/api/projects/${id}/milestones`),
+        api.get<BoardTask[]>(`/api/projects/${id}/tasks`),
       ]);
       setMilestones(updatedMilestones);
       setTasks(updatedTasks);
@@ -1268,7 +498,7 @@ export default function ProjectDetailPage() {
               TODO
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {todoTasks.length}
+              {todoCount}
             </Typography>
           </CardContent>
         </Card>
@@ -1278,7 +508,7 @@ export default function ProjectDetailPage() {
               In Progress
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'info.main' }}>
-              {inProgressTasks.length}
+              {inProgressCount}
             </Typography>
           </CardContent>
         </Card>
@@ -1288,7 +518,7 @@ export default function ProjectDetailPage() {
               Done
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
-              {doneTasks.length}
+              {doneCount}
             </Typography>
           </CardContent>
         </Card>
@@ -1467,7 +697,7 @@ export default function ProjectDetailPage() {
         )}
       </Box>
 
-      {/* ---- Tasks Header with View Toggle ---- */}
+      {/* ---- Tasks Header ---- */}
       <Box
         sx={{
           display: 'flex',
@@ -1478,179 +708,33 @@ export default function ProjectDetailPage() {
           mb: 3,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>
-            Tasks
-          </Typography>
-          <ToggleButtonGroup value={viewMode} exclusive onChange={handleViewChange} size="small">
-            <ToggleButton value="board" aria-label="Board view">
-              <ViewColumnIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Board
-            </ToggleButton>
-            <ToggleButton value="milestones" aria-label="Milestones view">
-              <ViewStreamIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Milestones
-            </ToggleButton>
-            <ToggleButton value="people" aria-label="People view">
-              <PeopleIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              People
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          Tasks
+        </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDialogOpen(true)}>
           Add Task
         </Button>
       </Box>
 
-      {/* ---- Task Views ---- */}
-      {tasksLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : viewMode === 'board' ? (
-        <>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 3,
-            }}
-          >
-            <KanbanColumn
-              title="TODO"
-              tasks={todoTasks}
-              color="default"
-              milestones={milestones}
-              onAssignmentsChange={handleAssignmentsChange}
-              onMilestoneChange={handleMilestoneChange}
-            />
-            <KanbanColumn
-              title="In Progress"
-              tasks={inProgressTasks}
-              color="info"
-              milestones={milestones}
-              onAssignmentsChange={handleAssignmentsChange}
-              onMilestoneChange={handleMilestoneChange}
-            />
-            <KanbanColumn
-              title="Done"
-              tasks={doneTasks}
-              color="success"
-              milestones={milestones}
-              onAssignmentsChange={handleAssignmentsChange}
-              onMilestoneChange={handleMilestoneChange}
-            />
-          </Box>
-          {cancelledCount > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
-            </Typography>
-          )}
-        </>
-      ) : viewMode === 'milestones' ? (
-        <>
-          {/* Milestone filter bar */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              mb: 2,
-              flexWrap: 'wrap',
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={hideEmptyMilestones}
-                  onChange={(e) => handleHideEmptyChange(e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="body2" color="text.secondary">
-                  Show only active milestones
-                </Typography>
-              }
-              sx={{ mr: 2 }}
-            />
-            {manuallyHiddenCount > 0 && (
-              <Chip
-                label={`${manuallyHiddenCount} milestone${manuallyHiddenCount === 1 ? '' : 's'} hidden`}
-                size="small"
-                variant="outlined"
-                onClick={showAllMilestones}
-                onDelete={showAllMilestones}
-                deleteIcon={<VisibilityIcon fontSize="small" />}
-                sx={{ fontSize: 12, height: 26 }}
-              />
-            )}
-          </Box>
-          {filteredSwimlanes.length === 0 && swimlanes.length > 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-              All milestones are hidden.{' '}
-              <Box
-                component="span"
-                onClick={showAllMilestones}
-                sx={{
-                  color: 'primary.main',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-              >
-                Show all
-              </Box>
-            </Typography>
-          ) : (
-            filteredSwimlanes.map((lane) => (
-              <MilestoneSwimlane
-                key={lane.id ?? '__none__'}
-                swimlane={lane}
-                allMilestones={milestones}
-                onAssignmentsChange={handleAssignmentsChange}
-                onMilestoneChange={handleMilestoneChange}
-                onEditMilestone={handleOpenEditMilestone}
-                onDeleteMilestone={handleOpenDeleteMilestone}
-                isManuallyHidden={hiddenMilestoneIds.has(lane.id ?? '__none__')}
-                onToggleVisibility={toggleMilestoneVisibility}
-              />
-            ))
-          )}
-          {hiddenCount > 0 && filteredSwimlanes.length > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 1 }}>
-              {hiddenCount} milestone{hiddenCount === 1 ? '' : 's'} hidden
-            </Typography>
-          )}
-          {cancelledCount > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
-            </Typography>
-          )}
-        </>
-      ) : (
-        <>
-          {personRows.length === 0 ? (
-            <Typography variant="body1" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-              No tasks to display.
-            </Typography>
-          ) : (
-            personRows.map((row) => (
-              <PeopleBoardRow
-                key={row.memberId ?? 'unassigned'}
-                row={row}
-                milestones={milestones}
-                onAssignmentsChange={handleAssignmentsChange}
-                onMilestoneChange={handleMilestoneChange}
-              />
-            ))
-          )}
-          {cancelledCount > 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {cancelledCount} cancelled {cancelledCount === 1 ? 'task' : 'tasks'}
-            </Typography>
-          )}
-        </>
-      )}
+      {/* ---- Task Board ---- */}
+      <ProjectTaskBoard
+        tasks={tasks}
+        milestones={milestones}
+        loading={tasksLoading}
+        weeklyHoursMap={weeklyHoursMap}
+        initialViewMode={initialViewMode}
+        onViewModeChange={handleViewChange}
+        initialHideEmpty={initialHideEmpty}
+        onHideEmptyChange={handleHideEmptyChange}
+        onAssignmentsChange={handleAssignmentsChange}
+        onMilestoneChange={handleMilestoneChange}
+        onEditMilestone={handleOpenEditMilestone}
+        onDeleteMilestone={handleOpenDeleteMilestone}
+        hiddenMilestoneIds={hiddenMilestoneIds}
+        onToggleMilestoneVisibility={toggleMilestoneVisibility}
+        onShowAllMilestones={showAllMilestones}
+        cancelledCount={cancelledCount}
+      />
 
       {/* ---- Add Task Dialog ---- */}
       <Dialog

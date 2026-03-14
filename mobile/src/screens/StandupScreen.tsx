@@ -6,14 +6,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
-  Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api } from '../lib/api';
-import TaskCard from '../components/TaskCard';
+import ProjectTaskBoard from '../components/ProjectTaskBoard';
+import type { BoardTask, BoardMilestone } from '../components/ProjectTaskBoard';
 
 interface Client {
   id: string;
@@ -25,51 +24,6 @@ interface Project {
   name: string;
   status: string;
   client: Client | null;
-}
-
-interface TaskAssignment {
-  id: string;
-  team_member_id: string;
-  team_member: {
-    id: string;
-    full_name: string;
-    email: string;
-  };
-}
-
-interface Task {
-  id: string;
-  project_id: string;
-  description: string;
-  status: string;
-  completed_at?: string | null;
-  is_stale?: boolean;
-  milestone_id?: string | null;
-  assignments?: TaskAssignment[];
-}
-
-interface Milestone {
-  id: string;
-  project_id: string;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-}
-
-type StandupViewMode = 'board' | 'milestones' | 'people';
-
-interface SwimlaneData {
-  id: string | null;
-  name: string;
-  due_date: string | null;
-  is_overdue?: boolean;
-  tasks: Task[];
-}
-
-interface PersonRow {
-  memberId: string | null;
-  memberName: string;
-  tasks: Task[];
 }
 
 const STANDUP_PROMPTS = [
@@ -106,49 +60,14 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
-function isRecentlyCompleted(task: Task): boolean {
-  if (!task.completed_at) return true;
-  const completedDate = new Date(task.completed_at);
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  return completedDate >= sevenDaysAgo;
-}
-
-const TASK_STATUS_LABEL: Record<string, string> = {
-  TODO: 'To Do',
-  IN_PROGRESS: 'In Progress',
-  DONE: 'Done',
-  CANCELLED: 'Cancelled',
-};
-
-const TASK_STATUS_BG: Record<string, string> = {
-  TODO: '#E0E0E0',
-  IN_PROGRESS: '#BBDEFB',
-  DONE: '#C8E6C9',
-  CANCELLED: '#FFE0B2',
-};
-
-const COLUMN_COLORS: Record<string, string> = {
-  TODO: '#F5F5F5',
-  IN_PROGRESS: '#E3F2FD',
-  DONE: '#E8F5E9',
-};
-
-const COLUMN_LABELS: Record<string, string> = {
-  TODO: 'To Do',
-  IN_PROGRESS: 'In Progress',
-  DONE: 'Done (7d)',
-};
-
-const screenWidth = Dimensions.get('window').width;
-
 export default function StandupScreen() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<StandupViewMode>('board');
-  const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>({});
-  const [milestonesByProject, setMilestonesByProject] = useState<Record<string, Milestone[]>>({});
+  const [tasksByProject, setTasksByProject] = useState<Record<string, BoardTask[]>>({});
+  const [milestonesByProject, setMilestonesByProject] = useState<Record<string, BoardMilestone[]>>(
+    {},
+  );
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
   const [hideEmptyMilestones, setHideEmptyMilestones] = useState(false);
 
@@ -211,8 +130,8 @@ export default function StandupScreen() {
       setLoadingProjects((prev) => new Set(prev).add(projectId));
       try {
         const [taskData, milestoneData] = await Promise.all([
-          api.get<Task[]>(`/api/projects/${projectId}/tasks`),
-          api.get<Milestone[]>(`/api/projects/${projectId}/milestones`),
+          api.get<BoardTask[]>(`/api/projects/${projectId}/tasks`),
+          api.get<BoardMilestone[]>(`/api/projects/${projectId}/milestones`),
         ]);
         setTasksByProject((prev) => ({ ...prev, [projectId]: taskData }));
         setMilestonesByProject((prev) => ({ ...prev, [projectId]: milestoneData }));
@@ -258,83 +177,9 @@ export default function StandupScreen() {
 
   const currentMilestones = currentProject ? (milestonesByProject[currentProject.id] ?? []) : [];
 
-  const todoTasks = currentTasks.filter((t) => t.status === 'TODO');
-  const inProgressTasks = currentTasks.filter((t) => t.status === 'IN_PROGRESS');
-  const doneTasks = currentTasks.filter((t) => t.status === 'DONE' && isRecentlyCompleted(t));
-
   const totalNonCancelled = currentTasks.filter((t) => t.status !== 'CANCELLED').length;
   const doneCount = currentTasks.filter((t) => t.status === 'DONE').length;
   const completionPercent = totalNonCancelled > 0 ? (doneCount / totalNonCancelled) * 100 : 0;
-
-  // ---- Milestone swimlanes ----
-  const swimlanes = useMemo<SwimlaneData[]>(() => {
-    if (!currentProject) return [];
-    const sorted = [...currentMilestones].sort((a, b) => {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    });
-    const activeTasks = currentTasks.filter((t) => t.status !== 'CANCELLED');
-    const lanes: SwimlaneData[] = sorted.map((m) => ({
-      id: m.id,
-      name: m.name,
-      due_date: m.due_date,
-      is_overdue: m.is_overdue,
-      tasks: activeTasks.filter((t) => t.milestone_id === m.id),
-    }));
-    const unassigned = activeTasks.filter((t) => !t.milestone_id);
-    if (unassigned.length > 0 || lanes.length > 0) {
-      lanes.push({
-        id: null,
-        name: 'No Milestone',
-        due_date: null,
-        is_overdue: false,
-        tasks: unassigned,
-      });
-    }
-    return lanes;
-  }, [currentProject, currentTasks, currentMilestones]);
-
-  const filteredSwimlanes = useMemo(() => {
-    if (!hideEmptyMilestones) return swimlanes;
-    return swimlanes.filter((lane) => {
-      return lane.tasks.some((t) => t.status === 'IN_PROGRESS' || t.status === 'DONE');
-    });
-  }, [swimlanes, hideEmptyMilestones]);
-
-  const hiddenMilestoneCount = swimlanes.length - filteredSwimlanes.length;
-
-  // ---- People rows ----
-  const personRows = useMemo<PersonRow[]>(() => {
-    if (!currentProject) return [];
-    const memberMap = new Map<string, { member: TaskAssignment['team_member']; tasks: Task[] }>();
-    const unassignedTasks: Task[] = [];
-    for (const task of currentTasks) {
-      if (task.status === 'CANCELLED') continue;
-      const assignments = task.assignments ?? [];
-      if (assignments.length === 0) {
-        unassignedTasks.push(task);
-      } else {
-        for (const a of assignments) {
-          const mid = a.team_member.id;
-          if (!memberMap.has(mid)) memberMap.set(mid, { member: a.team_member, tasks: [] });
-          memberMap.get(mid)!.tasks.push(task);
-        }
-      }
-    }
-    const rows: PersonRow[] = [];
-    const sortedMembers = Array.from(memberMap.entries()).sort((a, b) =>
-      a[1].member.full_name.localeCompare(b[1].member.full_name),
-    );
-    for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
-      rows.push({ memberId, memberName: member.full_name, tasks: memberTasks });
-    }
-    if (unassignedTasks.length > 0) {
-      rows.push({ memberId: null, memberName: 'Unassigned', tasks: unassignedTasks });
-    }
-    return rows;
-  }, [currentProject, currentTasks]);
 
   if (projectsLoading) {
     return (
@@ -440,221 +285,17 @@ export default function StandupScreen() {
                 />
               </View>
 
-              {/* View Toggle */}
-              <View style={styles.viewToggleRow}>
-                {(['board', 'milestones', 'people'] as const).map((mode) => (
-                  <TouchableOpacity
-                    key={mode}
-                    onPress={() => setViewMode(mode)}
-                    style={[styles.viewToggleBtn, viewMode === mode && styles.viewToggleBtnActive]}
-                  >
-                    <Text
-                      style={[
-                        styles.viewToggleText,
-                        viewMode === mode && styles.viewToggleTextActive,
-                      ]}
-                    >
-                      {mode === 'board' ? 'Board' : mode === 'milestones' ? 'Milestones' : 'People'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Task Views */}
+              {/* Task Board */}
               {isCurrentLoading ? (
                 <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
-              ) : viewMode === 'board' ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.columnsScroll}
-                >
-                  {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((col) => {
-                    const colTasks =
-                      col === 'TODO'
-                        ? todoTasks
-                        : col === 'IN_PROGRESS'
-                          ? inProgressTasks
-                          : doneTasks;
-                    return (
-                      <View
-                        key={col}
-                        style={[styles.column, { backgroundColor: COLUMN_COLORS[col] }]}
-                      >
-                        <View style={styles.columnHeader}>
-                          <Text style={styles.columnTitle}>{COLUMN_LABELS[col]}</Text>
-                          <Text style={styles.columnCount}>{colTasks.length}</Text>
-                        </View>
-                        {colTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            title={task.description}
-                            status={task.status}
-                            assignments={task.assignments}
-                          />
-                        ))}
-                        {colTasks.length === 0 && <Text style={styles.noTasksText}>No tasks</Text>}
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              ) : viewMode === 'milestones' ? (
-                <View style={styles.milestonesContainer}>
-                  {/* Hide empty milestones toggle */}
-                  <View style={styles.toggleRow}>
-                    <Text style={styles.toggleLabel}>Show only active milestones</Text>
-                    <Switch
-                      value={hideEmptyMilestones}
-                      onValueChange={handleHideEmptyChange}
-                      trackColor={{ false: '#D0D0D0', true: colors.primary + '80' }}
-                      thumbColor={hideEmptyMilestones ? colors.primary : '#f4f3f4'}
-                    />
-                    {hiddenMilestoneCount > 0 && (
-                      <Text style={styles.hiddenCount}>({hiddenMilestoneCount} hidden)</Text>
-                    )}
-                  </View>
-                  {filteredSwimlanes.length === 0 ? (
-                    <Text style={styles.noTasksText}>No milestones or tasks to display.</Text>
-                  ) : (
-                    filteredSwimlanes.map((lane) => {
-                      const laneTodo = lane.tasks.filter((t) => t.status === 'TODO');
-                      const laneInProgress = lane.tasks.filter((t) => t.status === 'IN_PROGRESS');
-                      const laneDone = lane.tasks.filter((t) => t.status === 'DONE');
-                      const laneTotal = laneTodo.length + laneInProgress.length + laneDone.length;
-                      return (
-                        <View
-                          key={lane.id ?? '__none__'}
-                          style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
-                        >
-                          <View style={styles.swimlaneHeader}>
-                            <Text style={styles.swimlaneName}>{lane.name}</Text>
-                            {lane.due_date && (
-                              <Text style={styles.swimlaneDue}>
-                                Due {new Date(lane.due_date).toLocaleDateString()}
-                              </Text>
-                            )}
-                            {lane.is_overdue && (
-                              <View style={styles.overdueChip}>
-                                <Text style={styles.overdueChipText}>Overdue</Text>
-                              </View>
-                            )}
-                            <View style={styles.countChip}>
-                              <Text style={styles.countChipText}>{laneTotal}</Text>
-                            </View>
-                          </View>
-                          {laneTotal === 0 ? (
-                            <Text style={styles.noTasksText}>No tasks</Text>
-                          ) : (
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              style={styles.columnsScroll}
-                            >
-                              {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((col) => {
-                                const colTasks =
-                                  col === 'TODO'
-                                    ? laneTodo
-                                    : col === 'IN_PROGRESS'
-                                      ? laneInProgress
-                                      : laneDone;
-                                return (
-                                  <View
-                                    key={col}
-                                    style={[styles.column, { backgroundColor: COLUMN_COLORS[col] }]}
-                                  >
-                                    <View style={styles.columnHeader}>
-                                      <Text style={styles.columnTitle}>{COLUMN_LABELS[col]}</Text>
-                                      <Text style={styles.columnCount}>{colTasks.length}</Text>
-                                    </View>
-                                    {colTasks.map((task) => (
-                                      <TaskCard
-                                        key={task.id}
-                                        title={task.description}
-                                        status={task.status}
-                                        assignments={task.assignments}
-                                      />
-                                    ))}
-                                    {colTasks.length === 0 && (
-                                      <Text style={styles.noTasksText}>No tasks</Text>
-                                    )}
-                                  </View>
-                                );
-                              })}
-                            </ScrollView>
-                          )}
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
               ) : (
-                <View style={styles.peopleContainer}>
-                  {personRows.length === 0 ? (
-                    <Text style={styles.noTasksText}>No tasks to display.</Text>
-                  ) : (
-                    personRows.map((row) => {
-                      const rowTodo = row.tasks.filter((t) => t.status === 'TODO');
-                      const rowInProgress = row.tasks.filter((t) => t.status === 'IN_PROGRESS');
-                      const rowDone = row.tasks.filter((t) => t.status === 'DONE');
-                      return (
-                        <View key={row.memberId ?? 'unassigned'} style={styles.personSection}>
-                          <View style={styles.personHeader}>
-                            <View
-                              style={[
-                                styles.personAvatar,
-                                { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
-                              ]}
-                            >
-                              <Text style={styles.personAvatarText}>
-                                {row.memberName.charAt(0).toUpperCase()}
-                              </Text>
-                            </View>
-                            <Text style={styles.personName}>{row.memberName}</Text>
-                            <View style={styles.countChip}>
-                              <Text style={styles.countChipText}>{row.tasks.length}</Text>
-                            </View>
-                          </View>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.columnsScroll}
-                          >
-                            {(['TODO', 'IN_PROGRESS', 'DONE'] as const).map((col) => {
-                              const colTasks =
-                                col === 'TODO'
-                                  ? rowTodo
-                                  : col === 'IN_PROGRESS'
-                                    ? rowInProgress
-                                    : rowDone;
-                              return (
-                                <View
-                                  key={col}
-                                  style={[styles.column, { backgroundColor: COLUMN_COLORS[col] }]}
-                                >
-                                  <View style={styles.columnHeader}>
-                                    <Text style={styles.columnTitle}>{COLUMN_LABELS[col]}</Text>
-                                    <Text style={styles.columnCount}>{colTasks.length}</Text>
-                                  </View>
-                                  {colTasks.map((task) => (
-                                    <TaskCard
-                                      key={task.id}
-                                      title={task.description}
-                                      status={task.status}
-                                      assignments={task.assignments}
-                                    />
-                                  ))}
-                                  {colTasks.length === 0 && (
-                                    <Text style={styles.noTasksText}>No tasks</Text>
-                                  )}
-                                </View>
-                              );
-                            })}
-                          </ScrollView>
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
+                <ProjectTaskBoard
+                  tasks={currentTasks}
+                  milestones={currentMilestones}
+                  filterRecentDone
+                  hideEmptyMilestones={hideEmptyMilestones}
+                  onHideEmptyChange={handleHideEmptyChange}
+                />
               )}
             </>
           )}
@@ -814,43 +455,6 @@ const styles = StyleSheet.create({
   loader: {
     paddingVertical: spacing.xl,
   },
-  columnsScroll: {
-    marginHorizontal: -spacing.md,
-  },
-  column: {
-    width: screenWidth * 0.65,
-    borderRadius: borderRadius.card,
-    padding: spacing.sm,
-    marginHorizontal: spacing.xs,
-    minHeight: 150,
-  },
-  columnHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-  },
-  columnTitle: {
-    fontSize: typography.sizes.body1,
-    fontWeight: typography.weights.semibold,
-    color: colors.text,
-  },
-  columnCount: {
-    fontSize: typography.sizes.caption,
-    color: '#666',
-    backgroundColor: '#E0E0E0',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  noTasksText: {
-    fontSize: typography.sizes.body2,
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
   plannedSubtitle: {
     fontSize: typography.sizes.body2,
     color: '#666',
@@ -888,157 +492,5 @@ const styles = StyleSheet.create({
   plannedChipText: {
     fontSize: typography.sizes.caption,
     color: '#666',
-  },
-  viewToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-    gap: 0,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D0D0D0',
-    overflow: 'hidden',
-    alignSelf: 'center',
-  },
-  viewToggleBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#fff',
-  },
-  viewToggleBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  viewToggleText: {
-    fontSize: typography.sizes.caption,
-    fontWeight: typography.weights.medium,
-    color: '#666',
-  },
-  viewToggleTextActive: {
-    color: '#fff',
-    fontWeight: typography.weights.semibold,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
-  },
-  toggleLabel: {
-    fontSize: typography.sizes.body2,
-    color: '#666',
-    flex: 1,
-  },
-  hiddenCount: {
-    fontSize: typography.sizes.caption,
-    color: '#999',
-  },
-  milestonesContainer: {
-    paddingHorizontal: spacing.xs,
-  },
-  swimlane: {
-    marginBottom: spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-    borderRadius: borderRadius.card,
-    backgroundColor: '#F5F5F5',
-    padding: spacing.sm,
-  },
-  swimlaneOverdue: {
-    borderLeftColor: '#f44336',
-    backgroundColor: '#FFF3F0',
-  },
-  swimlaneHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  swimlaneName: {
-    fontSize: typography.sizes.body1,
-    fontWeight: typography.weights.semibold,
-    color: colors.text,
-  },
-  swimlaneDue: {
-    fontSize: typography.sizes.caption,
-    color: '#666',
-  },
-  overdueChip: {
-    backgroundColor: '#f44336',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  overdueChipText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: typography.weights.semibold,
-  },
-  countChip: {
-    backgroundColor: '#E0E0E0',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    marginLeft: 'auto',
-  },
-  countChipText: {
-    fontSize: typography.sizes.caption,
-    color: '#666',
-  },
-  milestoneTaskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: '#fff',
-    borderRadius: borderRadius.card,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-    marginBottom: spacing.xs,
-  },
-  milestoneTaskText: {
-    flex: 1,
-    fontSize: typography.sizes.body2,
-    color: colors.text,
-  },
-  statusChipSmall: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  statusChipSmallText: {
-    fontSize: 10,
-    fontWeight: typography.weights.medium,
-    color: '#333',
-  },
-  peopleContainer: {
-    paddingHorizontal: spacing.xs,
-  },
-  personSection: {
-    marginBottom: spacing.md,
-  },
-  personHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  personAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  personAvatarText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: typography.weights.bold,
-  },
-  personName: {
-    fontSize: typography.sizes.body1,
-    fontWeight: typography.weights.semibold,
-    color: colors.text,
   },
 });
