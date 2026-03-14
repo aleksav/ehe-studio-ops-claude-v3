@@ -156,6 +156,16 @@ test.describe('Demo Recording', () => {
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1500);
 
+    // Overview tab shows stats, budget, milestones summary
+    await expect(page.getByRole('tab', { name: /overview/i })).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(2500);
+
+    // Switch to Tasks tab
+    await subtitle(page, 'Tasks tab shows board, milestones, and people views');
+    await page.waitForTimeout(800);
+    await page.getByRole('tab', { name: /tasks/i }).click();
+    await page.waitForTimeout(1500);
+
     // Wait for the board to load
     await expect(page.getByText('TODO').first()).toBeVisible({
       timeout: 10000,
