@@ -298,21 +298,31 @@ function TaskCard({
         border: '1px solid',
         borderColor: 'divider',
         borderRadius: 2,
+        height: 100,
         cursor: draggable ? 'grab' : undefined,
         '&:active': draggable ? { cursor: 'grabbing' } : undefined,
         '&[draggable]:hover': draggable ? { boxShadow: 2 } : undefined,
       }}
     >
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <CardContent
+        sx={{
+          p: 2,
+          '&:last-child': { pb: 2 },
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Typography
           variant="body2"
           sx={{
             fontWeight: 500,
             mb: 1,
+            flex: 1,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: '-webkit-box',
-            WebkitLineClamp: onStatusChange ? 2 : 3,
+            WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
           }}
         >

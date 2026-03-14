@@ -73,6 +73,8 @@ const styles = StyleSheet.create({
     borderColor: colors.divider,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    height: 88,
+    justifyContent: 'space-between' as const,
   },
   title: {
     fontSize: 14,
