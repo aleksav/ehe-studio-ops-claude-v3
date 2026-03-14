@@ -505,7 +505,7 @@ export default function DashboardPage() {
                 color="warning"
                 size="small"
                 onClick={() =>
-                  navigate(`/weekly-grid?week=${missingTime.oldest_incomplete_week_start}`)
+                  navigate(`/time-logging?week=${missingTime.oldest_incomplete_week_start}`)
                 }
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
