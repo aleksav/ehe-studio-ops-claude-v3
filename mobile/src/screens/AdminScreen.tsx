@@ -5,8 +5,9 @@ import { colors, spacing, typography } from '@ehestudio-ops/shared';
 import ClientsScreen from './ClientsScreen';
 import TeamScreen from './TeamScreen';
 import AuditLogScreen from './AuditLogScreen';
+import TaskRatesScreen from './TaskRatesScreen';
 
-const TABS = ['Clients', 'Team', 'Audit Log'] as const;
+const TABS = ['Clients', 'Team', 'Audit Log', 'Task Rates'] as const;
 type TabKey = (typeof TABS)[number];
 
 const STORAGE_KEY = 'admin-active-tab';
@@ -49,6 +50,7 @@ export default function AdminScreen() {
         {activeTab === 0 && <ClientsScreen />}
         {activeTab === 1 && <TeamScreen />}
         {activeTab === 2 && <AuditLogScreen />}
+        {activeTab === 3 && <TaskRatesScreen />}
       </View>
     </View>
   );
