@@ -184,7 +184,7 @@ export default function TimeLoggingScreen() {
   const [blockOverrideReason, setBlockOverrideReason] = useState('');
 
   const fetchGridEntries = useCallback(async () => {
-    if (!teamMemberId || selectedProjectIds.length === 0) {
+    if (!teamMemberId) {
       setCells({});
       return;
     }
@@ -198,8 +198,20 @@ export default function TimeLoggingScreen() {
         `/api/time-entries?team_member_id=${teamMemberId}&start_date=${startDate}&end_date=${endDate}`,
       );
 
+      // Auto-include projects that have existing time entries for this week
+      const entryProjectIds = new Set(data.map((e) => e.project_id));
+      const mergedProjectIds = [...selectedProjectIds];
+      for (const epid of entryProjectIds) {
+        if (!mergedProjectIds.includes(epid)) {
+          mergedProjectIds.push(epid);
+        }
+      }
+      if (mergedProjectIds.length !== selectedProjectIds.length) {
+        setSelectedProjectIds(mergedProjectIds);
+      }
+
       const newCells: Record<string, CellData> = {};
-      for (const pid of selectedProjectIds) {
+      for (const pid of mergedProjectIds) {
         for (const d of weekDates) {
           const dk = formatDate(d);
           const ck = cellKey(pid, dk);
@@ -653,9 +665,13 @@ export default function TimeLoggingScreen() {
                         <Text style={styles.projectLabel} numberOfLines={2}>
                           {projectLabel}
                         </Text>
-                        <TouchableOpacity onPress={() => handleRemoveProject(pid)}>
-                          <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-                        </TouchableOpacity>
+                        {rowTotal > 0 ? (
+                          <Ionicons name="lock-closed-outline" size={16} color="#999" />
+                        ) : (
+                          <TouchableOpacity onPress={() => handleRemoveProject(pid)}>
+                            <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                       {weekDates.map((d) => {
                         const ds = formatDate(d);

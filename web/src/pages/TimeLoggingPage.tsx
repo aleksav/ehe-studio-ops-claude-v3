@@ -425,7 +425,7 @@ export default function TimeLoggingPage() {
 
   // Fetch entries for the week
   const fetchGridEntries = useCallback(async () => {
-    if (!teamMemberId || selectedProjectIds.length === 0) {
+    if (!teamMemberId) {
       setCells({});
       return;
     }
@@ -440,8 +440,21 @@ export default function TimeLoggingPage() {
         `/api/time-entries?team_member_id=${teamMemberId}&start_date=${startDate}&end_date=${endDate}`,
       );
 
+      // Auto-include projects that have existing time entries for this week
+      const entryProjectIds = new Set(data.map((e) => e.project_id));
+      const mergedProjectIds = [...selectedProjectIds];
+      for (const epid of entryProjectIds) {
+        if (!mergedProjectIds.includes(epid)) {
+          mergedProjectIds.push(epid);
+        }
+      }
+      if (mergedProjectIds.length !== selectedProjectIds.length) {
+        setSelectedProjectIds(mergedProjectIds);
+        saveProjectIds(mergedProjectIds);
+      }
+
       const newCells: Record<string, CellData> = {};
-      for (const pid of selectedProjectIds) {
+      for (const pid of mergedProjectIds) {
         for (const d of weekDates) {
           const dk = dateKey(d);
           const ck = cellKey(pid, dk);
@@ -1185,16 +1198,30 @@ export default function TimeLoggingPage() {
                           {rowTotal > 0 ? rowTotal.toFixed(1) : '-'}
                         </TableCell>
                         <TableCell>
-                          <Tooltip title="Remove project">
-                            <IconButton
-                              size="small"
-                              tabIndex={-1}
-                              onClick={() => handleRemoveProject(pid)}
-                              color="error"
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {rowTotal > 0 ? (
+                            <Tooltip title="Cannot remove — hours logged this week">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  tabIndex={-1}
+                                  disabled
+                                >
+                                  <DeleteOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Remove project">
+                              <IconButton
+                                size="small"
+                                tabIndex={-1}
+                                onClick={() => handleRemoveProject(pid)}
+                                color="error"
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
