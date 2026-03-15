@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Box, CircularProgress, IconButton, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -115,6 +115,12 @@ export default function TeamCalendarPage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
+  // The displayed month/year in the nav header — updated on scroll
+  const [visibleMonth, setVisibleMonth] = useState(today.getMonth());
+  const [visibleYear, setVisibleYear] = useState(today.getFullYear());
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,22 +178,77 @@ export default function TeamCalendarPage() {
   const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
   const totalDays = dayEntries.length;
 
+  // Keep visibleMonth/visibleYear in sync when base month changes (e.g. on nav click)
+  useEffect(() => {
+    setVisibleMonth(month);
+    setVisibleYear(year);
+  }, [month, year]);
+
+  // --- Wheel → horizontal scroll ---
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Only intercept vertical wheel when we can scroll horizontally
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [loading]); // re-attach after loading finishes
+
+  // --- Scroll → detect visible month ---
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // The scrollLeft tells us how many pixels we've scrolled past the name column.
+      // Each day column is DAY_COL_WIDTH pixels wide, so we can compute the index.
+      const scrollLeft = container.scrollLeft;
+      const dayIndex = Math.min(Math.floor(scrollLeft / DAY_COL_WIDTH), dayEntries.length - 1);
+      const idx = Math.max(0, dayIndex);
+      const entry = dayEntries[idx];
+      if (entry) {
+        setVisibleMonth(entry.month);
+        setVisibleYear(entry.year);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [dayEntries, loading]);
+
   const handlePrev = () => {
-    if (month === 0) {
-      setMonth(11);
-      setYear(year - 1);
-    } else {
-      setMonth(month - 1);
-    }
+    const prev = month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 };
+    setMonth(prev.month);
+    setYear(prev.year);
+
+    // After state update, scroll to the start
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+      }
+    });
   };
 
   const handleNext = () => {
-    if (month === 11) {
-      setMonth(0);
-      setYear(year + 1);
-    } else {
-      setMonth(month + 1);
-    }
+    const next = month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+    setMonth(next.month);
+    setYear(next.year);
+
+    // After state update, scroll to the start
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+      }
+    });
   };
 
   const getCellColor = (entry: DayEntry): string => {
@@ -249,7 +310,7 @@ export default function TeamCalendarPage() {
           <ChevronLeftIcon />
         </IconButton>
         <Typography variant="h6" sx={{ fontWeight: 600, minWidth: 180, textAlign: 'center' }}>
-          {MONTH_NAMES[month]} {year}
+          {MONTH_NAMES[visibleMonth]} {visibleYear}
         </Typography>
         <IconButton onClick={handleNext} size="small" aria-label="Next month">
           <ChevronRightIcon />
@@ -279,7 +340,7 @@ export default function TeamCalendarPage() {
       </Box>
 
       {/* Grid */}
-      <Box sx={{ overflowX: 'auto', position: 'relative' }}>
+      <Box ref={scrollContainerRef} sx={{ overflowX: 'auto', position: 'relative' }}>
         <Box
           component="table"
           sx={{

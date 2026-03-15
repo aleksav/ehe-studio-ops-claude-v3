@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@ehestudio-ops/shared';
@@ -117,6 +119,12 @@ export default function TeamCalendarScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
+  // Visible month/year updated as user scrolls
+  const [visibleMonth, setVisibleMonth] = useState(today.getMonth());
+  const [visibleYear, setVisibleYear] = useState(today.getFullYear());
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +198,28 @@ export default function TeamCalendarScreen() {
     return spans;
   }, [dayEntries]);
 
+  // Sync visible month when base month/year changes
+  useEffect(() => {
+    setVisibleMonth(month);
+    setVisibleYear(year);
+  }, [month, year]);
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const scrollX = e.nativeEvent.contentOffset.x;
+      const dayIndex = Math.max(
+        0,
+        Math.min(Math.floor(scrollX / DAY_COL_WIDTH), dayEntries.length - 1),
+      );
+      const entry = dayEntries[dayIndex];
+      if (entry) {
+        setVisibleMonth(entry.month);
+        setVisibleYear(entry.year);
+      }
+    },
+    [dayEntries],
+  );
+
   const handlePrev = () => {
     if (month === 0) {
       setMonth(11);
@@ -197,6 +227,7 @@ export default function TeamCalendarScreen() {
     } else {
       setMonth(month - 1);
     }
+    scrollViewRef.current?.scrollTo({ x: 0, animated: true });
   };
 
   const handleNext = () => {
@@ -206,6 +237,7 @@ export default function TeamCalendarScreen() {
     } else {
       setMonth(month + 1);
     }
+    scrollViewRef.current?.scrollTo({ x: 0, animated: true });
   };
 
   const getCellColor = (entry: DayEntry): string => {
@@ -234,7 +266,7 @@ export default function TeamCalendarScreen() {
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>
-          {MONTH_NAMES[month]} {year}
+          {MONTH_NAMES[visibleMonth]} {visibleYear}
         </Text>
         <TouchableOpacity
           onPress={handleNext}
@@ -284,7 +316,13 @@ export default function TeamCalendarScreen() {
         </View>
 
         {/* Scrollable day columns */}
-        <ScrollView horizontal showsHorizontalScrollIndicator>
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
           <View>
             {/* Month label row */}
             <View style={styles.monthLabelRow}>
