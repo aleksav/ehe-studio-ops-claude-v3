@@ -64,6 +64,9 @@ export interface ProjectTaskBoardProps {
   /** Filter Done tasks to only recently completed (last 7 days). */
   filterRecentDone?: boolean;
 
+  /** Initial view mode. Defaults to 'board'. */
+  initialViewMode?: ViewMode;
+
   // ---- Hide empty milestones ----
   hideEmptyMilestones?: boolean;
   onHideEmptyChange?: (checked: boolean) => void;
@@ -164,10 +167,11 @@ export default function ProjectTaskBoard({
   tasks,
   milestones,
   filterRecentDone,
+  initialViewMode = 'board',
   hideEmptyMilestones: hideEmptyMilestonesProp,
   onHideEmptyChange,
 }: ProjectTaskBoardProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('board');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [hideEmptyMilestones, setHideEmptyMilestones] = useState(hideEmptyMilestonesProp ?? false);
 
   const handleHideEmptyChange = (checked: boolean) => {

@@ -579,6 +579,7 @@ export default function StandupScreen() {
                   tasks={currentTasks}
                   milestones={currentMilestones}
                   filterRecentDone
+                  initialViewMode="milestones"
                   hideEmptyMilestones={hideEmptyMilestones}
                   onHideEmptyChange={handleHideEmptyChange}
                 />

@@ -1104,6 +1104,7 @@ export default function StandupPage() {
                       milestones={currentMilestones}
                       loading={isCurrentLoading}
                       filterRecentDone
+                      initialViewMode="milestones"
                       initialHideEmpty={initialHideEmpty}
                       onHideEmptyChange={handleHideEmptyChange}
                       onAssignmentsChange={handleAssignmentsChange}
