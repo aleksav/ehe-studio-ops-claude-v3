@@ -1,5 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch } from 'react-native';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { TouchableOpacity } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import TaskCard from './TaskCard';
@@ -90,6 +99,8 @@ const COLUMN_LABELS: Record<string, string> = {
   DONE: 'Done',
 };
 
+const PAGE_HORIZONTAL_PADDING = spacing.sm;
+
 // ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
@@ -103,10 +114,184 @@ function isRecentlyCompleted(task: BoardTask): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// StatusColumns: renders three kanban columns horizontally
+// PageIndicator: dot indicator for swipeable pages
 // ---------------------------------------------------------------------------
 
-function StatusColumns({
+function PageIndicator({
+  total,
+  current,
+  labels,
+}: {
+  total: number;
+  current: number;
+  labels?: string[];
+}) {
+  if (total <= 1) return null;
+
+  return (
+    <View style={styles.indicatorContainer}>
+      {labels ? (
+        // Mini tab bar with labels
+        <View style={styles.miniTabBar}>
+          {labels.map((label, index) => (
+            <View
+              key={index}
+              style={[
+                styles.miniTab,
+                index === current && styles.miniTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.miniTabText,
+                  index === current && styles.miniTabTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        // Dot indicators
+        <View style={styles.dotsRow}>
+          {Array.from({ length: total }).map((_, index) => (
+            <View
+              key={index}
+              style={[styles.dot, index === current && styles.dotActive]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SwipeablePages: generic paginated horizontal scroll wrapper
+// ---------------------------------------------------------------------------
+
+function SwipeablePages({
+  children,
+  labels,
+  pageKey,
+}: {
+  children: React.ReactNode[];
+  labels?: string[];
+  pageKey?: string;
+}) {
+  const [currentPage, setCurrentPage] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const windowWidth = Dimensions.get('window').width;
+  const pageWidth = windowWidth - PAGE_HORIZONTAL_PADDING * 2;
+
+  // Reset page when content changes (e.g. switching views, filtering)
+  const prevKeyRef = useRef(pageKey);
+  if (pageKey !== prevKeyRef.current) {
+    prevKeyRef.current = pageKey;
+    if (currentPage !== 0) {
+      setCurrentPage(0);
+      // Scroll to start on next frame
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ x: 0, animated: false });
+      }, 0);
+    }
+  }
+
+  const totalPages = children.length;
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const page = Math.round(offsetX / pageWidth);
+      setCurrentPage(Math.max(0, Math.min(page, totalPages - 1)));
+    },
+    [pageWidth, totalPages],
+  );
+
+  if (totalPages === 0) {
+    return <Text style={styles.noTasks}>No items to display.</Text>;
+  }
+
+  return (
+    <View>
+      <PageIndicator
+        total={totalPages}
+        current={currentPage}
+        labels={labels}
+      />
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScroll}
+        contentContainerStyle={{ paddingHorizontal: 0 }}
+        decelerationRate="fast"
+        snapToInterval={pageWidth}
+        snapToAlignment="start"
+      >
+        {children.map((child, index) => (
+          <View key={index} style={{ width: pageWidth }}>
+            {child}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TaskColumn: a single column of tasks (used as a swipeable page)
+// ---------------------------------------------------------------------------
+
+function TaskColumn({
+  status,
+  tasks,
+  milestoneMap,
+  doneLabel,
+}: {
+  status: string;
+  tasks: BoardTask[];
+  milestoneMap?: Map<string, string>;
+  doneLabel?: string;
+}) {
+  return (
+    <ScrollView style={styles.pageScroll} nestedScrollEnabled>
+      <View
+        style={[styles.column, { backgroundColor: COLUMN_COLORS[status] }]}
+      >
+        <View style={styles.columnHeader}>
+          <Text style={styles.columnTitle}>
+            {status === 'DONE' && doneLabel ? doneLabel : COLUMN_LABELS[status]}
+          </Text>
+          <Text style={styles.columnCount}>{tasks.length}</Text>
+        </View>
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            title={task.description}
+            status={task.status}
+            milestoneName={
+              task.milestone_id && milestoneMap
+                ? milestoneMap.get(task.milestone_id)
+                : null
+            }
+            assignments={task.assignments}
+          />
+        ))}
+        {tasks.length === 0 && <Text style={styles.noTasks}>No tasks</Text>}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BoardSwipeable: Board view with swipeable TODO/IN_PROGRESS/DONE pages
+// ---------------------------------------------------------------------------
+
+function BoardSwipeable({
   tasks,
   milestoneMap,
   filterRecentDone,
@@ -120,7 +305,8 @@ function StatusColumns({
   const todoTasks = tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter(
-    (t) => t.status === 'DONE' && (!filterRecentDone || isRecentlyCompleted(t)),
+    (t) =>
+      t.status === 'DONE' && (!filterRecentDone || isRecentlyCompleted(t)),
   );
 
   const columns = [
@@ -129,32 +315,140 @@ function StatusColumns({
     { status: 'DONE' as const, tasks: doneTasks },
   ];
 
+  const labels = columns.map(
+    ({ status, tasks: colTasks }) =>
+      `${COLUMN_LABELS[status]} (${colTasks.length})`,
+  );
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <View style={styles.boardRow}>
-        {columns.map(({ status, tasks: colTasks }) => (
-          <View key={status} style={[styles.column, { backgroundColor: COLUMN_COLORS[status] }]}>
-            <View style={styles.columnHeader}>
-              <Text style={styles.columnTitle}>
-                {status === 'DONE' && doneLabel ? doneLabel : COLUMN_LABELS[status]}
-              </Text>
-              <Text style={styles.columnCount}>{colTasks.length}</Text>
+    <SwipeablePages labels={labels} pageKey="board">
+      {columns.map(({ status, tasks: colTasks }) => (
+        <TaskColumn
+          key={status}
+          status={status}
+          tasks={colTasks}
+          milestoneMap={milestoneMap}
+          doneLabel={doneLabel}
+        />
+      ))}
+    </SwipeablePages>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MilestonePage: a single milestone swimlane rendered as a full page
+// ---------------------------------------------------------------------------
+
+function MilestonePage({
+  lane,
+  milestoneMap,
+  filterRecentDone,
+  doneLabel,
+}: {
+  lane: SwimlaneData;
+  milestoneMap: Map<string, string>;
+  filterRecentDone?: boolean;
+  doneLabel?: string;
+}) {
+  const activeTasks = lane.tasks.filter(
+    (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS' || t.status === 'DONE',
+  );
+
+  return (
+    <ScrollView style={styles.pageScroll} nestedScrollEnabled>
+      <View style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}>
+        <View style={styles.swimlaneHeader}>
+          <Text style={styles.swimlaneName}>{lane.name}</Text>
+          {lane.due_date && (
+            <Text style={styles.swimlaneDue}>
+              Due {new Date(lane.due_date).toLocaleDateString()}
+            </Text>
+          )}
+          {lane.is_overdue && (
+            <View style={styles.overdueChip}>
+              <Text style={styles.overdueChipText}>Overdue</Text>
             </View>
-            {colTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                title={task.description}
-                status={task.status}
-                milestoneName={
-                  task.milestone_id && milestoneMap ? milestoneMap.get(task.milestone_id) : null
-                }
-                assignments={task.assignments}
-              />
-            ))}
-            {colTasks.length === 0 && <Text style={styles.noTasks}>No tasks</Text>}
+          )}
+          <View style={styles.countChip}>
+            <Text style={styles.countChipText}>{activeTasks.length}</Text>
           </View>
-        ))}
+        </View>
       </View>
+
+      {activeTasks.length === 0 ? (
+        <Text style={styles.noTasks}>No tasks</Text>
+      ) : (
+        activeTasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            title={task.description}
+            status={task.status}
+            milestoneName={
+              task.milestone_id && milestoneMap
+                ? milestoneMap.get(task.milestone_id)
+                : null
+            }
+            assignments={task.assignments}
+          />
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PersonPage: a single person's tasks rendered as a full page
+// ---------------------------------------------------------------------------
+
+function PersonPage({
+  row,
+  milestoneMap,
+  filterRecentDone,
+  doneLabel,
+}: {
+  row: PersonRow;
+  milestoneMap: Map<string, string>;
+  filterRecentDone?: boolean;
+  doneLabel?: string;
+}) {
+  const activeTasks = row.tasks.filter((t) => t.status !== 'CANCELLED');
+
+  return (
+    <ScrollView style={styles.pageScroll} nestedScrollEnabled>
+      <View style={styles.personHeader}>
+        <View
+          style={[
+            styles.personAvatar,
+            { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
+          ]}
+        >
+          <Text style={styles.personAvatarText}>
+            {row.memberName.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <Text style={styles.personName}>{row.memberName}</Text>
+        <View style={styles.countChip}>
+          <Text style={styles.countChipText}>{activeTasks.length}</Text>
+        </View>
+      </View>
+
+      {activeTasks.length === 0 ? (
+        <Text style={styles.noTasks}>No tasks</Text>
+      ) : (
+        activeTasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            title={task.description}
+            status={task.status}
+            milestoneName={
+              task.milestone_id && milestoneMap
+                ? milestoneMap.get(task.milestone_id)
+                : null
+            }
+            assignments={task.assignments}
+          />
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -172,7 +466,9 @@ export default function ProjectTaskBoard({
   onHideEmptyChange,
 }: ProjectTaskBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
-  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(hideEmptyMilestonesProp ?? false);
+  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(
+    hideEmptyMilestonesProp ?? false,
+  );
 
   const handleHideEmptyChange = (checked: boolean) => {
     setHideEmptyMilestones(checked);
@@ -217,7 +513,9 @@ export default function ProjectTaskBoard({
   const filteredSwimlanes = useMemo(() => {
     if (!hideEmptyMilestones) return swimlanes;
     return swimlanes.filter((lane) => {
-      return lane.tasks.some((t) => t.status === 'IN_PROGRESS' || t.status === 'DONE');
+      return lane.tasks.some(
+        (t) => t.status === 'IN_PROGRESS' || t.status === 'DONE',
+      );
     });
   }, [swimlanes, hideEmptyMilestones]);
 
@@ -250,15 +548,29 @@ export default function ProjectTaskBoard({
       a[1].member.full_name.localeCompare(b[1].member.full_name),
     );
     for (const [memberId, { member, tasks: memberTasks }] of sortedMembers) {
-      rows.push({ memberId, memberName: member.full_name, tasks: memberTasks });
+      rows.push({
+        memberId,
+        memberName: member.full_name,
+        tasks: memberTasks,
+      });
     }
     if (unassignedTasks.length > 0) {
-      rows.push({ memberId: null, memberName: 'Unassigned', tasks: unassignedTasks });
+      rows.push({
+        memberId: null,
+        memberName: 'Unassigned',
+        tasks: unassignedTasks,
+      });
     }
     return rows;
   }, [tasks]);
 
   const doneLabel = filterRecentDone ? 'Done (7d)' : undefined;
+
+  // Milestone page labels for indicator
+  const milestoneLabels = filteredSwimlanes.map((lane) => lane.name);
+
+  // People page labels for indicator
+  const peopleLabels = personRows.map((row) => row.memberName);
 
   return (
     <View>
@@ -270,8 +582,17 @@ export default function ProjectTaskBoard({
             style={[styles.tab, viewMode === mode && styles.tabActive]}
             onPress={() => setViewMode(mode)}
           >
-            <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
-              {mode === 'board' ? 'Board' : mode === 'milestones' ? 'Milestones' : 'People'}
+            <Text
+              style={[
+                styles.tabText,
+                viewMode === mode && styles.tabTextActive,
+              ]}
+            >
+              {mode === 'board'
+                ? 'Board'
+                : mode === 'milestones'
+                  ? 'Milestones'
+                  : 'People'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -279,7 +600,7 @@ export default function ProjectTaskBoard({
 
       {/* Board View */}
       {viewMode === 'board' && (
-        <StatusColumns
+        <BoardSwipeable
           tasks={tasks}
           milestoneMap={milestoneMap}
           filterRecentDone={filterRecentDone}
@@ -289,7 +610,7 @@ export default function ProjectTaskBoard({
 
       {/* Milestones View */}
       {viewMode === 'milestones' && (
-        <View style={styles.milestonesContainer}>
+        <View>
           {/* Hide empty milestones toggle */}
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Show only active milestones</Text>
@@ -300,86 +621,54 @@ export default function ProjectTaskBoard({
               thumbColor={hideEmptyMilestones ? colors.primary : '#f4f3f4'}
             />
             {hiddenMilestoneCount > 0 && (
-              <Text style={styles.hiddenCount}>({hiddenMilestoneCount} hidden)</Text>
+              <Text style={styles.hiddenCount}>
+                ({hiddenMilestoneCount} hidden)
+              </Text>
             )}
           </View>
           {filteredSwimlanes.length === 0 ? (
-            <Text style={styles.noTasks}>No milestones or tasks to display.</Text>
+            <Text style={styles.noTasks}>
+              No milestones or tasks to display.
+            </Text>
           ) : (
-            filteredSwimlanes.map((lane) => {
-              const laneTotal = lane.tasks.filter(
-                (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS' || t.status === 'DONE',
-              ).length;
-              return (
-                <View
+            <SwipeablePages
+              labels={milestoneLabels.length <= 5 ? milestoneLabels : undefined}
+              pageKey={`milestones-${filteredSwimlanes.length}`}
+            >
+              {filteredSwimlanes.map((lane) => (
+                <MilestonePage
                   key={lane.id ?? '__none__'}
-                  style={[styles.swimlane, lane.is_overdue && styles.swimlaneOverdue]}
-                >
-                  <View style={styles.swimlaneHeader}>
-                    <Text style={styles.swimlaneName}>{lane.name}</Text>
-                    {lane.due_date && (
-                      <Text style={styles.swimlaneDue}>
-                        Due {new Date(lane.due_date).toLocaleDateString()}
-                      </Text>
-                    )}
-                    {lane.is_overdue && (
-                      <View style={styles.overdueChip}>
-                        <Text style={styles.overdueChipText}>Overdue</Text>
-                      </View>
-                    )}
-                    <View style={styles.countChip}>
-                      <Text style={styles.countChipText}>{laneTotal}</Text>
-                    </View>
-                  </View>
-                  {laneTotal === 0 ? (
-                    <Text style={styles.noTasks}>No tasks</Text>
-                  ) : (
-                    <StatusColumns
-                      tasks={lane.tasks}
-                      milestoneMap={milestoneMap}
-                      filterRecentDone={filterRecentDone}
-                      doneLabel={doneLabel}
-                    />
-                  )}
-                </View>
-              );
-            })
+                  lane={lane}
+                  milestoneMap={milestoneMap}
+                  filterRecentDone={filterRecentDone}
+                  doneLabel={doneLabel}
+                />
+              ))}
+            </SwipeablePages>
           )}
         </View>
       )}
 
       {/* People View */}
       {viewMode === 'people' && (
-        <View style={styles.peopleContainer}>
+        <View>
           {personRows.length === 0 ? (
             <Text style={styles.noTasks}>No tasks to display.</Text>
           ) : (
-            personRows.map((row) => (
-              <View key={row.memberId ?? 'unassigned'} style={styles.personSection}>
-                <View style={styles.personHeader}>
-                  <View
-                    style={[
-                      styles.personAvatar,
-                      { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
-                    ]}
-                  >
-                    <Text style={styles.personAvatarText}>
-                      {row.memberName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.personName}>{row.memberName}</Text>
-                  <View style={styles.countChip}>
-                    <Text style={styles.countChipText}>{row.tasks.length}</Text>
-                  </View>
-                </View>
-                <StatusColumns
-                  tasks={row.tasks}
+            <SwipeablePages
+              labels={peopleLabels.length <= 5 ? peopleLabels : undefined}
+              pageKey={`people-${personRows.length}`}
+            >
+              {personRows.map((row) => (
+                <PersonPage
+                  key={row.memberId ?? 'unassigned'}
+                  row={row}
                   milestoneMap={milestoneMap}
                   filterRecentDone={filterRecentDone}
                   doneLabel={doneLabel}
                 />
-              </View>
-            ))
+              ))}
+            </SwipeablePages>
           )}
         </View>
       )}
@@ -416,16 +705,66 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: typography.weights.semibold,
   },
-  boardRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+
+  // Page indicator
+  indicatorContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D0D0D0',
+  },
+  dotActive: {
+    backgroundColor: colors.primary,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  miniTabBar: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  miniTab: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.chip,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  miniTabActive: {
+    backgroundColor: colors.primary,
+  },
+  miniTabText: {
+    fontSize: typography.sizes.caption,
+    color: '#666',
+    fontWeight: typography.weights.medium,
+  },
+  miniTabTextActive: {
+    color: '#fff',
+    fontWeight: typography.weights.semibold,
+  },
+
+  // Swipeable page content
+  pageScroll: {
+    flex: 1,
+  },
+
+  // Column (used in board pages)
   column: {
-    width: 280,
     borderRadius: borderRadius.card,
     padding: spacing.sm,
     minHeight: 150,
-    marginHorizontal: spacing.xs,
+    margin: spacing.xs,
   },
   columnHeader: {
     flexDirection: 'row',
@@ -454,15 +793,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: spacing.lg,
   },
-  milestonesContainer: {
-    paddingHorizontal: spacing.xs,
-  },
+
+  // Toggle row (milestones)
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   toggleLabel: {
     fontSize: typography.sizes.body2,
@@ -473,8 +811,10 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: '#999',
   },
+
+  // Milestone swimlane header (inside a page)
   swimlane: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderLeftWidth: 4,
     borderLeftColor: colors.primary,
     borderRadius: borderRadius.card,
@@ -489,7 +829,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
     flexWrap: 'wrap',
   },
   swimlaneName: {
@@ -523,17 +862,14 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.caption,
     color: '#666',
   },
-  peopleContainer: {
-    paddingHorizontal: spacing.xs,
-  },
-  personSection: {
-    marginBottom: spacing.md,
-  },
+
+  // Person header (inside a page)
   personHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   personAvatar: {
     width: 28,

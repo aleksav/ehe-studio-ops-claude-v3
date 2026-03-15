@@ -10,13 +10,8 @@ export type MainTabParamList = {
   Projects: undefined;
   Time: undefined;
   Standup: undefined;
-  More: undefined;
-};
-
-export type MoreStackParamList = {
-  MoreMenu: undefined;
-  Admin: undefined;
   TeamCalendar: undefined;
+  Admin: undefined;
 };
 
 export type ProjectsStackParamList = {

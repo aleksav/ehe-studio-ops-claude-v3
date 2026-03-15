@@ -9,11 +9,10 @@ import ProjectsScreen from '../screens/ProjectsScreen';
 import ProjectDetailScreen from '../screens/ProjectDetailScreen';
 import TimeLoggingScreen from '../screens/TimeLoggingScreen';
 import StandupScreen from '../screens/StandupScreen';
-import MoreScreen from '../screens/MoreScreen';
-import AdminScreen from '../screens/AdminScreen';
 import TeamCalendarScreen from '../screens/TeamCalendarScreen';
+import AdminScreen from '../screens/AdminScreen';
 
-import type { MainTabParamList, ProjectsStackParamList, MoreStackParamList } from './types';
+import type { MainTabParamList, ProjectsStackParamList } from './types';
 
 // --- Projects Stack ---
 const ProjectsStack = createNativeStackNavigator<ProjectsStackParamList>();
@@ -35,23 +34,6 @@ function ProjectsStackNavigator() {
   );
 }
 
-// --- More Stack ---
-const MoreStack = createNativeStackNavigator<MoreStackParamList>();
-
-function MoreStackNavigator() {
-  return (
-    <MoreStack.Navigator>
-      <MoreStack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More' }} />
-      <MoreStack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin' }} />
-      <MoreStack.Screen
-        name="TeamCalendar"
-        component={TeamCalendarScreen}
-        options={{ title: 'Team Calendar' }}
-      />
-    </MoreStack.Navigator>
-  );
-}
-
 // --- Main Tab Navigator ---
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -70,7 +52,7 @@ export default function MainTabNavigator() {
         options={{
           headerShown: true,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="grid-outline" size={size} color={color} />
           ),
         }}
       />
@@ -89,6 +71,7 @@ export default function MainTabNavigator() {
         options={{
           headerShown: true,
           title: 'Time Logging',
+          tabBarLabel: 'Time Logging',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="time-outline" size={size} color={color} />
           ),
@@ -100,16 +83,29 @@ export default function MainTabNavigator() {
         options={{
           headerShown: true,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
+            <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="More"
-        component={MoreStackNavigator}
+        name="TeamCalendar"
+        component={TeamCalendarScreen}
         options={{
+          headerShown: true,
+          title: 'Team Calendar',
+          tabBarLabel: 'Calendar',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="menu-outline" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Admin"
+        component={AdminScreen}
+        options={{
+          headerShown: true,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="shield-outline" size={size} color={color} />
           ),
         }}
       />

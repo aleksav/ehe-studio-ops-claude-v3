@@ -8,6 +8,8 @@ try {
   // fallback
 }
 
+const buildDate = new Date().toISOString().split('T')[0];
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'EHEStudio Ops',
@@ -17,6 +19,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
   splash: {
+    image: './assets/splash.png',
+    resizeMode: 'contain',
     backgroundColor: '#FFFFFF',
   },
   ios: {
@@ -39,6 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   runtimeVersion: '1.0.0',
   extra: {
     commitHash,
+    buildDate,
     eas: {
       projectId: '16878605-797e-4c4c-8c2e-b2b517f0ed57',
     },
