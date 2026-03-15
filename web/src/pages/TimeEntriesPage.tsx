@@ -47,9 +47,15 @@ interface TimeEntry {
   team_member: TimeEntryMember;
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 interface ProjectOption {
   id: string;
   name: string;
+  client_id: string | null;
 }
 
 interface MemberOption {
@@ -86,10 +92,12 @@ const TASK_TYPE_COLOR: Record<string, string> = {
 export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
 
   // Filters
+  const [clientId, setClientId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [memberId, setMemberId] = useState('');
   const [taskType, setTaskType] = useState('');
@@ -98,6 +106,10 @@ export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
 
   // Fetch filter options on mount
   useEffect(() => {
+    api
+      .get<ClientOption[]>('/api/clients')
+      .then((c) => setClients(c.sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => {});
     api
       .get<ProjectOption[]>('/api/projects')
       .then((p) => setProjects(p.sort((a, b) => a.name.localeCompare(b.name))))
@@ -108,10 +120,16 @@ export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
       .catch(() => {});
   }, []);
 
+  const filteredProjects = useMemo(
+    () => (clientId ? projects.filter((p) => p.client_id === clientId) : projects),
+    [projects, clientId],
+  );
+
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      if (clientId && !projectId) params.set('client_id', clientId);
       if (projectId) params.set('project_id', projectId);
       if (memberId) params.set('team_member_id', memberId);
       if (taskType) params.set('task_type', taskType);
@@ -125,7 +143,7 @@ export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, memberId, taskType, dateFrom, dateTo]);
+  }, [clientId, projectId, memberId, taskType, dateFrom, dateTo]);
 
   useEffect(() => {
     void fetchEntries();
@@ -147,6 +165,25 @@ export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
       {/* Filters */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Client</InputLabel>
+          <Select
+            value={clientId}
+            label="Client"
+            onChange={(e: SelectChangeEvent) => {
+              setClientId(e.target.value);
+              setProjectId('');
+            }}
+          >
+            <MenuItem value="">All</MenuItem>
+            {clients.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Project</InputLabel>
           <Select
             value={projectId}
@@ -154,7 +191,7 @@ export default function TimeEntriesPage({ embedded }: { embedded?: boolean }) {
             onChange={(e: SelectChangeEvent) => setProjectId(e.target.value)}
           >
             <MenuItem value="">All</MenuItem>
-            {projects.map((p) => (
+            {filteredProjects.map((p) => (
               <MenuItem key={p.id} value={p.id}>
                 {p.name}
               </MenuItem>

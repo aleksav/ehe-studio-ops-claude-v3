@@ -40,9 +40,15 @@ interface TimeEntry {
   team_member: TimeEntryMember;
 }
 
+interface ClientOption {
+  id: string;
+  name: string;
+}
+
 interface ProjectOption {
   id: string;
   name: string;
+  client_id: string | null;
 }
 
 interface MemberOption {
@@ -202,10 +208,12 @@ const pickerStyles = StyleSheet.create({
 export default function TimeEntriesScreen() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
 
   // Filters
+  const [clientId, setClientId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [memberId, setMemberId] = useState('');
   const [taskType, setTaskType] = useState('');
@@ -213,11 +221,16 @@ export default function TimeEntriesScreen() {
   const [dateTo, setDateTo] = useState('');
 
   // Picker modals
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [taskTypePickerOpen, setTaskTypePickerOpen] = useState(false);
 
   useEffect(() => {
+    api
+      .get<ClientOption[]>('/api/clients')
+      .then((c) => setClients(c.sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => {});
     api
       .get<ProjectOption[]>('/api/projects')
       .then((p) => setProjects(p.sort((a, b) => a.name.localeCompare(b.name))))
@@ -228,10 +241,16 @@ export default function TimeEntriesScreen() {
       .catch(() => {});
   }, []);
 
+  const filteredProjects = useMemo(
+    () => (clientId ? projects.filter((p) => p.client_id === clientId) : projects),
+    [projects, clientId],
+  );
+
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      if (clientId && !projectId) params.set('client_id', clientId);
       if (projectId) params.set('project_id', projectId);
       if (memberId) params.set('team_member_id', memberId);
       if (taskType) params.set('task_type', taskType);
@@ -245,7 +264,7 @@ export default function TimeEntriesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, memberId, taskType, dateFrom, dateTo]);
+  }, [clientId, projectId, memberId, taskType, dateFrom, dateTo]);
 
   useEffect(() => {
     void fetchEntries();
@@ -256,12 +275,17 @@ export default function TimeEntriesScreen() {
     [entries],
   );
 
-  const projectOptions: PickerOption[] = projects.map((p) => ({ value: p.id, label: p.name }));
+  const clientOptions: PickerOption[] = clients.map((c) => ({ value: c.id, label: c.name }));
+  const projectOptions: PickerOption[] = filteredProjects.map((p) => ({
+    value: p.id,
+    label: p.name,
+  }));
   const memberOptions: PickerOption[] = members.map((m) => ({
     value: m.id,
     label: m.full_name,
   }));
 
+  const selectedClientLabel = clients.find((c) => c.id === clientId)?.name ?? 'All';
   const selectedProjectLabel = projects.find((p) => p.id === projectId)?.name ?? 'All';
   const selectedMemberLabel = members.find((m) => m.id === memberId)?.full_name ?? 'All';
   const selectedTaskTypeLabel = TASK_TYPE_OPTIONS.find((t) => t.value === taskType)?.label ?? 'All';
@@ -306,6 +330,14 @@ export default function TimeEntriesScreen() {
       {/* Filters */}
       <View style={styles.filtersContainer}>
         <View style={styles.filterRow}>
+          <TouchableOpacity style={styles.filterButton} onPress={() => setClientPickerOpen(true)}>
+            <Ionicons name="business-outline" size={14} color="#666" />
+            <Text style={styles.filterLabel} numberOfLines={1}>
+              {selectedClientLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="#999" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.filterButton} onPress={() => setProjectPickerOpen(true)}>
             <Ionicons name="folder-outline" size={14} color="#666" />
             <Text style={styles.filterLabel} numberOfLines={1}>
@@ -313,7 +345,9 @@ export default function TimeEntriesScreen() {
             </Text>
             <Ionicons name="chevron-down" size={14} color="#999" />
           </TouchableOpacity>
+        </View>
 
+        <View style={styles.filterRow}>
           <TouchableOpacity style={styles.filterButton} onPress={() => setMemberPickerOpen(true)}>
             <Ionicons name="person-outline" size={14} color="#666" />
             <Text style={styles.filterLabel} numberOfLines={1}>
@@ -375,6 +409,17 @@ export default function TimeEntriesScreen() {
       )}
 
       {/* Picker Modals */}
+      <PickerModal
+        visible={clientPickerOpen}
+        onClose={() => setClientPickerOpen(false)}
+        title="Select Client"
+        options={clientOptions}
+        selected={clientId}
+        onSelect={(v) => {
+          setClientId(v);
+          setProjectId('');
+        }}
+      />
       <PickerModal
         visible={projectPickerOpen}
         onClose={() => setProjectPickerOpen(false)}

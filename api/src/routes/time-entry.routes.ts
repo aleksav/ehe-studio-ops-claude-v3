@@ -54,8 +54,13 @@ function parseISOWeek(weekStr: string): { start: Date; end: Date } | null {
 // GET /api/time-entries
 router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { project_id, team_member_id, task_type, date_from, date_to, week } = req.query;
+    const { project_id, team_member_id, task_type, client_id, date_from, date_to, week } =
+      req.query;
     const where: Record<string, unknown> = {};
+
+    if (client_id) {
+      where.project = { client_id: client_id as string };
+    }
 
     if (project_id) {
       where.project_id = project_id as string;
