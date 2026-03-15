@@ -12,6 +12,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { colors } from '@ehestudio-ops/shared';
@@ -79,6 +81,7 @@ function formatCurrency(amount: number, currency: string): string {
 export default function ProjectDashboardTab({ projectId }: ProjectDashboardTabProps) {
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filterMode, setFilterMode] = useState<'month' | 'range'>('month');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -115,46 +118,66 @@ export default function ProjectDashboardTab({ projectId }: ProjectDashboardTabPr
 
   return (
     <Box>
-      {/* Date Range Filter */}
+      {/* Filter */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <TextField
-          label="Month"
-          type="month"
-          size="small"
-          value={startDate ? startDate.slice(0, 7) : ''}
-          onChange={(e) => {
-            const val = e.target.value; // "YYYY-MM"
-            if (!val) {
+        <ToggleButtonGroup
+          value={filterMode}
+          exclusive
+          onChange={(_, v) => {
+            if (v) {
+              setFilterMode(v);
               setStartDate('');
               setEndDate('');
-              return;
             }
-            const [y, m] = val.split('-').map(Number);
-            const lastDay = new Date(y, m, 0).getDate();
-            setStartDate(`${val}-01`);
-            setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
           }}
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160 }}
-        />
-        <TextField
-          label="Start Date"
-          type="date"
           size="small"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160 }}
-        />
-        <TextField
-          label="End Date"
-          type="date"
-          size="small"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160 }}
-        />
+        >
+          <ToggleButton value="month">Month</ToggleButton>
+          <ToggleButton value="range">Date Range</ToggleButton>
+        </ToggleButtonGroup>
+        {filterMode === 'month' ? (
+          <TextField
+            label="Month"
+            type="month"
+            size="small"
+            value={startDate ? startDate.slice(0, 7) : ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (!val) {
+                setStartDate('');
+                setEndDate('');
+                return;
+              }
+              const [y, m] = val.split('-').map(Number);
+              const lastDay = new Date(y, m, 0).getDate();
+              setStartDate(`${val}-01`);
+              setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
+            }}
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 160 }}
+          />
+        ) : (
+          <>
+            <TextField
+              label="Start Date"
+              type="date"
+              size="small"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              size="small"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 160 }}
+            />
+          </>
+        )}
       </Box>
 
       {loading && <LinearProgress sx={{ mb: 1 }} />}

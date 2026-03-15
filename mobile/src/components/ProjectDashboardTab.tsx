@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  TextInput,
+  TouchableOpacity,
+} from 'react-native';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api } from '../lib/api';
 
@@ -65,6 +72,7 @@ function formatCurrency(amount: number, currency: string): string {
 export default function ProjectDashboardTab({ projectId }: Props) {
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filterMode, setFilterMode] = useState<'month' | 'range'>('month');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -101,50 +109,79 @@ export default function ProjectDashboardTab({ projectId }: Props) {
 
   return (
     <View>
-      {/* Month Shortcut */}
-      <View style={styles.dateRow}>
-        <View style={styles.dateField}>
-          <Text style={styles.dateLabel}>Month</Text>
-          <TextInput
-            style={styles.dateInput}
-            placeholder="YYYY-MM"
-            value={startDate ? startDate.slice(0, 7) : ''}
-            onChangeText={(val) => {
-              if (!val || !/^\d{4}-\d{2}$/.test(val)) {
-                setStartDate('');
-                setEndDate('');
-                return;
-              }
-              const [y, m] = val.split('-').map(Number);
-              const lastDay = new Date(y, m, 0).getDate();
-              setStartDate(`${val}-01`);
-              setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
-            }}
-          />
-        </View>
+      {/* Filter Mode Toggle */}
+      <View style={styles.toggleRow}>
+        <TouchableOpacity
+          style={[styles.toggleButton, filterMode === 'month' && styles.toggleButtonActive]}
+          onPress={() => {
+            setFilterMode('month');
+            setStartDate('');
+            setEndDate('');
+          }}
+        >
+          <Text style={[styles.toggleText, filterMode === 'month' && styles.toggleTextActive]}>
+            Month
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleButton, filterMode === 'range' && styles.toggleButtonActive]}
+          onPress={() => {
+            setFilterMode('range');
+            setStartDate('');
+            setEndDate('');
+          }}
+        >
+          <Text style={[styles.toggleText, filterMode === 'range' && styles.toggleTextActive]}>
+            Date Range
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Date Range Filters */}
-      <View style={styles.dateRow}>
-        <View style={styles.dateField}>
-          <Text style={styles.dateLabel}>Start Date</Text>
-          <TextInput
-            style={styles.dateInput}
-            placeholder="YYYY-MM-DD"
-            value={startDate}
-            onChangeText={setStartDate}
-          />
+      {/* Filter Inputs */}
+      {filterMode === 'month' ? (
+        <View style={styles.dateRow}>
+          <View style={styles.dateField}>
+            <Text style={styles.dateLabel}>Month</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY-MM"
+              value={startDate ? startDate.slice(0, 7) : ''}
+              onChangeText={(val) => {
+                if (!val || !/^\d{4}-\d{2}$/.test(val)) {
+                  setStartDate('');
+                  setEndDate('');
+                  return;
+                }
+                const [y, m] = val.split('-').map(Number);
+                const lastDay = new Date(y, m, 0).getDate();
+                setStartDate(`${val}-01`);
+                setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
+              }}
+            />
+          </View>
         </View>
-        <View style={styles.dateField}>
-          <Text style={styles.dateLabel}>End Date</Text>
-          <TextInput
-            style={styles.dateInput}
-            placeholder="YYYY-MM-DD"
-            value={endDate}
-            onChangeText={setEndDate}
-          />
+      ) : (
+        <View style={styles.dateRow}>
+          <View style={styles.dateField}>
+            <Text style={styles.dateLabel}>Start Date</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY-MM-DD"
+              value={startDate}
+              onChangeText={setStartDate}
+            />
+          </View>
+          <View style={styles.dateField}>
+            <Text style={styles.dateLabel}>End Date</Text>
+            <TextInput
+              style={styles.dateInput}
+              placeholder="YYYY-MM-DD"
+              value={endDate}
+              onChangeText={setEndDate}
+            />
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Overview Card */}
       <View style={styles.card}>
@@ -243,6 +280,34 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: spacing.xxl,
     alignItems: 'center',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+    borderRadius: borderRadius.input,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+  },
+  toggleButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleText: {
+    fontSize: typography.sizes.body2,
+    color: colors.text,
+    fontWeight: typography.weights.medium,
+  },
+  toggleTextActive: {
+    color: '#fff',
   },
   dateRow: {
     flexDirection: 'row',
