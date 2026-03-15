@@ -20,6 +20,7 @@ const createProjectSchema = z.object({
   budget_amount: z.number().optional(),
   currency_code: z.string().length(3).optional(),
   client_id: z.string().uuid().optional().nullable(),
+  external_board_url: z.string().url().nullable().optional(),
 });
 
 const updateProjectSchema = z.object({
@@ -32,6 +33,7 @@ const updateProjectSchema = z.object({
   budget_amount: z.number().nullable().optional(),
   currency_code: z.string().length(3).optional(),
   client_id: z.string().uuid().optional().nullable(),
+  external_board_url: z.string().url().nullable().optional(),
 });
 
 export async function list(req: AuthenticatedRequest, res: Response) {

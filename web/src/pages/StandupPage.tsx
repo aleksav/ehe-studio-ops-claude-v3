@@ -27,6 +27,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
@@ -45,6 +46,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
+  external_board_url: string | null;
   client: Client | null;
 }
 
@@ -797,20 +799,45 @@ export default function StandupPage() {
                   </Box>
 
                   {/* ---- Task Board ---- */}
-                  <ProjectTaskBoard
-                    tasks={currentTasks}
-                    milestones={currentMilestones}
-                    loading={isCurrentLoading}
-                    filterRecentDone
-                    initialHideEmpty={initialHideEmpty}
-                    onHideEmptyChange={handleHideEmptyChange}
-                    onAssignmentsChange={handleAssignmentsChange}
-                    onStatusChange={handleStatusChange}
-                    onLogTime={handleLogTimeTask}
-                    onDropStatus={handleDropStatus}
-                    onDropMilestone={handleDropMilestone}
-                    onDropPerson={handleDropPerson}
-                  />
+                  {currentProject.external_board_url ? (
+                    <Card
+                      elevation={0}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        p: 3,
+                      }}
+                    >
+                      <Typography variant="body1" sx={{ mb: 1.5 }}>
+                        Tasks for this project are managed externally.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        startIcon={<OpenInNewIcon />}
+                        href={currentProject.external_board_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open External Task Board
+                      </Button>
+                    </Card>
+                  ) : (
+                    <ProjectTaskBoard
+                      tasks={currentTasks}
+                      milestones={currentMilestones}
+                      loading={isCurrentLoading}
+                      filterRecentDone
+                      initialHideEmpty={initialHideEmpty}
+                      onHideEmptyChange={handleHideEmptyChange}
+                      onAssignmentsChange={handleAssignmentsChange}
+                      onStatusChange={handleStatusChange}
+                      onLogTime={handleLogTimeTask}
+                      onDropStatus={handleDropStatus}
+                      onDropMilestone={handleDropMilestone}
+                      onDropPerson={handleDropPerson}
+                    />
+                  )}
                 </>
               )}
             </Box>

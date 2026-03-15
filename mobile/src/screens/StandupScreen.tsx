@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
+  external_board_url: string | null;
   client: Client | null;
 }
 
@@ -331,7 +333,20 @@ export default function StandupScreen() {
               </TouchableOpacity>
 
               {/* Task Board */}
-              {isCurrentLoading ? (
+              {currentProject.external_board_url ? (
+                <View style={styles.externalBoardCard}>
+                  <Text style={styles.externalBoardText}>
+                    Tasks for this project are managed externally.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.externalBoardButton}
+                    onPress={() => Linking.openURL(currentProject.external_board_url!)}
+                  >
+                    <Ionicons name="open-outline" size={18} color="#fff" />
+                    <Text style={styles.externalBoardButtonText}>Open External Task Board</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : isCurrentLoading ? (
                 <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
               ) : (
                 <ProjectTaskBoard
@@ -744,6 +759,36 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   createButtonText: {
+    color: '#fff',
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.semibold,
+  },
+  externalBoardCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.card,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+  },
+  externalBoardText: {
+    fontSize: typography.sizes.body1,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  externalBoardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.button,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    minHeight: 44,
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  externalBoardButtonText: {
     color: '#fff',
     fontSize: typography.sizes.body1,
     fontWeight: typography.weights.semibold,

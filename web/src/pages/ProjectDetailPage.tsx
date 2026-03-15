@@ -28,6 +28,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { api, ApiError } from '../lib/api';
 import type { Assignment } from '../components/AssigneeAvatars';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
@@ -50,6 +51,7 @@ interface Project {
   budget_amount: number | string | null;
   currency_code: string | null;
   description: string | null;
+  external_board_url: string | null;
   client: Client | null;
 }
 
@@ -789,55 +791,77 @@ export default function ProjectDetailPage() {
       {/* ---- Tasks Tab ---- */}
       {activeTab === 1 && (
         <>
-          {/* ---- Tasks Header ---- */}
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 1,
-              mb: 1.5,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleOpenCreateMilestone}
-              >
-                Add Milestone
-              </Button>
+          {project.external_board_url ? (
+            <Card
+              elevation={0}
+              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}
+            >
+              <Typography variant="body1" sx={{ mb: 1.5 }}>
+                Tasks for this project are managed externally.
+              </Typography>
               <Button
                 variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setDialogOpen(true)}
+                startIcon={<OpenInNewIcon />}
+                href={project.external_board_url}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                Add Task
+                Open External Task Board
               </Button>
-            </Box>
-          </Box>
+            </Card>
+          ) : (
+            <>
+              {/* ---- Tasks Header ---- */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 1,
+                  mb: 1.5,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenCreateMilestone}
+                  >
+                    Add Milestone
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    Add Task
+                  </Button>
+                </Box>
+              </Box>
 
-          {/* ---- Task Board ---- */}
-          <ProjectTaskBoard
-            tasks={tasks}
-            milestones={milestones}
-            loading={tasksLoading}
-            weeklyHoursMap={weeklyHoursMap}
-            initialViewMode={initialViewMode}
-            onViewModeChange={handleViewChange}
-            initialHideEmpty={initialHideEmpty}
-            onHideEmptyChange={handleHideEmptyChange}
-            onAssignmentsChange={handleAssignmentsChange}
-            onMilestoneChange={handleMilestoneChange}
-            onEditMilestone={handleOpenEditMilestone}
-            onDeleteMilestone={handleOpenDeleteMilestone}
-            hiddenMilestoneIds={hiddenMilestoneIds}
-            onToggleMilestoneVisibility={toggleMilestoneVisibility}
-            onShowAllMilestones={showAllMilestones}
-            cancelledCount={cancelledCount}
-          />
+              {/* ---- Task Board ---- */}
+              <ProjectTaskBoard
+                tasks={tasks}
+                milestones={milestones}
+                loading={tasksLoading}
+                weeklyHoursMap={weeklyHoursMap}
+                initialViewMode={initialViewMode}
+                onViewModeChange={handleViewChange}
+                initialHideEmpty={initialHideEmpty}
+                onHideEmptyChange={handleHideEmptyChange}
+                onAssignmentsChange={handleAssignmentsChange}
+                onMilestoneChange={handleMilestoneChange}
+                onEditMilestone={handleOpenEditMilestone}
+                onDeleteMilestone={handleOpenDeleteMilestone}
+                hiddenMilestoneIds={hiddenMilestoneIds}
+                onToggleMilestoneVisibility={toggleMilestoneVisibility}
+                onShowAllMilestones={showAllMilestones}
+                cancelledCount={cancelledCount}
+              />
+            </>
+          )}
         </>
       )}
 

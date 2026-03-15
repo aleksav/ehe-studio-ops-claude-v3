@@ -6,7 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api } from '../lib/api';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
@@ -21,6 +24,7 @@ interface Project {
   name: string;
   status: string;
   description: string | null;
+  external_board_url: string | null;
   client: { id: string; name: string } | null;
 }
 
@@ -117,7 +121,22 @@ export default function ProjectDetailScreen({ route, navigation }: Props) {
       </View>
 
       {/* Task Board */}
-      <ProjectTaskBoard tasks={tasks} milestones={milestones} />
+      {project.external_board_url ? (
+        <View style={styles.externalBoardCard}>
+          <Text style={styles.externalBoardText}>
+            Tasks for this project are managed externally.
+          </Text>
+          <TouchableOpacity
+            style={styles.externalBoardButton}
+            onPress={() => Linking.openURL(project.external_board_url!)}
+          >
+            <Ionicons name="open-outline" size={18} color="#fff" />
+            <Text style={styles.externalBoardButtonText}>Open External Task Board</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ProjectTaskBoard tasks={tasks} milestones={milestones} />
+      )}
     </ScrollView>
   );
 }
@@ -170,5 +189,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.sizes.body2,
     color: '#999',
+  },
+  externalBoardCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.card,
+    padding: spacing.lg,
+  },
+  externalBoardText: {
+    fontSize: typography.sizes.body1,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  externalBoardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.button,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    minHeight: 44,
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  externalBoardButtonText: {
+    color: '#fff',
+    fontSize: typography.sizes.body1,
+    fontWeight: typography.weights.semibold,
   },
 });

@@ -51,6 +51,7 @@ export async function createProjectService(
     budget_type?: string;
     budget_amount?: number;
     currency_code?: string;
+    external_board_url?: string | null;
   },
   actorId: string | null,
 ) {
@@ -86,6 +87,7 @@ export async function updateProjectService(
     budget_type?: string;
     budget_amount?: number | null;
     currency_code?: string;
+    external_board_url?: string | null;
   },
   actorId: string | null,
 ) {

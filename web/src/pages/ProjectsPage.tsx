@@ -46,6 +46,7 @@ interface Project {
   budget_amount: number | string | null;
   currency_code: string | null;
   description: string | null;
+  external_board_url: string | null;
   client: Client | null;
 }
 
@@ -57,6 +58,7 @@ interface ProjectFormData {
   budget_type: string;
   budget_amount: string;
   currency_code: string;
+  external_board_url: string;
 }
 
 const EMPTY_FORM: ProjectFormData = {
@@ -67,6 +69,7 @@ const EMPTY_FORM: ProjectFormData = {
   budget_type: 'NONE',
   budget_amount: '',
   currency_code: 'GBP',
+  external_board_url: '',
 };
 
 // ---------------------------------------------------------------------------
@@ -180,6 +183,7 @@ export default function ProjectsPage() {
       budget_type: project.budget_type ?? 'NONE',
       budget_amount: project.budget_amount != null ? String(project.budget_amount) : '',
       currency_code: project.currency_code ?? 'GBP',
+      external_board_url: project.external_board_url ?? '',
     });
     setDialogOpen(true);
   };
@@ -205,6 +209,7 @@ export default function ProjectsPage() {
       status: form.status,
       client_id: form.client_id || null,
       budget_type: form.budget_type,
+      external_board_url: form.external_board_url.trim() || null,
     };
 
     if (showBudgetFields) {
@@ -549,6 +554,14 @@ export default function ProjectsPage() {
                   />
                 </>
               )}
+              <TextField
+                label="External Task Board URL (Linear, Jira, etc.)"
+                value={form.external_board_url}
+                onChange={(e) => setForm((f) => ({ ...f, external_board_url: e.target.value }))}
+                fullWidth
+                placeholder="https://linear.app/team/project"
+                helperText="If set, a link to this board will be shown instead of the built-in task board."
+              />
             </Box>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>

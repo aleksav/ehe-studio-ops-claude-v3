@@ -46,6 +46,17 @@ enum AuditAction {
   DELETE
 }
 
+enum MemberType {
+  EMPLOYEE
+  CONTRACTOR
+}
+
+enum HolidayDayType {
+  FULL
+  AM
+  PM
+}
+
 model User {
   id             String   @id @default(uuid())
   email          String   @unique
@@ -59,19 +70,21 @@ model User {
 }
 
 model TeamMember {
-  id                  String    @id @default(uuid())
+  id                  String      @id @default(uuid())
   full_name           String
-  email               String    @unique
+  email               String      @unique
   role_title          String?
   preferred_task_type TaskType?
-  is_active           Boolean   @default(true)
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
+  member_type         MemberType  @default(EMPLOYEE)
+  is_active           Boolean     @default(true)
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
 
-  user             User?
-  task_assignments TaskAssignment[]
-  time_entries     TimeEntry[]
-  audit_logs       AuditLog[]       @relation("AuditActor")
+  user              User?
+  task_assignments  TaskAssignment[]
+  time_entries      TimeEntry[]
+  audit_logs        AuditLog[]         @relation("AuditActor")
+  planned_holidays  PlannedHoliday[]
 
   @@index([is_active])
   @@map("team_members")
@@ -100,9 +113,10 @@ model Project {
   end_date      DateTime?     @db.Date
   budget_type   BudgetType    @default(NONE)
   budget_amount Decimal?      @db.Decimal(12, 2)
-  currency_code String        @default("GBP") @db.Char(3)
-  client_id     String?
-  client        Client?       @relation(fields: [client_id], references: [id], onDelete: SetNull)
+  currency_code      String        @default("GBP") @db.Char(3)
+  external_board_url String?
+  client_id          String?
+  client             Client?       @relation(fields: [client_id], references: [id], onDelete: SetNull)
   created_at    DateTime      @default(now())
   updated_at    DateTime      @updatedAt
 
@@ -244,4 +258,20 @@ model AuditLog {
   @@index([entity_type, entity_id])
   @@index([entity_type, created_at])
   @@map("audit_logs")
+}
+
+model PlannedHoliday {
+  id             String         @id @default(uuid())
+  team_member_id String
+  team_member    TeamMember     @relation(fields: [team_member_id], references: [id], onDelete: Cascade)
+  date           DateTime       @db.Date
+  day_type       HolidayDayType @default(FULL)
+  notes          String?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  @@unique([team_member_id, date])
+  @@index([team_member_id])
+  @@index([date])
+  @@map("planned_holidays")
 }
