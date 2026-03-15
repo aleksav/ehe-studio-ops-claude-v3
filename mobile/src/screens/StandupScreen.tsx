@@ -31,6 +31,115 @@ interface Project {
   client: Client | null;
 }
 
+// ---------------------------------------------------------------------------
+// Leave / Holiday helpers (mirrored from web StandupPage)
+// ---------------------------------------------------------------------------
+
+interface PlannedHolidayRaw {
+  id: string;
+  team_member_id: string;
+  date: string;
+  day_type: 'FULL' | 'AM' | 'PM';
+  notes: string | null;
+}
+
+interface TeamMemberBasic {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
+
+interface LeaveEntry {
+  name: string;
+  dates: string[];
+  dayTypes: Map<string, string>; // dateKey -> FULL/AM/PM
+}
+
+function getMonday(d: Date): Date {
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const m = new Date(d);
+  m.setDate(diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
+
+function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function buildLeaveGroups(
+  holidays: PlannedHolidayRaw[],
+  members: TeamMemberBasic[],
+): { today: LeaveEntry[]; thisWeek: LeaveEntry[]; nextWeek: LeaveEntry[] } {
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const thisMonday = getMonday(now);
+  const thisSunday = new Date(thisMonday);
+  thisSunday.setDate(thisSunday.getDate() + 6);
+
+  const nextMonday = new Date(thisMonday);
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  const nextSunday = new Date(nextMonday);
+  nextSunday.setDate(nextSunday.getDate() + 6);
+
+  const fmt = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+  const thisMondayKey = fmt(thisMonday);
+  const thisSundayKey = fmt(thisSunday);
+  const nextMondayKey = fmt(nextMonday);
+  const nextSundayKey = fmt(nextSunday);
+
+  const memberMap = new Map(members.map((mm) => [mm.id, mm.full_name]));
+
+  // Group holidays by member
+  const byMember = new Map<string, { dates: string[]; dayTypes: Map<string, string> }>();
+  for (const h of holidays) {
+    const dk = h.date.substring(0, 10);
+    if (!byMember.has(h.team_member_id)) {
+      byMember.set(h.team_member_id, { dates: [], dayTypes: new Map() });
+    }
+    const entry = byMember.get(h.team_member_id)!;
+    entry.dates.push(dk);
+    entry.dayTypes.set(dk, h.day_type);
+  }
+
+  const todayEntries: LeaveEntry[] = [];
+  const thisWeekEntries: LeaveEntry[] = [];
+  const nextWeekEntries: LeaveEntry[] = [];
+
+  for (const [memberId, data] of byMember) {
+    const name = memberMap.get(memberId) ?? memberId;
+    const isOffToday = data.dates.includes(todayKey);
+
+    // This week dates (excluding today to avoid duplication)
+    const thisWeekDates = data.dates.filter(
+      (dd) => dd >= thisMondayKey && dd <= thisSundayKey && dd !== todayKey,
+    );
+
+    // Next week dates
+    const nextWeekDates = data.dates.filter((dd) => dd >= nextMondayKey && dd <= nextSundayKey);
+
+    if (isOffToday) {
+      const allThisWeekDates = data.dates.filter(
+        (dd) => dd >= thisMondayKey && dd <= thisSundayKey,
+      );
+      todayEntries.push({ name, dates: allThisWeekDates, dayTypes: data.dayTypes });
+    } else if (thisWeekDates.length > 0) {
+      thisWeekEntries.push({ name, dates: thisWeekDates, dayTypes: data.dayTypes });
+    }
+
+    if (nextWeekDates.length > 0) {
+      nextWeekEntries.push({ name, dates: nextWeekDates, dayTypes: data.dayTypes });
+    }
+  }
+
+  return { today: todayEntries, thisWeek: thisWeekEntries, nextWeek: nextWeekEntries };
+}
+
 const STANDUP_PROMPTS = [
   'What did you accomplish yesterday?',
   'Any blockers the team can help with?',
@@ -76,6 +185,13 @@ export default function StandupScreen() {
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
   const [hideEmptyMilestones, setHideEmptyMilestones] = useState(false);
 
+  // Leave data
+  const [leaveGroups, setLeaveGroups] = useState<{
+    today: LeaveEntry[];
+    thisWeek: LeaveEntry[];
+    nextWeek: LeaveEntry[];
+  }>({ today: [], thisWeek: [], nextWeek: [] });
+
   // Load hideEmptyMilestones from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem('standup-hide-empty-milestones').then((val) => {
@@ -105,10 +221,15 @@ export default function StandupScreen() {
     [allProjects],
   );
 
-  // Carousel items: active projects + planned summary slide at the end
+  // Carousel items: holidays first, then active projects, then planned
   const carouselItems = useMemo(() => {
-    const items: Array<{ type: 'active'; project: Project } | { type: 'planned' }> =
-      activeProjects.map((p) => ({ type: 'active' as const, project: p }));
+    const items: Array<
+      { type: 'holidays' } | { type: 'active'; project: Project } | { type: 'planned' }
+    > = [];
+    items.push({ type: 'holidays' as const });
+    for (const p of activeProjects) {
+      items.push({ type: 'active' as const, project: p });
+    }
     if (plannedProjects.length > 0) {
       items.push({ type: 'planned' as const });
     }
@@ -133,6 +254,34 @@ export default function StandupScreen() {
       }
     })();
   }, []);
+
+  // Fetch leave data
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const year = new Date().getFullYear();
+        const [holidays, members] = await Promise.all([
+          api.get<PlannedHolidayRaw[]>(`/api/planned-holidays?year=${year}`),
+          api.get<TeamMemberBasic[]>('/api/team-members'),
+        ]);
+        if (!cancelled) {
+          const active = members.filter((m) => m.is_active);
+          setLeaveGroups(buildLeaveGroups(holidays, active));
+        }
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hasLeave =
+    leaveGroups.today.length > 0 ||
+    leaveGroups.thisWeek.length > 0 ||
+    leaveGroups.nextWeek.length > 0;
 
   // Fetch tasks for current project
   const fetchProjectTasks = useCallback(
@@ -256,16 +405,18 @@ export default function StandupScreen() {
               styles.dot,
               idx === currentIndex && [
                 styles.dotActive,
-                item.type === 'planned' && styles.dotPlanned,
+                (item.type === 'planned' || item.type === 'holidays') && styles.dotPlanned,
               ],
             ]}
           />
         ))}
       </View>
       <Text style={styles.counter}>
-        {currentItem?.type === 'planned'
-          ? 'Coming Up Next'
-          : `Project ${currentIndex + 1} of ${activeProjects.length}`}
+        {currentItem?.type === 'holidays'
+          ? 'Availability'
+          : currentItem?.type === 'planned'
+            ? 'Coming Up Next'
+            : `Project ${currentIndex} of ${activeProjects.length}`}
       </Text>
 
       {/* Navigation + Project */}
@@ -279,6 +430,81 @@ export default function StandupScreen() {
         </TouchableOpacity>
 
         <View style={styles.projectSpotlight}>
+          {/* Holidays / Team Availability Slide */}
+          {currentItem?.type === 'holidays' && (
+            <>
+              <View style={styles.availabilityHeader}>
+                <Ionicons name="sunny-outline" size={22} color={colors.primary} />
+                <Text style={styles.availabilityTitle}>Team Availability</Text>
+              </View>
+              {!hasLeave ? (
+                <View style={styles.leaveCard}>
+                  <Text style={styles.leaveCardBody}>
+                    Everyone is available — no leave booked for this period.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.leaveCardGroup}>
+                  {leaveGroups.today.length > 0 && (
+                    <View style={styles.leaveCard}>
+                      <Text style={styles.leaveCardLabelError}>Off Today</Text>
+                      {leaveGroups.today.map((entry) => {
+                        const extraDays = entry.dates.length > 1;
+                        return (
+                          <Text key={entry.name} style={styles.leaveCardBody}>
+                            <Text style={styles.leaveCardName}>{entry.name}</Text>
+                            {entry.dayTypes.get(entry.dates[0]) !== 'FULL'
+                              ? ` (${entry.dayTypes.get(entry.dates[0])} only)`
+                              : ''}
+                            {extraDays
+                              ? ` — off until ${formatDateShort(entry.dates[entry.dates.length - 1])}`
+                              : ''}
+                          </Text>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {leaveGroups.thisWeek.length > 0 && (
+                    <View style={styles.leaveCard}>
+                      <Text style={styles.leaveCardLabelWarning}>Later This Week</Text>
+                      {leaveGroups.thisWeek.map((entry) => (
+                        <Text key={entry.name} style={styles.leaveCardBody}>
+                          <Text style={styles.leaveCardName}>{entry.name}</Text>
+                          {' — '}
+                          {entry.dates
+                            .map((d) => {
+                              const dt = entry.dayTypes.get(d);
+                              const label = formatDateShort(d);
+                              return dt !== 'FULL' ? `${label} (${dt})` : label;
+                            })
+                            .join(', ')}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                  {leaveGroups.nextWeek.length > 0 && (
+                    <View style={styles.leaveCard}>
+                      <Text style={styles.leaveCardLabelNeutral}>Next Week</Text>
+                      {leaveGroups.nextWeek.map((entry) => (
+                        <Text key={entry.name} style={styles.leaveCardBody}>
+                          <Text style={styles.leaveCardName}>{entry.name}</Text>
+                          {' — '}
+                          {entry.dates
+                            .map((d) => {
+                              const dt = entry.dayTypes.get(d);
+                              const label = formatDateShort(d);
+                              return dt !== 'FULL' ? `${label} (${dt})` : label;
+                            })
+                            .join(', ')}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
           {/* Planned Projects Slide */}
           {currentItem?.type === 'planned' && (
             <>
@@ -655,6 +881,54 @@ const styles = StyleSheet.create({
   plannedChipText: {
     fontSize: typography.sizes.caption,
     color: '#666',
+  },
+  availabilityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  availabilityTitle: {
+    fontSize: typography.sizes.h3,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  leaveCardGroup: {
+    gap: spacing.sm,
+  },
+  leaveCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.card,
+    padding: spacing.md,
+  },
+  leaveCardLabelError: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.error,
+    marginBottom: spacing.xs,
+  },
+  leaveCardLabelWarning: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.warning,
+    marginBottom: spacing.xs,
+  },
+  leaveCardLabelNeutral: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  leaveCardBody: {
+    fontSize: typography.sizes.body2,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  leaveCardName: {
+    fontWeight: typography.weights.semibold,
   },
   addTaskButton: {
     flexDirection: 'row',
