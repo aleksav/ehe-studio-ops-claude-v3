@@ -24,6 +24,8 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { api, ApiError } from '../lib/api';
 
@@ -210,6 +212,10 @@ export default function HolidaysModal({
   const [holidays, setHolidays] = useState<PlannedHoliday[]>([]);
   const [allowance, setAllowance] = useState<HolidayAllowance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [form, setForm] = useState<HolidayFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -264,6 +270,25 @@ export default function HolidaysModal({
     () => new Set(holidays.map((h) => h.date.substring(0, 10))),
     [holidays],
   );
+
+  const filteredHolidays = useMemo(() => {
+    const prefix = `${viewMonth.year}-${String(viewMonth.month + 1).padStart(2, '0')}`;
+    return holidays.filter((h) => h.date.substring(0, 7) === prefix);
+  }, [holidays, viewMonth]);
+
+  const viewMonthLabel = useMemo(() => {
+    const d = new Date(viewMonth.year, viewMonth.month, 1);
+    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }, [viewMonth]);
+
+  const prevMonth = () =>
+    setViewMonth((v) =>
+      v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 },
+    );
+  const nextMonth = () =>
+    setViewMonth((v) =>
+      v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 },
+    );
 
   const rangePreview = useMemo(() => {
     if (!form.startDate || !form.endDate) return null;
@@ -413,7 +438,7 @@ export default function HolidaysModal({
                 </Card>
               )}
 
-              {/* Add button */}
+              {/* Month navigation + Add button */}
               <Box
                 sx={{
                   display: 'flex',
@@ -422,18 +447,30 @@ export default function HolidaysModal({
                   mb: 1,
                 }}
               >
-                <Typography variant="body2" fontWeight={600}>
-                  Booked Holidays
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <IconButton size="small" onClick={prevMonth} aria-label="Previous month">
+                    <ChevronLeftIcon fontSize="small" />
+                  </IconButton>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{ minWidth: 130, textAlign: 'center' }}
+                  >
+                    {viewMonthLabel}
+                  </Typography>
+                  <IconButton size="small" onClick={nextMonth} aria-label="Next month">
+                    <ChevronRightIcon fontSize="small" />
+                  </IconButton>
+                </Box>
                 <Button size="small" startIcon={<AddIcon />} onClick={handleOpenAdd}>
                   Add Holiday
                 </Button>
               </Box>
 
-              {/* Holiday list */}
-              {holidays.length === 0 ? (
+              {/* Holiday list for selected month */}
+              {filteredHolidays.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                  No holidays planned for {year}.
+                  No holidays in {viewMonthLabel}.
                 </Typography>
               ) : (
                 <Box
@@ -445,7 +482,7 @@ export default function HolidaysModal({
                     overflowY: 'auto',
                   }}
                 >
-                  {holidays.map((holiday) => {
+                  {filteredHolidays.map((holiday) => {
                     const isFuture = holiday.date.substring(0, 10) >= today;
                     return (
                       <Card

@@ -196,6 +196,10 @@ export default function HolidaysModal({
   const [holidays, setHolidays] = useState<PlannedHoliday[]>([]);
   const [allowance, setAllowance] = useState<HolidayAllowance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
 
   // Add form state
   const [formVisible, setFormVisible] = useState(false);
@@ -252,6 +256,25 @@ export default function HolidaysModal({
     () => new Set(holidays.map((h) => h.date.substring(0, 10))),
     [holidays],
   );
+
+  const filteredHolidays = useMemo(() => {
+    const prefix = `${viewMonth.year}-${String(viewMonth.month + 1).padStart(2, '0')}`;
+    return holidays.filter((h) => h.date.substring(0, 7) === prefix);
+  }, [holidays, viewMonth]);
+
+  const viewMonthLabel = useMemo(() => {
+    const d = new Date(viewMonth.year, viewMonth.month, 1);
+    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }, [viewMonth]);
+
+  const prevMonth = () =>
+    setViewMonth((v) =>
+      v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 },
+    );
+  const nextMonth = () =>
+    setViewMonth((v) =>
+      v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 },
+    );
 
   const rangePreview = useMemo(() => {
     if (!isValidDate(formStartDate) || !isValidDate(formEndDate)) return null;
@@ -417,17 +440,36 @@ export default function HolidaysModal({
                 </View>
               )}
 
-              {/* Add button */}
-              <TouchableOpacity style={styles.addButton} onPress={handleOpenAdd}>
-                <Ionicons name="add" size={18} color={colors.primary} />
-                <Text style={styles.addButtonText}>Add Holiday</Text>
-              </TouchableOpacity>
+              {/* Month navigation + Add button */}
+              <View style={styles.monthNavRow}>
+                <View style={styles.monthNavControls}>
+                  <TouchableOpacity
+                    onPress={prevMonth}
+                    style={styles.monthNavButton}
+                    accessibilityLabel="Previous month"
+                  >
+                    <Ionicons name="chevron-back" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                  <Text style={styles.monthNavLabel}>{viewMonthLabel}</Text>
+                  <TouchableOpacity
+                    onPress={nextMonth}
+                    style={styles.monthNavButton}
+                    accessibilityLabel="Next month"
+                  >
+                    <Ionicons name="chevron-forward" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={styles.addButton} onPress={handleOpenAdd}>
+                  <Ionicons name="add" size={18} color={colors.primary} />
+                  <Text style={styles.addButtonText}>Add Holiday</Text>
+                </TouchableOpacity>
+              </View>
 
-              {/* Holiday list */}
-              {holidays.length === 0 ? (
-                <Text style={styles.emptyText}>No holidays planned for {year}.</Text>
+              {/* Holiday list for selected month */}
+              {filteredHolidays.length === 0 ? (
+                <Text style={styles.emptyText}>No holidays in {viewMonthLabel}.</Text>
               ) : (
-                holidays.map((holiday) => {
+                filteredHolidays.map((holiday) => {
                   const isFuture = holiday.date.substring(0, 10) >= today;
                   return (
                     <View key={holiday.id} style={styles.holidayCard}>
@@ -662,12 +704,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
   },
+  monthNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  monthNavControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  monthNavButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthNavLabel: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+    minWidth: 120,
+    textAlign: 'center',
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
     minHeight: 44,
   },
   addButtonText: {
