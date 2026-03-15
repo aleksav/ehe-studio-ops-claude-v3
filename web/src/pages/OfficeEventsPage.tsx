@@ -56,10 +56,16 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   IMPORTANT_EVENT: 'Important Event',
 };
 
-const EVENT_TYPE_COLORS: Record<string, 'error' | 'info' | 'warning'> = {
+const EVENT_TYPE_COLORS: Record<string, 'error' | 'warning' | 'info'> = {
   OFFICE_CLOSED: 'error',
-  TEAM_SOCIAL: 'info',
-  IMPORTANT_EVENT: 'warning',
+  TEAM_SOCIAL: 'warning',
+  IMPORTANT_EVENT: 'info',
+};
+
+const EVENT_TYPE_ALLOW_TIME_ENTRY_DEFAULT: Record<string, boolean> = {
+  OFFICE_CLOSED: false,
+  TEAM_SOCIAL: true,
+  IMPORTANT_EVENT: true,
 };
 
 const currentYear = new Date().getFullYear();
@@ -355,7 +361,13 @@ export default function OfficeEventsPage({ embedded = false }: { embedded?: bool
               <Select
                 value={formEventType}
                 label="Event Type"
-                onChange={(e) => setFormEventType(e.target.value)}
+                onChange={(e) => {
+                  const type = e.target.value;
+                  setFormEventType(type);
+                  if (!editingEvent) {
+                    setFormAllowTimeEntry(EVENT_TYPE_ALLOW_TIME_ENTRY_DEFAULT[type] ?? false);
+                  }
+                }}
               >
                 {EVENT_TYPE_OPTIONS.map((opt) => (
                   <MenuItem key={opt.value} value={opt.value}>

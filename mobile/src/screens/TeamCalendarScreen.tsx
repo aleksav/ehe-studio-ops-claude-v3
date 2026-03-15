@@ -119,7 +119,11 @@ const MONTH_NAMES = [
 const COLOR_WORKDAY = '#C8E6C9';
 const COLOR_WEEKEND = '#FFCDD2';
 const COLOR_HOLIDAY = '#E53935';
-const COLOR_OFFICE_CLOSED = '#78909C';
+const COLOR_OFFICE_CLOSED = '#EF5350';
+const COLOR_SOCIAL_BLOCKED = '#F9A825';
+const COLOR_SOCIAL_ALLOWED = '#FFF176';
+const COLOR_IMPORTANT_BLOCKED = '#FB8C00';
+const COLOR_IMPORTANT_ALLOWED = '#FFCC80';
 
 const NAME_COL_WIDTH = 100;
 const DAY_COL_WIDTH = 28;
@@ -209,40 +213,23 @@ export default function TeamCalendarScreen() {
     return set;
   }, [holidays]);
 
-  const officeClosedDates = useMemo(() => {
-    const set = new Set<string>();
-    officeEvents
-      .filter((ev) => ev.event_type === 'OFFICE_CLOSED')
-      .forEach((ev) => {
-        const start = ev.start_date.substring(0, 10);
-        const end = ev.end_date.substring(0, 10);
-        const startDate = new Date(start + 'T00:00:00');
-        const endDate = new Date(end + 'T00:00:00');
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          set.add(`${d.getFullYear()}-${m}-${dd}`);
-        }
-      });
-    return set;
-  }, [officeEvents]);
-
-  const officeEventMarkerDates = useMemo(() => {
-    const set = new Set<string>();
-    officeEvents
-      .filter((ev) => ev.event_type === 'TEAM_SOCIAL' || ev.event_type === 'IMPORTANT_EVENT')
-      .forEach((ev) => {
-        const start = ev.start_date.substring(0, 10);
-        const end = ev.end_date.substring(0, 10);
-        const startDate = new Date(start + 'T00:00:00');
-        const endDate = new Date(end + 'T00:00:00');
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          set.add(`${d.getFullYear()}-${m}-${dd}`);
-        }
-      });
-    return set;
+  const officeEventDateMap = useMemo(() => {
+    const map = new Map<string, { event_type: string; allow_time_entry: boolean }>();
+    officeEvents.forEach((ev) => {
+      const start = ev.start_date.substring(0, 10);
+      const end = ev.end_date.substring(0, 10);
+      const startDate = new Date(start + 'T00:00:00');
+      const endDate = new Date(end + 'T00:00:00');
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        map.set(`${d.getFullYear()}-${m}-${dd}`, {
+          event_type: ev.event_type,
+          allow_time_entry: ev.allow_time_entry,
+        });
+      }
+    });
+    return map;
   }, [officeEvents]);
 
   const monthSpans = useMemo(() => {
@@ -306,7 +293,14 @@ export default function TeamCalendarScreen() {
 
   const getCellColor = (entry: DayEntry): string => {
     if (holidaySet.has(entry.dateKey)) return COLOR_HOLIDAY;
-    if (officeClosedDates.has(entry.dateKey)) return COLOR_OFFICE_CLOSED;
+    const ev = officeEventDateMap.get(entry.dateKey);
+    if (ev) {
+      if (ev.event_type === 'OFFICE_CLOSED') return COLOR_OFFICE_CLOSED;
+      if (ev.event_type === 'TEAM_SOCIAL')
+        return ev.allow_time_entry ? COLOR_SOCIAL_ALLOWED : COLOR_SOCIAL_BLOCKED;
+      if (ev.event_type === 'IMPORTANT_EVENT')
+        return ev.allow_time_entry ? COLOR_IMPORTANT_ALLOWED : COLOR_IMPORTANT_BLOCKED;
+    }
     if (isWeekend(entry.year, entry.month, entry.day)) return COLOR_WEEKEND;
     return COLOR_WORKDAY;
   };
@@ -444,9 +438,10 @@ export default function TeamCalendarScreen() {
                           isMonthBoundary ? styles.monthBoundaryLeft : null,
                         ]}
                       >
-                        {officeEventMarkerDates.has(entry.dateKey) && (
-                          <View style={styles.eventMarker} />
-                        )}
+                        {officeEventDateMap.has(entry.dateKey) &&
+                          officeEventDateMap.get(entry.dateKey)?.event_type !== 'OFFICE_CLOSED' && (
+                            <View style={styles.eventMarker} />
+                          )}
                       </View>
                     );
                   })}

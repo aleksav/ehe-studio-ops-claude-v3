@@ -360,6 +360,9 @@ export default function OfficeEventsScreen() {
                 ]}
                 onPress={() => {
                   setFormEventType(opt.value);
+                  if (!editingEvent) {
+                    setFormAllowTimeEntry(opt.value !== 'OFFICE_CLOSED');
+                  }
                   setTypePickerVisible(false);
                 }}
               >
