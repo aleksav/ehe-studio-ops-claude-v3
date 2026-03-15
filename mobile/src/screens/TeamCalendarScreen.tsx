@@ -28,6 +28,13 @@ interface PublicHoliday {
   name: string;
 }
 
+interface DayEntry {
+  year: number;
+  month: number; // 0-based
+  day: number;
+  dateKey: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -49,6 +56,32 @@ function formatDateKey(year: number, month: number, day: number): string {
   const m = String(month + 1).padStart(2, '0');
   const d = String(day).padStart(2, '0');
   return `${year}-${m}-${d}`;
+}
+
+function nextMonth(year: number, month: number): { year: number; month: number } {
+  return month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+}
+
+function buildTwoMonthDays(year: number, month: number): DayEntry[] {
+  const entries: DayEntry[] = [];
+
+  const days1 = getDaysInMonth(year, month);
+  for (let d = 1; d <= days1; d++) {
+    entries.push({ year, month, day: d, dateKey: formatDateKey(year, month, d) });
+  }
+
+  const nm = nextMonth(year, month);
+  const days2 = getDaysInMonth(nm.year, nm.month);
+  for (let d = 1; d <= days2; d++) {
+    entries.push({
+      year: nm.year,
+      month: nm.month,
+      day: d,
+      dateKey: formatDateKey(nm.year, nm.month, d),
+    });
+  }
+
+  return entries;
 }
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -88,21 +121,32 @@ export default function TeamCalendarScreen() {
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const nm = nextMonth(year, month);
+  const yearsToFetch = useMemo(() => {
+    const s = new Set<number>();
+    s.add(year);
+    s.add(nm.year);
+    return Array.from(s);
+  }, [year, nm.year]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [membersData, holidaysData] = await Promise.all([
+      const holidayPromises = yearsToFetch.map((y) =>
+        api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
+      );
+      const [membersData, ...holidayArrays] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
-        api.get<PublicHoliday[]>(`/api/public-holidays?year=${year}`),
+        ...holidayPromises,
       ]);
       setMembers(membersData);
-      setHolidays(holidaysData);
+      setHolidays(holidayArrays.flat());
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [yearsToFetch]);
 
   useEffect(() => {
     fetchData();
@@ -119,8 +163,32 @@ export default function TeamCalendarScreen() {
     return set;
   }, [holidays]);
 
-  const daysInMonth = getDaysInMonth(year, month);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
+
+  // Compute month boundary indices for labels
+  const monthSpans = useMemo(() => {
+    const spans: { label: string; startIndex: number; count: number }[] = [];
+    let currentLabel = '';
+    let start = 0;
+    let count = 0;
+    dayEntries.forEach((entry, i) => {
+      const label = `${MONTH_NAMES[entry.month].slice(0, 3)} ${entry.year}`;
+      if (label !== currentLabel) {
+        if (count > 0) {
+          spans.push({ label: currentLabel, startIndex: start, count });
+        }
+        currentLabel = label;
+        start = i;
+        count = 1;
+      } else {
+        count++;
+      }
+    });
+    if (count > 0) {
+      spans.push({ label: currentLabel, startIndex: start, count });
+    }
+    return spans;
+  }, [dayEntries]);
 
   const handlePrev = () => {
     if (month === 0) {
@@ -140,10 +208,9 @@ export default function TeamCalendarScreen() {
     }
   };
 
-  const getCellColor = (day: number): string => {
-    const key = formatDateKey(year, month, day);
-    if (holidaySet.has(key)) return COLOR_HOLIDAY;
-    if (isWeekend(year, month, day)) return COLOR_WEEKEND;
+  const getCellColor = (entry: DayEntry): string => {
+    if (holidaySet.has(entry.dateKey)) return COLOR_HOLIDAY;
+    if (isWeekend(entry.year, entry.month, entry.day)) return COLOR_WEEKEND;
     return COLOR_WORKDAY;
   };
 
@@ -159,13 +226,21 @@ export default function TeamCalendarScreen() {
     <View style={styles.container}>
       {/* Navigation */}
       <View style={styles.navRow}>
-        <TouchableOpacity onPress={handlePrev} style={styles.navButton}>
+        <TouchableOpacity
+          onPress={handlePrev}
+          style={styles.navButton}
+          accessibilityLabel="Previous month"
+        >
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>
           {MONTH_NAMES[month]} {year}
         </Text>
-        <TouchableOpacity onPress={handleNext} style={styles.navButton}>
+        <TouchableOpacity
+          onPress={handleNext}
+          style={styles.navButton}
+          accessibilityLabel="Next month"
+        >
           <Ionicons name="chevron-forward" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -186,44 +261,93 @@ export default function TeamCalendarScreen() {
         </View>
       </View>
 
-      {/* Grid */}
-      <ScrollView horizontal showsHorizontalScrollIndicator>
-        <View>
-          {/* Header row */}
-          <View style={styles.headerRow}>
-            <View style={styles.nameHeaderCell}>
-              <Text style={styles.headerText}>Name</Text>
-            </View>
-            {days.map((day) => (
-              <View key={day} style={styles.dayHeaderCell}>
-                <Text style={styles.dayOfWeekText}>
-                  {DAY_LABELS[getDayOfWeek(year, month, day)]}
-                </Text>
-                <Text style={styles.dayNumberText}>{day}</Text>
-              </View>
-            ))}
+      {/* Grid: sticky name column on left + horizontally scrollable day columns */}
+      <View style={styles.gridContainer}>
+        {/* Sticky name column */}
+        <View style={styles.stickyNameColumn}>
+          {/* Empty cell for month label row */}
+          <View style={styles.monthLabelPlaceholder} />
+          {/* Empty cell for day header row */}
+          <View style={styles.nameHeaderCell}>
+            <Text style={styles.headerText}>Name</Text>
           </View>
-
-          {/* Data rows */}
-          <ScrollView showsVerticalScrollIndicator>
+          {/* Member name cells */}
+          <ScrollView showsVerticalScrollIndicator={false}>
             {activeMembers.map((member) => (
-              <View key={member.id} style={styles.dataRow}>
-                <View style={styles.nameCell}>
-                  <Text style={styles.nameText} numberOfLines={1}>
-                    {member.full_name}
-                  </Text>
-                </View>
-                {days.map((day) => (
-                  <View
-                    key={day}
-                    style={[styles.dayCell, { backgroundColor: getCellColor(day) }]}
-                  />
-                ))}
+              <View key={member.id} style={styles.nameCell}>
+                <Text style={styles.nameText} numberOfLines={1}>
+                  {member.full_name}
+                </Text>
               </View>
             ))}
           </ScrollView>
         </View>
-      </ScrollView>
+
+        {/* Scrollable day columns */}
+        <ScrollView horizontal showsHorizontalScrollIndicator>
+          <View>
+            {/* Month label row */}
+            <View style={styles.monthLabelRow}>
+              {monthSpans.map((span) => (
+                <View
+                  key={`${span.label}-${span.startIndex}`}
+                  style={[
+                    styles.monthLabelCell,
+                    {
+                      width: span.count * DAY_COL_WIDTH,
+                      borderLeftWidth: span.startIndex > 0 ? 2 : 0,
+                    },
+                  ]}
+                >
+                  <Text style={styles.monthLabelText}>{span.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Day number header row */}
+            <View style={styles.headerRow}>
+              {dayEntries.map((entry, i) => {
+                const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
+                return (
+                  <View
+                    key={`hdr-${entry.dateKey}`}
+                    style={[
+                      styles.dayHeaderCell,
+                      isMonthBoundary ? styles.monthBoundaryLeft : null,
+                    ]}
+                  >
+                    <Text style={styles.dayOfWeekText}>
+                      {DAY_LABELS[getDayOfWeek(entry.year, entry.month, entry.day)]}
+                    </Text>
+                    <Text style={styles.dayNumberText}>{entry.day}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Data rows */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {activeMembers.map((member) => (
+                <View key={member.id} style={styles.dataRow}>
+                  {dayEntries.map((entry, i) => {
+                    const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
+                    return (
+                      <View
+                        key={`${member.id}-${entry.dateKey}`}
+                        style={[
+                          styles.dayCell,
+                          { backgroundColor: getCellColor(entry) },
+                          isMonthBoundary ? styles.monthBoundaryLeft : null,
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -249,6 +373,10 @@ const styles = StyleSheet.create({
   },
   navButton: {
     padding: spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   navTitle: {
     fontSize: typography.sizes.h3,
@@ -279,21 +407,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
   },
-  headerRow: {
+  gridContainer: {
+    flex: 1,
     flexDirection: 'row',
-    borderBottomWidth: 2,
-    borderBottomColor: colors.divider,
+  },
+  stickyNameColumn: {
+    width: NAME_COL_WIDTH,
+    backgroundColor: '#FAFAFA',
+    zIndex: 2,
+  },
+  monthLabelPlaceholder: {
+    height: 20,
   },
   nameHeaderCell: {
     width: NAME_COL_WIDTH,
+    height: 32,
     justifyContent: 'flex-end',
     paddingBottom: 4,
     paddingLeft: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.divider,
   },
   headerText: {
     fontSize: 11,
     fontWeight: typography.weights.semibold,
     color: colors.text,
+  },
+  monthLabelRow: {
+    flexDirection: 'row',
+    height: 20,
+  },
+  monthLabelCell: {
+    justifyContent: 'center',
+    paddingLeft: 4,
+    borderLeftColor: colors.divider,
+  },
+  monthLabelText: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.divider,
   },
   dayHeaderCell: {
     width: DAY_COL_WIDTH,
@@ -321,6 +478,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: spacing.sm,
     backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
   },
   nameText: {
     fontSize: 10,
@@ -332,5 +491,9 @@ const styles = StyleSheet.create({
     height: DAY_COL_WIDTH,
     borderRightWidth: 1,
     borderRightColor: 'rgba(0,0,0,0.06)',
+  },
+  monthBoundaryLeft: {
+    borderLeftWidth: 2,
+    borderLeftColor: colors.divider,
   },
 });

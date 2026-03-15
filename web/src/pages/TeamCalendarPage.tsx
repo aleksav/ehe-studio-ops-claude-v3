@@ -21,6 +21,13 @@ interface PublicHoliday {
   name: string;
 }
 
+interface DayEntry {
+  year: number;
+  month: number; // 0-based
+  day: number;
+  dateKey: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -42,6 +49,36 @@ function formatDateKey(year: number, month: number, day: number): string {
   const m = String(month + 1).padStart(2, '0');
   const d = String(day).padStart(2, '0');
   return `${year}-${m}-${d}`;
+}
+
+/** Return the next month/year pair given a 0-based month. */
+function nextMonth(year: number, month: number): { year: number; month: number } {
+  return month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+}
+
+/** Build a continuous array of DayEntry for two months starting at (year, month). */
+function buildTwoMonthDays(year: number, month: number): DayEntry[] {
+  const entries: DayEntry[] = [];
+
+  // First month
+  const days1 = getDaysInMonth(year, month);
+  for (let d = 1; d <= days1; d++) {
+    entries.push({ year, month, day: d, dateKey: formatDateKey(year, month, d) });
+  }
+
+  // Second month
+  const nm = nextMonth(year, month);
+  const days2 = getDaysInMonth(nm.year, nm.month);
+  for (let d = 1; d <= days2; d++) {
+    entries.push({
+      year: nm.year,
+      month: nm.month,
+      day: d,
+      dateKey: formatDateKey(nm.year, nm.month, d),
+    });
+  }
+
+  return entries;
 }
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -82,21 +119,33 @@ export default function TeamCalendarPage() {
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // The second month may be in a different year, so fetch holidays for both.
+  const nm = nextMonth(year, month);
+  const yearsToFetch = useMemo(() => {
+    const s = new Set<number>();
+    s.add(year);
+    s.add(nm.year);
+    return Array.from(s);
+  }, [year, nm.year]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [membersData, holidaysData] = await Promise.all([
+      const holidayPromises = yearsToFetch.map((y) =>
+        api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
+      );
+      const [membersData, ...holidayArrays] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
-        api.get<PublicHoliday[]>(`/api/public-holidays?year=${year}`),
+        ...holidayPromises,
       ]);
       setMembers(membersData);
-      setHolidays(holidaysData);
+      setHolidays(holidayArrays.flat());
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [yearsToFetch]);
 
   useEffect(() => {
     fetchData();
@@ -119,8 +168,9 @@ export default function TeamCalendarPage() {
     return map;
   }, [holidays]);
 
-  const daysInMonth = getDaysInMonth(year, month);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  // Build the continuous 2-month strip
+  const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
+  const totalDays = dayEntries.length;
 
   const handlePrev = () => {
     if (month === 0) {
@@ -140,17 +190,40 @@ export default function TeamCalendarPage() {
     }
   };
 
-  const getCellColor = (day: number): string => {
-    const key = formatDateKey(year, month, day);
-    if (holidaySet.has(key)) return COLOR_HOLIDAY;
-    if (isWeekend(year, month, day)) return COLOR_WEEKEND;
+  const getCellColor = (entry: DayEntry): string => {
+    if (holidaySet.has(entry.dateKey)) return COLOR_HOLIDAY;
+    if (isWeekend(entry.year, entry.month, entry.day)) return COLOR_WEEKEND;
     return COLOR_WORKDAY;
   };
 
-  const getCellTooltip = (day: number): string | undefined => {
-    const key = formatDateKey(year, month, day);
-    return holidayNameMap.get(key);
+  const getCellTooltip = (entry: DayEntry): string | undefined => {
+    return holidayNameMap.get(entry.dateKey);
   };
+
+  // Compute month label spans for the top header row
+  const monthSpans = useMemo(() => {
+    const spans: { label: string; colStart: number; colSpan: number }[] = [];
+    let currentLabel = '';
+    let start = 0;
+    let count = 0;
+    dayEntries.forEach((entry, i) => {
+      const label = `${MONTH_NAMES[entry.month]} ${entry.year}`;
+      if (label !== currentLabel) {
+        if (count > 0) {
+          spans.push({ label: currentLabel, colStart: start, colSpan: count });
+        }
+        currentLabel = label;
+        start = i;
+        count = 1;
+      } else {
+        count++;
+      }
+    });
+    if (count > 0) {
+      spans.push({ label: currentLabel, colStart: start, colSpan: count });
+    }
+    return spans;
+  }, [dayEntries]);
 
   if (loading) {
     return (
@@ -172,13 +245,13 @@ export default function TeamCalendarPage() {
 
       {/* Navigation */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-        <IconButton onClick={handlePrev} size="small">
+        <IconButton onClick={handlePrev} size="small" aria-label="Previous month">
           <ChevronLeftIcon />
         </IconButton>
         <Typography variant="h6" sx={{ fontWeight: 600, minWidth: 180, textAlign: 'center' }}>
           {MONTH_NAMES[month]} {year}
         </Typography>
-        <IconButton onClick={handleNext} size="small">
+        <IconButton onClick={handleNext} size="small" aria-label="Next month">
           <ChevronRightIcon />
         </IconButton>
       </Box>
@@ -206,114 +279,176 @@ export default function TeamCalendarPage() {
       </Box>
 
       {/* Grid */}
-      <Box sx={{ overflowX: 'auto' }}>
+      <Box sx={{ overflowX: 'auto', position: 'relative' }}>
         <Box
+          component="table"
           sx={{
-            display: 'grid',
-            gridTemplateColumns: `${NAME_COL_WIDTH}px repeat(${daysInMonth}, ${DAY_COL_WIDTH}px)`,
-            gap: 0,
-            minWidth: NAME_COL_WIDTH + daysInMonth * DAY_COL_WIDTH,
+            borderCollapse: 'collapse',
+            minWidth: NAME_COL_WIDTH + totalDays * DAY_COL_WIDTH,
           }}
         >
-          {/* Header row */}
-          <Box
-            sx={{
-              position: 'sticky',
-              left: 0,
-              zIndex: 2,
-              bgcolor: 'background.default',
-              borderBottom: '2px solid',
-              borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'flex-end',
-              pb: 0.5,
-              pl: 1,
-            }}
-          >
-            <Typography variant="caption" fontWeight={600}>
-              Team Member
-            </Typography>
-          </Box>
-          {days.map((day) => (
-            <Box
-              key={day}
-              sx={{
-                borderBottom: '2px solid',
-                borderColor: 'divider',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                pb: 0.5,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1 }}
-              >
-                {DAY_LABELS[getDayOfWeek(year, month, day)]}
-              </Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2 }}>
-                {day}
-              </Typography>
-            </Box>
-          ))}
-
-          {/* Data rows */}
-          {activeMembers.map((member) => (
-            <>
-              {/* Name cell */}
+          {/* Month label row */}
+          <Box component="thead">
+            <Box component="tr">
               <Box
-                key={`name-${member.id}`}
+                component="th"
                 sx={{
                   position: 'sticky',
                   left: 0,
-                  zIndex: 1,
+                  zIndex: 3,
                   bgcolor: 'background.default',
-                  display: 'flex',
-                  alignItems: 'center',
-                  pl: 1,
-                  height: DAY_COL_WIDTH,
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                  overflow: 'hidden',
+                  width: NAME_COL_WIDTH,
+                  minWidth: NAME_COL_WIDTH,
                 }}
-              >
-                <Typography
-                  variant="caption"
+              />
+              {monthSpans.map((span) => (
+                <Box
+                  component="th"
+                  key={`${span.label}-${span.colStart}`}
+                  colSpan={span.colSpan}
                   sx={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: NAME_COL_WIDTH - 16,
+                    textAlign: 'left',
+                    px: 0.5,
+                    py: 0.5,
+                    borderLeft: span.colStart > 0 ? '2px solid' : 'none',
+                    borderColor: 'divider',
+                    bgcolor: 'background.default',
                   }}
                 >
-                  {member.full_name}
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}
+                  >
+                    {span.label}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Day number header row */}
+            <Box component="tr">
+              <Box
+                component="th"
+                sx={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 3,
+                  bgcolor: 'background.default',
+                  borderBottom: '2px solid',
+                  borderColor: 'divider',
+                  width: NAME_COL_WIDTH,
+                  minWidth: NAME_COL_WIDTH,
+                  textAlign: 'left',
+                  pl: 1,
+                  pb: 0.5,
+                  verticalAlign: 'bottom',
+                }}
+              >
+                <Typography variant="caption" fontWeight={600}>
+                  Team Member
                 </Typography>
               </Box>
-
-              {/* Day cells */}
-              {days.map((day) => {
-                const tooltip = getCellTooltip(day);
+              {dayEntries.map((entry, i) => {
+                const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
                 return (
                   <Box
-                    key={`${member.id}-${day}`}
-                    title={tooltip}
+                    component="th"
+                    key={`hdr-${entry.dateKey}`}
                     sx={{
-                      height: DAY_COL_WIDTH,
-                      bgcolor: getCellColor(day),
-                      borderBottom: '1px solid',
-                      borderRight: '1px solid',
-                      borderColor: 'rgba(0,0,0,0.08)',
-                      cursor: tooltip ? 'help' : 'default',
+                      width: DAY_COL_WIDTH,
+                      minWidth: DAY_COL_WIDTH,
+                      borderBottom: '2px solid',
+                      borderColor: 'divider',
+                      borderLeft: isMonthBoundary ? '2px solid' : 'none',
+                      textAlign: 'center',
+                      verticalAlign: 'bottom',
+                      pb: 0.5,
+                      px: 0,
                     }}
-                  />
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1, display: 'block' }}
+                    >
+                      {DAY_LABELS[getDayOfWeek(entry.year, entry.month, entry.day)]}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, display: 'block' }}
+                    >
+                      {entry.day}
+                    </Typography>
+                  </Box>
                 );
               })}
-            </>
-          ))}
+            </Box>
+          </Box>
+
+          {/* Data rows */}
+          <Box component="tbody">
+            {activeMembers.map((member) => (
+              <Box component="tr" key={member.id}>
+                {/* Name cell */}
+                <Box
+                  component="td"
+                  sx={{
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    bgcolor: 'background.default',
+                    pl: 1,
+                    height: DAY_COL_WIDTH,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    width: NAME_COL_WIDTH,
+                    minWidth: NAME_COL_WIDTH,
+                    overflow: 'hidden',
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'block',
+                      maxWidth: NAME_COL_WIDTH - 16,
+                    }}
+                  >
+                    {member.full_name}
+                  </Typography>
+                </Box>
+
+                {/* Day cells */}
+                {dayEntries.map((entry, i) => {
+                  const tooltip = getCellTooltip(entry);
+                  const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
+                  return (
+                    <Box
+                      component="td"
+                      key={`${member.id}-${entry.dateKey}`}
+                      title={tooltip}
+                      sx={{
+                        height: DAY_COL_WIDTH,
+                        width: DAY_COL_WIDTH,
+                        minWidth: DAY_COL_WIDTH,
+                        bgcolor: getCellColor(entry),
+                        borderBottom: '1px solid',
+                        borderRight: '1px solid',
+                        borderLeft: isMonthBoundary ? '2px solid' : 'none',
+                        borderColor: 'rgba(0,0,0,0.08)',
+                        cursor: tooltip ? 'help' : 'default',
+                        p: 0,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            ))}
+          </Box>
         </Box>
       </Box>
     </Box>
