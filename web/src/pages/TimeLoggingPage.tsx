@@ -39,6 +39,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   startOfISOWeek,
   endOfISOWeek,
@@ -418,6 +420,7 @@ export default function TimeLoggingPage() {
     projectId: string;
     reason: 'weekend' | 'holiday' | 'office_event';
   }>({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+  const [blockOverrideReason, setBlockOverrideReason] = useState('');
   const [pendingFocusCellKey, setPendingFocusCellKey] = useState<string | null>(null);
 
   // Fetch entries for the week
@@ -621,6 +624,7 @@ export default function TimeLoggingPage() {
   );
 
   const handleBlockDialogConfirm = useCallback(() => {
+    if (!blockOverrideReason.trim()) return;
     const { dateStr, projectId } = blockDialog;
     setUnblockedDates((prev) => {
       const next = new Set(prev);
@@ -628,13 +632,15 @@ export default function TimeLoggingPage() {
       return next;
     });
     setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+    setBlockOverrideReason('');
     if (dateStr && projectId) {
       setPendingFocusCellKey(cellKey(projectId, dateStr));
     }
-  }, [blockDialog]);
+  }, [blockDialog, blockOverrideReason]);
 
   const handleBlockDialogCancel = useCallback(() => {
     setBlockDialog({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
+    setBlockOverrideReason('');
   }, []);
 
   const interceptBlockedFocus = useCallback(
@@ -975,17 +981,35 @@ export default function TimeLoggingPage() {
                             {format(d, 'MMM d')}
                           </Typography>
                           {blockReason && (
-                            <Typography
-                              variant="caption"
-                              display="block"
-                              sx={{ fontSize: 9, color: 'text.disabled' }}
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 0.25,
+                              }}
                             >
-                              {blockReason === 'weekend'
-                                ? '(Weekend)'
-                                : blockReason === 'office_event'
-                                  ? `(${officeEventBlockedDates.get(ds) ?? 'Office Event'})`
-                                  : '(Holiday)'}
-                            </Typography>
+                              {isDateBlocked ? (
+                                <LockOutlinedIcon sx={{ fontSize: 10, color: 'text.disabled' }} />
+                              ) : (
+                                <Tooltip title="Override active" arrow>
+                                  <WarningAmberIcon sx={{ fontSize: 10, color: 'warning.main' }} />
+                                </Tooltip>
+                              )}
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontSize: 9,
+                                  color: isDateBlocked ? 'text.disabled' : 'warning.main',
+                                }}
+                              >
+                                {blockReason === 'weekend'
+                                  ? '(Weekend)'
+                                  : blockReason === 'office_event'
+                                    ? `(${officeEventBlockedDates.get(ds) ?? 'Office Event'})`
+                                    : '(Holiday)'}
+                              </Typography>
+                            </Box>
                           )}
                         </TableCell>
                       );
@@ -1030,6 +1054,7 @@ export default function TimeLoggingPage() {
                             officeEventBlockedDates,
                           );
                           const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
+                          const isOverridden = blockReason !== null && unblockedDates.has(ds);
                           const hasValue = parseFloat(cell?.hours ?? '0') > 0;
                           const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
                           return (
@@ -1040,6 +1065,11 @@ export default function TimeLoggingPage() {
                                 bgcolor: dateBlocked ? '#F0F0F0' : dailyTotalBg(dt),
                                 p: 0.5,
                                 ...(dateBlocked && { color: 'text.disabled' }),
+                                ...(isOverridden && {
+                                  borderLeft: '2px solid',
+                                  borderRight: '2px solid',
+                                  borderColor: 'warning.main',
+                                }),
                               }}
                             >
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -1200,19 +1230,43 @@ export default function TimeLoggingPage() {
             </TableContainer>
           )}
 
-          {/* Weekend / holiday confirmation dialog */}
-          <Dialog open={blockDialog.open} onClose={handleBlockDialogCancel}>
-            <DialogTitle>Blocked Date</DialogTitle>
+          {/* Weekend / holiday override confirmation dialog */}
+          <Dialog open={blockDialog.open} onClose={handleBlockDialogCancel} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningAmberIcon sx={{ color: 'warning.main' }} />
+              Override Blocked Date
+            </DialogTitle>
             <DialogContent>
-              <DialogContentText>
-                This date is a {blockDialog.reason === 'weekend' ? 'weekend' : 'bank holiday'}. Do
-                you still want to log time?
+              <DialogContentText sx={{ mb: 2 }}>
+                This day is a{' '}
+                <strong>{blockDialog.reason === 'weekend' ? 'weekend' : 'public holiday'}</strong>.
+                Time entry is normally blocked. Please provide a brief reason to override.
               </DialogContentText>
+              <TextField
+                autoFocus
+                fullWidth
+                size="small"
+                label="Reason for override"
+                placeholder="e.g. Urgent client deadline, on-call duty"
+                value={blockOverrideReason}
+                onChange={(e) => setBlockOverrideReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && blockOverrideReason.trim()) {
+                    handleBlockDialogConfirm();
+                  }
+                }}
+                helperText="This override applies to this session only."
+              />
             </DialogContent>
             <DialogActions>
               <Button onClick={handleBlockDialogCancel}>Cancel</Button>
-              <Button onClick={handleBlockDialogConfirm} variant="contained">
-                Continue
+              <Button
+                onClick={handleBlockDialogConfirm}
+                variant="contained"
+                color="warning"
+                disabled={!blockOverrideReason.trim()}
+              >
+                Override &amp; Log Time
               </Button>
             </DialogActions>
           </Dialog>

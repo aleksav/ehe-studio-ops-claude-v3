@@ -88,6 +88,14 @@ function cellKey(projectId: string, dateStr: string): string {
   return `${projectId}::${dateStr}`;
 }
 
+function isBlockedDate(dateStr: string, holidayDates: Set<string>): 'weekend' | 'holiday' | null {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  if (day === 0 || day === 6) return 'weekend';
+  if (holidayDates.has(dateStr)) return 'holiday';
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Tab type
 // ---------------------------------------------------------------------------
@@ -144,6 +152,36 @@ export default function TimeLoggingScreen() {
   const [cells, setCells] = useState<Record<string, CellData>>({});
   const [gridEntriesLoading, setGridEntriesLoading] = useState(false);
   const [addPickerVisible, setAddPickerVisible] = useState(false);
+
+  // ---- Public holidays ----
+  const [holidayDates, setHolidayDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ date: string }[]>('/api/public-holidays');
+        if (!cancelled) {
+          setHolidayDates(new Set(data.map((h) => h.date.substring(0, 10))));
+        }
+      } catch {
+        // silently fail — holidays will just not be blocked
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---- Break-glass override state ----
+  const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
+  const [blockDialog, setBlockDialog] = useState<{
+    visible: boolean;
+    dateStr: string;
+    projectId: string;
+    reason: 'weekend' | 'holiday';
+  }>({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
+  const [blockOverrideReason, setBlockOverrideReason] = useState('');
 
   const fetchGridEntries = useCallback(async () => {
     if (!teamMemberId || selectedProjectIds.length === 0) {
@@ -539,12 +577,36 @@ export default function TimeLoggingScreen() {
                   <View style={styles.projectCell}>
                     <Text style={styles.headerText}>Project</Text>
                   </View>
-                  {weekDates.map((d, i) => (
-                    <View key={formatDate(d)} style={styles.dayCell}>
-                      <Text style={styles.dayLabel}>{DAY_LABELS[i]}</Text>
-                      <Text style={styles.dateLabel}>{formatShort(d)}</Text>
-                    </View>
-                  ))}
+                  {weekDates.map((d, i) => {
+                    const ds = formatDate(d);
+                    const blockReason = isBlockedDate(ds, holidayDates);
+                    const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
+                    const isOverridden = blockReason !== null && unblockedDates.has(ds);
+                    return (
+                      <View
+                        key={ds}
+                        style={[
+                          styles.dayCell,
+                          isDateBlocked && styles.dayCellBlocked,
+                          isOverridden && styles.dayCellOverridden,
+                        ]}
+                      >
+                        <View style={styles.dayLabelRow}>
+                          {isDateBlocked && <Ionicons name="lock-closed" size={9} color="#999" />}
+                          {isOverridden && (
+                            <Ionicons name="warning" size={9} color={colors.warning} />
+                          )}
+                          <Text style={styles.dayLabel}>{DAY_LABELS[i]}</Text>
+                        </View>
+                        <Text style={styles.dateLabel}>{formatShort(d)}</Text>
+                        {blockReason && (
+                          <Text style={styles.blockedLabel}>
+                            {blockReason === 'weekend' ? 'Wknd' : 'Hol'}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
                   <View style={styles.totalCell}>
                     <Text style={styles.headerText}>Total</Text>
                   </View>
@@ -574,8 +636,34 @@ export default function TimeLoggingScreen() {
                         const ds = formatDate(d);
                         const ck = cellKey(pid, ds);
                         const cell = cells[ck];
+                        const cellBlockReason = isBlockedDate(ds, holidayDates);
+                        const cellBlocked = cellBlockReason !== null && !unblockedDates.has(ds);
+                        const cellOverridden = cellBlockReason !== null && unblockedDates.has(ds);
+
+                        if (cellBlocked) {
+                          return (
+                            <TouchableOpacity
+                              key={ds}
+                              style={[styles.inputCell, styles.inputCellBlocked]}
+                              onPress={() =>
+                                setBlockDialog({
+                                  visible: true,
+                                  dateStr: ds,
+                                  projectId: pid,
+                                  reason: cellBlockReason as 'weekend' | 'holiday',
+                                })
+                              }
+                            >
+                              <Ionicons name="lock-closed" size={16} color="#999" />
+                            </TouchableOpacity>
+                          );
+                        }
+
                         return (
-                          <View key={ds} style={styles.inputCell}>
+                          <View
+                            key={ds}
+                            style={[styles.inputCell, cellOverridden && styles.inputCellOverridden]}
+                          >
                             <View style={styles.stepperRow}>
                               <TouchableOpacity
                                 style={styles.stepperButton}
@@ -651,6 +739,72 @@ export default function TimeLoggingScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Break-glass override confirmation modal */}
+      <Modal
+        visible={blockDialog.visible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          setBlockDialog({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
+          setBlockOverrideReason('');
+        }}
+      >
+        <View style={styles.overrideOverlay}>
+          <View style={styles.overrideCard}>
+            <View style={styles.overrideTitleRow}>
+              <Ionicons name="warning" size={20} color={colors.warning} />
+              <Text style={styles.overrideTitle}>Override Blocked Date</Text>
+            </View>
+            <Text style={styles.overrideBody}>
+              This day is a{' '}
+              <Text style={styles.overrideBold}>
+                {blockDialog.reason === 'weekend' ? 'weekend' : 'public holiday'}
+              </Text>
+              . Time entry is normally blocked. Please provide a brief reason to override.
+            </Text>
+            <TextInput
+              style={styles.overrideInput}
+              value={blockOverrideReason}
+              onChangeText={setBlockOverrideReason}
+              placeholder="e.g. Urgent client deadline, on-call duty"
+              placeholderTextColor="#999"
+              autoFocus
+            />
+            <Text style={styles.overrideHint}>This override applies to this session only.</Text>
+            <View style={styles.overrideActions}>
+              <TouchableOpacity
+                style={styles.overrideCancelButton}
+                onPress={() => {
+                  setBlockDialog({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
+                  setBlockOverrideReason('');
+                }}
+              >
+                <Text style={styles.overrideCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.overrideConfirmButton,
+                  !blockOverrideReason.trim() && styles.buttonDisabled,
+                ]}
+                disabled={!blockOverrideReason.trim()}
+                onPress={() => {
+                  if (!blockOverrideReason.trim()) return;
+                  setUnblockedDates((prev) => {
+                    const next = new Set(prev);
+                    next.add(blockDialog.dateStr);
+                    return next;
+                  });
+                  setBlockDialog({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
+                  setBlockOverrideReason('');
+                }}
+              >
+                <Text style={styles.overrideConfirmText}>Override</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ============================================================= */}
       {/* QUICK ENTRY TAB                                                 */}
@@ -976,6 +1130,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
   },
+  dayCellBlocked: {
+    backgroundColor: '#F0F0F0',
+  },
+  dayCellOverridden: {
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderLeftColor: colors.warning,
+    borderRightColor: colors.warning,
+  },
+  dayLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   dayLabel: {
     fontSize: typography.sizes.caption,
     fontWeight: typography.weights.semibold,
@@ -985,11 +1153,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#999',
   },
+  blockedLabel: {
+    fontSize: 8,
+    color: '#999',
+    marginTop: 1,
+  },
   inputCell: {
     width: 90,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xs,
+  },
+  inputCellBlocked: {
+    backgroundColor: '#F0F0F0',
+    minHeight: 44,
+  },
+  inputCellOverridden: {
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderLeftColor: colors.warning,
+    borderRightColor: colors.warning,
   },
   stepperRow: {
     flexDirection: 'row',
@@ -1249,6 +1432,91 @@ const styles = StyleSheet.create({
   },
   modalItemTextSelected: {
     color: colors.primary,
+    fontWeight: typography.weights.semibold,
+  },
+
+  // Break-glass override modal
+  overrideOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  overrideCard: {
+    backgroundColor: '#fff',
+    borderRadius: borderRadius.card,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 360,
+  },
+  overrideTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  overrideTitle: {
+    fontSize: typography.sizes.h4,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+  },
+  overrideBody: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
+  overrideBold: {
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  overrideInput: {
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: borderRadius.input,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    fontSize: typography.sizes.body2,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  overrideHint: {
+    fontSize: typography.sizes.caption,
+    color: '#999',
+    marginBottom: spacing.md,
+  },
+  overrideActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  overrideCancelButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overrideCancelText: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+    fontWeight: typography.weights.medium,
+  },
+  overrideConfirmButton: {
+    backgroundColor: colors.warning,
+    borderRadius: borderRadius.button,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overrideConfirmText: {
+    color: '#fff',
+    fontSize: typography.sizes.body2,
     fontWeight: typography.weights.semibold,
   },
 });
