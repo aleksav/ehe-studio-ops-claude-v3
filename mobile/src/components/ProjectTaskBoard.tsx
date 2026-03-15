@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -174,20 +174,22 @@ function SwipeablePages({
   const windowWidth = Dimensions.get('window').width;
   const pageWidth = windowWidth - PAGE_HORIZONTAL_PADDING * 2;
 
-  // Reset page when content changes (e.g. switching views, filtering)
-  const prevKeyRef = useRef(pageKey);
-  if (pageKey !== prevKeyRef.current) {
-    prevKeyRef.current = pageKey;
-    if (currentPage !== 0) {
-      setCurrentPage(0);
-      // Scroll to start on next frame
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ x: 0, animated: false });
-      }, 0);
-    }
-  }
-
   const totalPages = children.length;
+
+  // Reset to page 0 when content identity changes (e.g. filtering milestones)
+  useEffect(() => {
+    setCurrentPage(0);
+    scrollRef.current?.scrollTo({ x: 0, animated: false });
+  }, [pageKey]);
+
+  // Clamp currentPage if it exceeds the new page count (e.g. after filtering)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage >= totalPages) {
+      const clamped = totalPages - 1;
+      setCurrentPage(clamped);
+      scrollRef.current?.scrollTo({ x: clamped * pageWidth, animated: false });
+    }
+  }, [totalPages, currentPage, pageWidth]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -437,6 +439,13 @@ export default function ProjectTaskBoard({
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [hideEmptyMilestones, setHideEmptyMilestones] = useState(hideEmptyMilestonesProp ?? false);
 
+  // Sync internal state when the prop changes from the parent
+  useEffect(() => {
+    if (hideEmptyMilestonesProp !== undefined) {
+      setHideEmptyMilestones(hideEmptyMilestonesProp);
+    }
+  }, [hideEmptyMilestonesProp]);
+
   const handleHideEmptyChange = (checked: boolean) => {
     setHideEmptyMilestones(checked);
     onHideEmptyChange?.(checked);
@@ -585,7 +594,7 @@ export default function ProjectTaskBoard({
           ) : (
             <SwipeablePages
               labels={milestoneLabels.length <= 5 ? milestoneLabels : undefined}
-              pageKey={`milestones-${filteredSwimlanes.length}`}
+              pageKey={`milestones-${filteredSwimlanes.map((l) => l.id ?? 'none').join(',')}`}
             >
               {filteredSwimlanes.map((lane) => (
                 <MilestonePage
