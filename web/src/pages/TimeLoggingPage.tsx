@@ -41,6 +41,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import {
   startOfISOWeek,
   endOfISOWeek,
@@ -53,6 +54,7 @@ import {
 } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 import { api, ApiError } from '../lib/api';
+import HolidaysModal from '../components/HolidaysModal';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -398,6 +400,21 @@ export default function TimeLoggingPage() {
       cancelled = true;
     };
   }, [teamMemberId]);
+
+  const refreshLeaveDates = useCallback(async () => {
+    if (!teamMemberId) return;
+    try {
+      const data = await api.get<{ date: string; day_type: string }[]>(
+        `/api/team-members/${teamMemberId}/holidays`,
+      );
+      setLeaveDates(new Set(data.map((h) => h.date.substring(0, 10))));
+    } catch {
+      // silently fail
+    }
+  }, [teamMemberId]);
+
+  // ---- Holidays modal ----
+  const [holidaysModalOpen, setHolidaysModalOpen] = useState(false);
 
   // =====================================================================
   // WEEKLY GRID STATE
@@ -864,12 +881,35 @@ export default function TimeLoggingPage() {
   // ---- Render ----
   return (
     <Box sx={{ p: { xs: 2, sm: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h3" sx={{ mb: 0.5, fontWeight: 600 }}>
-        Time Logging
-      </Typography>
+      <Box
+        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}
+      >
+        <Typography variant="h3" sx={{ fontWeight: 600 }}>
+          Time Logging
+        </Typography>
+        {teamMemberId && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<BeachAccessIcon />}
+            onClick={() => setHolidaysModalOpen(true)}
+          >
+            Holidays
+          </Button>
+        )}
+      </Box>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
         Track your time with the weekly grid or log individual entries.
       </Typography>
+
+      {teamMemberId && (
+        <HolidaysModal
+          open={holidaysModalOpen}
+          onClose={() => setHolidaysModalOpen(false)}
+          teamMemberId={teamMemberId}
+          onHolidaysChanged={refreshLeaveDates}
+        />
+      )}
 
       {/* ---- Tabs ---- */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>

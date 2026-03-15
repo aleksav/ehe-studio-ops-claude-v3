@@ -15,6 +15,7 @@ import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared
 import { TaskType } from '@ehestudio-ops/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { api, ApiError } from '../lib/api';
+import HolidaysModal from '../components/HolidaysModal';
 
 interface Project {
   id: string;
@@ -242,6 +243,21 @@ export default function TimeLoggingScreen() {
       cancelled = true;
     };
   }, [teamMemberId]);
+
+  const refreshLeaveDates = useCallback(async () => {
+    if (!teamMemberId) return;
+    try {
+      const data = await api.get<{ date: string; day_type: string }[]>(
+        `/api/team-members/${teamMemberId}/holidays`,
+      );
+      setLeaveDates(new Set(data.map((h) => h.date.substring(0, 10))));
+    } catch {
+      // silently fail
+    }
+  }, [teamMemberId]);
+
+  // ---- Holidays modal ----
+  const [holidaysModalVisible, setHolidaysModalVisible] = useState(false);
 
   // ---- Break-glass override state ----
   const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
@@ -559,25 +575,46 @@ export default function TimeLoggingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'grid' && styles.tabActive]}
-          onPress={() => setActiveTab('grid')}
-        >
-          <Text style={[styles.tabText, activeTab === 'grid' && styles.tabTextActive]}>
-            Weekly Grid
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'quick' && styles.tabActive]}
-          onPress={() => setActiveTab('quick')}
-        >
-          <Text style={[styles.tabText, activeTab === 'quick' && styles.tabTextActive]}>
-            Quick Entry
-          </Text>
-        </TouchableOpacity>
+      {/* Tab Switcher + Holidays button */}
+      <View style={styles.tabBarRow}>
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'grid' && styles.tabActive]}
+            onPress={() => setActiveTab('grid')}
+          >
+            <Text style={[styles.tabText, activeTab === 'grid' && styles.tabTextActive]}>
+              Weekly Grid
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'quick' && styles.tabActive]}
+            onPress={() => setActiveTab('quick')}
+          >
+            <Text style={[styles.tabText, activeTab === 'quick' && styles.tabTextActive]}>
+              Quick Entry
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {teamMemberId && (
+          <TouchableOpacity
+            style={styles.holidaysButton}
+            onPress={() => setHolidaysModalVisible(true)}
+            accessibilityLabel="View holidays"
+          >
+            <Ionicons name="sunny-outline" size={18} color={colors.primary} />
+            <Text style={styles.holidaysButtonText}>Holidays</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {teamMemberId && (
+        <HolidaysModal
+          visible={holidaysModalVisible}
+          onClose={() => setHolidaysModalVisible(false)}
+          teamMemberId={teamMemberId}
+          onHolidaysChanged={refreshLeaveDates}
+        />
+      )}
 
       {/* ============================================================= */}
       {/* WEEKLY GRID TAB                                                 */}
@@ -1142,11 +1179,29 @@ const styles = StyleSheet.create({
   },
 
   // Tab bar
-  tabBar: {
+  tabBarRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  holidaysButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    minWidth: 44,
+  },
+  holidaysButtonText: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
   },
   tab: {
     flex: 1,
