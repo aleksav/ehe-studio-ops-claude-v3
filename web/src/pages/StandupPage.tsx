@@ -28,6 +28,7 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import { api, ApiError } from '../lib/api';
 import LogTimeModal from '../components/LogTimeModal';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
@@ -90,6 +91,126 @@ function formatProjectName(project: Project): string {
   return project.client ? `${project.client.name} — ${project.name}` : project.name;
 }
 
+// ---------------------------------------------------------------------------
+// Holiday / leave helpers
+// ---------------------------------------------------------------------------
+
+interface PlannedHolidayRaw {
+  id: string;
+  team_member_id: string;
+  date: string;
+  day_type: 'FULL' | 'AM' | 'PM';
+  notes: string | null;
+}
+
+interface TeamMemberBasic {
+  id: string;
+  full_name: string;
+  is_active: boolean;
+}
+
+interface LeaveEntry {
+  name: string;
+  dates: string[];
+  dayTypes: Map<string, string>; // dateKey -> FULL/AM/PM
+}
+
+function getMonday(d: Date): Date {
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const m = new Date(d);
+  m.setDate(diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
+
+function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function buildLeaveGroups(
+  holidays: PlannedHolidayRaw[],
+  members: TeamMemberBasic[],
+): { today: LeaveEntry[]; thisWeek: LeaveEntry[]; nextWeek: LeaveEntry[] } {
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const thisMonday = getMonday(now);
+  const thisSunday = new Date(thisMonday);
+  thisSunday.setDate(thisSunday.getDate() + 6);
+
+  const nextMonday = new Date(thisMonday);
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  const nextSunday = new Date(nextMonday);
+  nextSunday.setDate(nextSunday.getDate() + 6);
+
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const thisMondayKey = fmt(thisMonday);
+  const thisSundayKey = fmt(thisSunday);
+  const nextMondayKey = fmt(nextMonday);
+  const nextSundayKey = fmt(nextSunday);
+
+  const memberMap = new Map(members.map((m) => [m.id, m.full_name]));
+
+  // Group holidays by member
+  const byMember = new Map<string, { dates: string[]; dayTypes: Map<string, string> }>();
+  for (const h of holidays) {
+    const dk = h.date.substring(0, 10);
+    if (!byMember.has(h.team_member_id)) {
+      byMember.set(h.team_member_id, { dates: [], dayTypes: new Map() });
+    }
+    const entry = byMember.get(h.team_member_id)!;
+    entry.dates.push(dk);
+    entry.dayTypes.set(dk, h.day_type);
+  }
+
+  const todayEntries: LeaveEntry[] = [];
+  const thisWeekEntries: LeaveEntry[] = [];
+  const nextWeekEntries: LeaveEntry[] = [];
+
+  for (const [memberId, data] of byMember) {
+    const name = memberMap.get(memberId) ?? memberId;
+    const isOffToday = data.dates.includes(todayKey);
+
+    // This week dates (excluding today to avoid duplication)
+    const thisWeekDates = data.dates.filter(
+      (d) => d >= thisMondayKey && d <= thisSundayKey && d !== todayKey,
+    );
+
+    // Next week dates
+    const nextWeekDates = data.dates.filter((d) => d >= nextMondayKey && d <= nextSundayKey);
+
+    if (isOffToday) {
+      // If also off rest of week, combine into one entry
+      const allThisWeekDates = data.dates.filter((d) => d >= thisMondayKey && d <= thisSundayKey);
+      todayEntries.push({
+        name,
+        dates: allThisWeekDates,
+        dayTypes: data.dayTypes,
+      });
+    } else if (thisWeekDates.length > 0) {
+      thisWeekEntries.push({
+        name,
+        dates: thisWeekDates,
+        dayTypes: data.dayTypes,
+      });
+    }
+
+    if (nextWeekDates.length > 0) {
+      nextWeekEntries.push({
+        name,
+        dates: nextWeekDates,
+        dayTypes: data.dayTypes,
+      });
+    }
+  }
+
+  return { today: todayEntries, thisWeek: thisWeekEntries, nextWeek: nextWeekEntries };
+}
+
 /** Return true if the task was completed within the last 7 days. */
 function isRecentlyCompleted(task: BoardTask): boolean {
   if (!task.completed_at) return true;
@@ -125,6 +246,13 @@ export default function StandupPage() {
   // Projects
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+
+  // Leave data
+  const [leaveGroups, setLeaveGroups] = useState<{
+    today: LeaveEntry[];
+    thisWeek: LeaveEntry[];
+    nextWeek: LeaveEntry[];
+  }>({ today: [], thisWeek: [], nextWeek: [] });
 
   // Carousel state
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -183,10 +311,20 @@ export default function StandupPage() {
     [allProjects],
   );
 
-  // Build carousel items: active projects + a "Planned" summary slide at the end
+  const hasLeave =
+    leaveGroups.today.length > 0 ||
+    leaveGroups.thisWeek.length > 0 ||
+    leaveGroups.nextWeek.length > 0;
+
+  // Build carousel items: holidays first, then active projects, then planned
   const carouselItems = useMemo(() => {
-    const items: Array<{ type: 'active'; project: Project } | { type: 'planned' }> =
-      activeProjects.map((p) => ({ type: 'active' as const, project: p }));
+    const items: Array<
+      { type: 'holidays' } | { type: 'active'; project: Project } | { type: 'planned' }
+    > = [];
+    items.push({ type: 'holidays' as const });
+    for (const p of activeProjects) {
+      items.push({ type: 'active' as const, project: p });
+    }
     if (plannedProjects.length > 0) {
       items.push({ type: 'planned' as const });
     }
@@ -212,6 +350,29 @@ export default function StandupPage() {
         // silently fail
       } finally {
         if (!cancelled) setProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---- Fetch leave data ----
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const year = new Date().getFullYear();
+        const [holidays, members] = await Promise.all([
+          api.get<PlannedHolidayRaw[]>(`/api/planned-holidays?year=${year}`),
+          api.get<TeamMemberBasic[]>('/api/team-members'),
+        ]);
+        if (!cancelled) {
+          const active = members.filter((m) => m.is_active);
+          setLeaveGroups(buildLeaveGroups(holidays, active));
+        }
+      } catch {
+        // silently fail
       }
     })();
     return () => {
@@ -599,9 +760,11 @@ export default function StandupPage() {
           />
         ))}
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-          {currentItem?.type === 'planned'
-            ? 'Coming Up'
-            : `${currentIndex + 1}/${activeProjects.length}`}
+          {currentItem?.type === 'holidays'
+            ? 'Availability'
+            : currentItem?.type === 'planned'
+              ? 'Coming Up'
+              : `${currentIndex}/${activeProjects.length}`}
         </Typography>
       </Box>
 
@@ -653,6 +816,119 @@ export default function StandupPage() {
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Fade in={visible} timeout={200}>
             <Box>
+              {/* ---- Holidays Slide ---- */}
+              {currentItem?.type === 'holidays' && (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <BeachAccessIcon sx={{ color: 'primary.main' }} />
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      Team Availability
+                    </Typography>
+                  </Box>
+                  {!hasLeave ? (
+                    <Card
+                      elevation={0}
+                      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                    >
+                      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                        <Typography variant="body1" color="text.secondary">
+                          Everyone is available — no leave booked for this period.
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {leaveGroups.today.length > 0 && (
+                        <Card
+                          elevation={0}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, mb: 1, color: 'error.main' }}
+                            >
+                              Off Today
+                            </Typography>
+                            {leaveGroups.today.map((entry) => {
+                              const extraDays = entry.dates.length > 1;
+                              return (
+                                <Box key={entry.name} sx={{ mb: 0.5 }}>
+                                  <Typography variant="body2">
+                                    <strong>{entry.name}</strong>
+                                    {entry.dayTypes.get(entry.dates[0]) !== 'FULL' &&
+                                      ` (${entry.dayTypes.get(entry.dates[0])} only)`}
+                                    {extraDays &&
+                                      ` — off until ${formatDateShort(entry.dates[entry.dates.length - 1])}`}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </CardContent>
+                        </Card>
+                      )}
+                      {leaveGroups.thisWeek.length > 0 && (
+                        <Card
+                          elevation={0}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, mb: 1, color: 'warning.main' }}
+                            >
+                              Later This Week
+                            </Typography>
+                            {leaveGroups.thisWeek.map((entry) => (
+                              <Box key={entry.name} sx={{ mb: 0.5 }}>
+                                <Typography variant="body2">
+                                  <strong>{entry.name}</strong>
+                                  {' — '}
+                                  {entry.dates
+                                    .map((d) => {
+                                      const dt = entry.dayTypes.get(d);
+                                      const label = formatDateShort(d);
+                                      return dt !== 'FULL' ? `${label} (${dt})` : label;
+                                    })
+                                    .join(', ')}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                      {leaveGroups.nextWeek.length > 0 && (
+                        <Card
+                          elevation={0}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                              Next Week
+                            </Typography>
+                            {leaveGroups.nextWeek.map((entry) => (
+                              <Box key={entry.name} sx={{ mb: 0.5 }}>
+                                <Typography variant="body2">
+                                  <strong>{entry.name}</strong>
+                                  {' — '}
+                                  {entry.dates
+                                    .map((d) => {
+                                      const dt = entry.dayTypes.get(d);
+                                      const label = formatDateShort(d);
+                                      return dt !== 'FULL' ? `${label} (${dt})` : label;
+                                    })
+                                    .join(', ')}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              )}
+
               {/* ---- Planned Projects Slide ---- */}
               {currentItem?.type === 'planned' && (
                 <Box>
@@ -889,7 +1165,11 @@ export default function StandupPage() {
                   color: 'text.secondary',
                 }}
               >
-                {nextItem.type === 'planned' ? 'Planned' : nextItem.project.name}
+                {nextItem.type === 'holidays'
+                  ? 'Availability'
+                  : nextItem.type === 'planned'
+                    ? 'Planned'
+                    : nextItem.project.name}
               </Typography>
             </Box>
           )}
