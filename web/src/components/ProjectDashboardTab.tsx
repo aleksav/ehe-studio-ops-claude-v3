@@ -116,7 +116,27 @@ export default function ProjectDashboardTab({ projectId }: ProjectDashboardTabPr
   return (
     <Box>
       {/* Date Range Filter */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <TextField
+          label="Month"
+          type="month"
+          size="small"
+          value={startDate ? startDate.slice(0, 7) : ''}
+          onChange={(e) => {
+            const val = e.target.value; // "YYYY-MM"
+            if (!val) {
+              setStartDate('');
+              setEndDate('');
+              return;
+            }
+            const [y, m] = val.split('-').map(Number);
+            const lastDay = new Date(y, m, 0).getDate();
+            setStartDate(`${val}-01`);
+            setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
+          }}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 160 }}
+        />
         <TextField
           label="Start Date"
           type="date"

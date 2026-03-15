@@ -101,6 +101,29 @@ export default function ProjectDashboardTab({ projectId }: Props) {
 
   return (
     <View>
+      {/* Month Shortcut */}
+      <View style={styles.dateRow}>
+        <View style={styles.dateField}>
+          <Text style={styles.dateLabel}>Month</Text>
+          <TextInput
+            style={styles.dateInput}
+            placeholder="YYYY-MM"
+            value={startDate ? startDate.slice(0, 7) : ''}
+            onChangeText={(val) => {
+              if (!val || !/^\d{4}-\d{2}$/.test(val)) {
+                setStartDate('');
+                setEndDate('');
+                return;
+              }
+              const [y, m] = val.split('-').map(Number);
+              const lastDay = new Date(y, m, 0).getDate();
+              setStartDate(`${val}-01`);
+              setEndDate(`${val}-${String(lastDay).padStart(2, '0')}`);
+            }}
+          />
+        </View>
+      </View>
+
       {/* Date Range Filters */}
       <View style={styles.dateRow}>
         <View style={styles.dateField}>
