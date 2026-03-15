@@ -69,19 +69,12 @@ function formatDateKey(year: number, month: number, day: number): string {
   return `${year}-${m}-${d}`;
 }
 
-/** Build a continuous array of DayEntry for 12 months: 6 before and 5 after the given month. */
-function buildYearDays(centerYear: number, centerMonth: number): DayEntry[] {
+/** Build a continuous array of DayEntry for a given number of months. */
+function buildMonthRange(startYear: number, startMonth: number, monthCount: number): DayEntry[] {
   const entries: DayEntry[] = [];
-  let startMonth = centerMonth - 6;
-  let startYear = centerYear;
-  while (startMonth < 0) {
-    startMonth += 12;
-    startYear -= 1;
-  }
-
   let y = startYear;
   let m = startMonth;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < monthCount; i++) {
     const days = getDaysInMonth(y, m);
     for (let d = 1; d <= days; d++) {
       entries.push({ year: y, month: m, day: d, dateKey: formatDateKey(y, m, d) });
@@ -93,6 +86,21 @@ function buildYearDays(centerYear: number, centerMonth: number): DayEntry[] {
     }
   }
   return entries;
+}
+
+/** Normalise a (year, month) pair where month may be negative or > 11. */
+function normaliseYearMonth(year: number, month: number): [number, number] {
+  let y = year;
+  let m = month;
+  while (m < 0) {
+    m += 12;
+    y -= 1;
+  }
+  while (m > 11) {
+    m -= 12;
+    y += 1;
+  }
+  return [y, m];
 }
 
 function findMonthStartIndex(entries: DayEntry[], year: number, month: number): number {
@@ -148,9 +156,21 @@ export default function TeamCalendarScreen() {
   const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const dayEntries = useMemo(
-    () => buildYearDays(centerYear, centerMonth),
+  // Dynamic month range state for infinite scroll
+  const [rangeStartYear, rangeStartMonth] = useMemo(
+    () => normaliseYearMonth(centerYear, centerMonth - 6),
     [centerYear, centerMonth],
+  );
+  const [startYear, setStartYear] = useState(rangeStartYear);
+  const [startMonth, setStartMonth] = useState(rangeStartMonth);
+  const [monthCount, setMonthCount] = useState(12);
+
+  const fetchedYearsRef = useRef<Set<number>>(new Set());
+  const isExpandingRef = useRef(false);
+
+  const dayEntries = useMemo(
+    () => buildMonthRange(startYear, startMonth, monthCount),
+    [startYear, startMonth, monthCount],
   );
 
   const yearsToFetch = useMemo(() => {
@@ -159,25 +179,45 @@ export default function TeamCalendarScreen() {
     return Array.from(s);
   }, [dayEntries]);
 
+  const fetchYearsData = useCallback(async (years: number[]) => {
+    const newYears = years.filter((y) => !fetchedYearsRef.current.has(y));
+    if (newYears.length === 0) return;
+    try {
+      const hPromises = newYears.map((y) =>
+        api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
+      );
+      const ePromises = newYears.map((y) => api.get<OfficeEvent[]>(`/api/office-events?year=${y}`));
+      const results = await Promise.all([...hPromises, ...ePromises]);
+      const hArrays = results.slice(0, newYears.length) as PublicHoliday[][];
+      const eArrays = results.slice(newYears.length) as OfficeEvent[][];
+      newYears.forEach((y) => fetchedYearsRef.current.add(y));
+      setHolidays((prev) => [...prev, ...hArrays.flat()]);
+      setOfficeEvents((prev) => [...prev, ...eArrays.flat()]);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const holidayPromises = yearsToFetch.map((y) =>
+      const hPromises = yearsToFetch.map((y) =>
         api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
       );
-      const officeEventPromises = yearsToFetch.map((y) =>
+      const ePromises = yearsToFetch.map((y) =>
         api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
       );
       const [membersData, ...rest] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
-        ...holidayPromises,
-        ...officeEventPromises,
+        ...hPromises,
+        ...ePromises,
       ]);
-      const holidayArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
-      const officeEventArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
+      const hArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
+      const eArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
       setMembers(membersData);
-      setHolidays(holidayArrays.flat());
-      setOfficeEvents(officeEventArrays.flat());
+      setHolidays(hArrays.flat());
+      setOfficeEvents(eArrays.flat());
+      yearsToFetch.forEach((y) => fetchedYearsRef.current.add(y));
     } catch {
       // silently fail
     } finally {
@@ -259,6 +299,8 @@ export default function TeamCalendarScreen() {
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const scrollX = e.nativeEvent.contentOffset.x;
+      const contentWidth = e.nativeEvent.contentSize.width;
+      const layoutWidth = e.nativeEvent.layoutMeasurement.width;
       const dayIndex = Math.max(
         0,
         Math.min(Math.floor(scrollX / DAY_COL_WIDTH), dayEntries.length - 1),
@@ -268,8 +310,41 @@ export default function TeamCalendarScreen() {
         setVisibleMonth(entry.month);
         setVisibleYear(entry.year);
       }
+
+      // Infinite scroll: prepend months when near the start
+      if (scrollX < 200 && !isExpandingRef.current) {
+        isExpandingRef.current = true;
+        const [newStartY, newStartM] = normaliseYearMonth(startYear, startMonth - 6);
+        const prepended = buildMonthRange(newStartY, newStartM, 6);
+        const addedWidth = prepended.length * DAY_COL_WIDTH;
+        setStartYear(newStartY);
+        setStartMonth(newStartM);
+        setMonthCount((prev) => prev + 6);
+        const newYears = new Set<number>();
+        prepended.forEach((de) => newYears.add(de.year));
+        fetchYearsData(Array.from(newYears));
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({ x: scrollX + addedWidth, animated: false });
+          isExpandingRef.current = false;
+        }, 50);
+      }
+
+      // Infinite scroll: append months when near the end
+      const maxScroll = contentWidth - layoutWidth;
+      if (maxScroll - scrollX < 200 && !isExpandingRef.current) {
+        isExpandingRef.current = true;
+        const [endY, endM] = normaliseYearMonth(startYear, startMonth + monthCount);
+        const appended = buildMonthRange(endY, endM, 6);
+        setMonthCount((prev) => prev + 6);
+        const newYears = new Set<number>();
+        appended.forEach((de) => newYears.add(de.year));
+        fetchYearsData(Array.from(newYears));
+        setTimeout(() => {
+          isExpandingRef.current = false;
+        }, 50);
+      }
     },
-    [dayEntries],
+    [dayEntries, startYear, startMonth, monthCount, fetchYearsData],
   );
 
   const scrollToMonth = (targetYear: number, targetMonth: number) => {
