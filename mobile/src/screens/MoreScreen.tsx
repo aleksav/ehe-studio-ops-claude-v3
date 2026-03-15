@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MoreStackParamList } from '../navigation/types';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://ehestudio-ops-api.onrender.com';
+const FRONTEND_VERSION = '0.0.1';
 
 type Props = NativeStackScreenProps<MoreStackParamList, 'MoreMenu'>;
 
@@ -19,6 +22,17 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 export default function MoreScreen({ navigation }: Props) {
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/version`)
+      .then((res) => res.json())
+      .then((data: { version: string }) => setBackendVersion(data.version))
+      .catch(() => setBackendVersion(null));
+  }, []);
+
+  const versionMismatch = backendVersion != null && backendVersion !== FRONTEND_VERSION;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {MENU_ITEMS.map((item) => (
@@ -33,6 +47,21 @@ export default function MoreScreen({ navigation }: Props) {
           <Ionicons name="chevron-forward" size={20} color="#ccc" />
         </TouchableOpacity>
       ))}
+
+      <View style={styles.versionContainer}>
+        {versionMismatch && (
+          <Ionicons
+            name="warning-outline"
+            size={14}
+            color="#F59E0B"
+            style={styles.versionWarningIcon}
+          />
+        )}
+        <Text style={[styles.versionText, versionMismatch && styles.versionMismatch]}>
+          FE v{FRONTEND_VERSION}
+          {backendVersion != null ? ` / BE v${backendVersion}` : ''}
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -64,5 +93,22 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body1,
     fontWeight: typography.weights.medium,
     color: colors.text,
+  },
+  versionContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  versionWarningIcon: {
+    marginRight: 4,
+  },
+  versionText: {
+    fontSize: 11,
+    color: '#999',
+  },
+  versionMismatch: {
+    color: '#F59E0B',
   },
 });

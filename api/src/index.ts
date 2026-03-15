@@ -16,6 +16,7 @@ import meRoutes from './routes/me.routes';
 import publicHolidayRoutes from './routes/public-holiday.routes';
 import officeEventRoutes from './routes/office-event.routes';
 import plannedHolidayRoutes from './routes/planned-holiday.routes';
+import versionRoutes from './routes/version.routes';
 import { authMiddleware } from './middleware/auth';
 import * as plannedHolidayController from './controllers/planned-holiday.controller';
 
@@ -50,6 +51,9 @@ const authLimiter = rateLimit({
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Version endpoint (no auth required)
+app.use('/api/version', versionRoutes);
 
 // Routes
 app.use(

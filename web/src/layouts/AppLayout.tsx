@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -14,6 +14,7 @@ import {
   Menu,
   MenuItem,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -26,6 +27,7 @@ import ForumIcon from '@mui/icons-material/Forum';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LogoutIcon from '@mui/icons-material/Logout';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useAuth } from '../contexts/AuthContext';
 
 const DRAWER_WIDTH = 260;
@@ -45,6 +47,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Admin', path: '/admin', icon: <AdminPanelSettingsIcon /> },
 ];
 
+const FRONTEND_VERSION = __PACKAGE_VERSION__;
+
 export default function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -54,6 +58,17 @@ export default function AppLayout() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_URL ?? '';
+    fetch(`${apiBase}/api/version`)
+      .then((res) => res.json())
+      .then((data: { version: string }) => setBackendVersion(data.version))
+      .catch(() => setBackendVersion(null));
+  }, []);
+
+  const versionMismatch = backendVersion != null && backendVersion !== FRONTEND_VERSION;
 
   const displayName = user?.team_member?.full_name ?? user?.email ?? '';
   const initials = displayName
@@ -122,9 +137,23 @@ export default function AppLayout() {
         <Typography variant="caption" color="text.disabled" display="block">
           Build {__APP_VERSION__}
         </Typography>
-        <Typography variant="caption" color="text.disabled">
+        <Typography variant="caption" color="text.disabled" display="block">
           {new Date(__APP_BUILD_DATE__).toLocaleDateString()}
         </Typography>
+        <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {versionMismatch && (
+            <Tooltip title="Frontend and backend versions do not match">
+              <WarningAmberIcon sx={{ fontSize: 14, color: 'warning.main' }} />
+            </Tooltip>
+          )}
+          <Typography
+            variant="caption"
+            sx={{ color: versionMismatch ? 'warning.main' : 'text.disabled' }}
+          >
+            FE v{FRONTEND_VERSION}
+            {backendVersion != null ? ` / BE v${backendVersion}` : ''}
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
