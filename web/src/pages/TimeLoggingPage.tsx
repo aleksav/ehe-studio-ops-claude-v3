@@ -685,12 +685,6 @@ export default function TimeLoggingPage() {
     (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
       const blockReason = isBlockedDate(dateStr, holidayDates, officeEventBlockedDates);
       if (blockReason && !unblockedDates.has(dateStr)) {
-        // Office events with allow_time_entry=false cannot be overridden
-        if (blockReason === 'office_event') {
-          e.preventDefault();
-          (e.target as HTMLElement).blur?.();
-          return true;
-        }
         e.preventDefault();
         (e.target as HTMLElement).blur?.();
         setBlockDialog({ open: true, dateStr, projectId, reason: blockReason });
@@ -1293,7 +1287,13 @@ export default function TimeLoggingPage() {
             <DialogContent>
               <DialogContentText sx={{ mb: 2 }}>
                 This day is a{' '}
-                <strong>{blockDialog.reason === 'weekend' ? 'weekend' : 'public holiday'}</strong>.
+                <strong>
+                  {blockDialog.reason === 'weekend'
+                    ? 'weekend'
+                    : blockDialog.reason === 'office_event'
+                      ? 'blocked office event'
+                      : 'public holiday'}
+                </strong>.
                 Time entry is normally blocked. Please provide a brief reason to override.
               </DialogContentText>
               <TextField

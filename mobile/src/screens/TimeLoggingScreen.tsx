@@ -88,11 +88,16 @@ function cellKey(projectId: string, dateStr: string): string {
   return `${projectId}::${dateStr}`;
 }
 
-function isBlockedDate(dateStr: string, holidayDates: Set<string>): 'weekend' | 'holiday' | null {
+function isBlockedDate(
+  dateStr: string,
+  holidayDates: Set<string>,
+  officeEventBlockedDates?: Map<string, string>,
+): 'weekend' | 'holiday' | 'office_event' | null {
   const d = new Date(dateStr + 'T00:00:00');
   const day = d.getDay();
   if (day === 0 || day === 6) return 'weekend';
   if (holidayDates.has(dateStr)) return 'holiday';
+  if (officeEventBlockedDates?.has(dateStr)) return 'office_event';
   return null;
 }
 
@@ -173,13 +178,51 @@ export default function TimeLoggingScreen() {
     };
   }, []);
 
+  // ---- Office events (blocked dates) ----
+  const [officeEventBlockedDates, setOfficeEventBlockedDates] = useState<Map<string, string>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{
+          start_date: string;
+          end_date: string;
+          name: string;
+          allow_time_entry: boolean;
+        }[]>('/api/office-events');
+        if (!cancelled) {
+          const blocked = new Map<string, string>();
+          for (const ev of data) {
+            if (ev.allow_time_entry) continue;
+            const start = new Date(ev.start_date.substring(0, 10) + 'T00:00:00');
+            const end = new Date(ev.end_date.substring(0, 10) + 'T00:00:00');
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              blocked.set(`${d.getFullYear()}-${m}-${dd}`, ev.name);
+            }
+          }
+          setOfficeEventBlockedDates(blocked);
+        }
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ---- Break-glass override state ----
   const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
   const [blockDialog, setBlockDialog] = useState<{
     visible: boolean;
     dateStr: string;
     projectId: string;
-    reason: 'weekend' | 'holiday';
+    reason: 'weekend' | 'holiday' | 'office_event';
   }>({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
   const [blockOverrideReason, setBlockOverrideReason] = useState('');
 
@@ -616,7 +659,7 @@ export default function TimeLoggingScreen() {
                   </View>
                   {weekDates.map((d, i) => {
                     const ds = formatDate(d);
-                    const blockReason = isBlockedDate(ds, holidayDates);
+                    const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates);
                     const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                     const isOverridden = blockReason !== null && unblockedDates.has(ds);
                     return (
@@ -677,7 +720,7 @@ export default function TimeLoggingScreen() {
                         const ds = formatDate(d);
                         const ck = cellKey(pid, ds);
                         const cell = cells[ck];
-                        const cellBlockReason = isBlockedDate(ds, holidayDates);
+                        const cellBlockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates);
                         const cellBlocked = cellBlockReason !== null && !unblockedDates.has(ds);
                         const cellOverridden = cellBlockReason !== null && unblockedDates.has(ds);
 
@@ -691,7 +734,7 @@ export default function TimeLoggingScreen() {
                                   visible: true,
                                   dateStr: ds,
                                   projectId: pid,
-                                  reason: cellBlockReason as 'weekend' | 'holiday',
+                                  reason: cellBlockReason as 'weekend' | 'holiday' | 'office_event',
                                 })
                               }
                             >
@@ -800,7 +843,11 @@ export default function TimeLoggingScreen() {
             <Text style={styles.overrideBody}>
               This day is a{' '}
               <Text style={styles.overrideBold}>
-                {blockDialog.reason === 'weekend' ? 'weekend' : 'public holiday'}
+                {blockDialog.reason === 'weekend'
+                  ? 'weekend'
+                  : blockDialog.reason === 'office_event'
+                    ? 'blocked office event'
+                    : 'public holiday'}
               </Text>
               . Time entry is normally blocked. Please provide a brief reason to override.
             </Text>
