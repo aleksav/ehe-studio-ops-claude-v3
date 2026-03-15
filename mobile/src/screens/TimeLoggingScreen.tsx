@@ -288,7 +288,32 @@ export default function TimeLoggingScreen() {
     }
 
     const hoursNum = parseFloat(snapped);
-    if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
+    const isZeroOrEmpty = !snapped || isNaN(hoursNum) || hoursNum <= 0;
+
+    // If zero/empty and there's an existing entry, delete it
+    if (isZeroOrEmpty && cell.entryId) {
+      setCells((prev) => ({
+        ...prev,
+        [ck]: { ...prev[ck], saving: true },
+      }));
+      try {
+        await api.delete(`/api/time-entries/${cell.entryId}`);
+        setCells((prev) => ({
+          ...prev,
+          [ck]: { ...prev[ck], hours: '', entryId: null, saving: false },
+        }));
+      } catch {
+        setCells((prev) => ({
+          ...prev,
+          [ck]: { ...prev[ck], saving: false },
+        }));
+        Alert.alert('Error', 'Failed to delete entry.');
+      }
+      return;
+    }
+
+    // Nothing to save if zero/empty and no existing entry
+    if (isZeroOrEmpty) return;
 
     setCells((prev) => ({
       ...prev,

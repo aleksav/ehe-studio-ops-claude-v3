@@ -576,7 +576,32 @@ export default function TimeLoggingPage() {
       }
 
       const hoursNum = parseFloat(snapped);
-      if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
+      const isZeroOrEmpty = !snapped || isNaN(hoursNum) || hoursNum <= 0;
+
+      // If zero/empty and there's an existing entry, delete it
+      if (isZeroOrEmpty && cell.entryId) {
+        setCells((prev) => ({
+          ...prev,
+          [ck]: { ...prev[ck], saving: true },
+        }));
+        try {
+          await api.delete(`/api/time-entries/${cell.entryId}`);
+          setCells((prev) => ({
+            ...prev,
+            [ck]: { ...prev[ck], hours: '', entryId: null, saving: false },
+          }));
+        } catch {
+          setCells((prev) => ({
+            ...prev,
+            [ck]: { ...prev[ck], saving: false },
+          }));
+          setGridErrorMsg('Failed to delete entry. Please try again.');
+        }
+        return;
+      }
+
+      // Nothing to save if zero/empty and no existing entry
+      if (isZeroOrEmpty) return;
 
       const blockReason = isBlockedDate(dateStr, holidayDates, officeEventBlockedDates);
       if (blockReason && !unblockedDates.has(dateStr)) return;
@@ -1117,6 +1142,7 @@ export default function TimeLoggingPage() {
                                         <Box
                                           component="button"
                                           type="button"
+                                          tabIndex={-1}
                                           onClick={() => {
                                             handleTaskTypeChange(ck, pid, t);
                                             setTimeout(() => void handleCellBlur(pid, ds), 0);
@@ -1162,6 +1188,7 @@ export default function TimeLoggingPage() {
                           <Tooltip title="Remove project">
                             <IconButton
                               size="small"
+                              tabIndex={-1}
                               onClick={() => handleRemoveProject(pid)}
                               color="error"
                             >
