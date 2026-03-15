@@ -247,7 +247,7 @@ export default function TeamCalendarScreen() {
 
   const holidaySet = useMemo(() => {
     const set = new Set<string>();
-    holidays.forEach((h) => set.add(h.date));
+    holidays.forEach((h) => set.add(h.date.substring(0, 10)));
     return set;
   }, [holidays]);
 

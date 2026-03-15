@@ -138,13 +138,13 @@ export default function TeamCalendarPage() {
 
   const holidaySet = useMemo(() => {
     const set = new Set<string>();
-    holidays.forEach((h) => set.add(h.date));
+    holidays.forEach((h) => set.add(h.date.substring(0, 10)));
     return set;
   }, [holidays]);
 
   const holidayNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    holidays.forEach((h) => map.set(h.date, h.name));
+    holidays.forEach((h) => map.set(h.date.substring(0, 10), h.name));
     return map;
   }, [holidays]);
 
