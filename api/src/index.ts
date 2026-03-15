@@ -15,6 +15,9 @@ import auditLogRoutes from './routes/audit-log.routes';
 import meRoutes from './routes/me.routes';
 import publicHolidayRoutes from './routes/public-holiday.routes';
 import officeEventRoutes from './routes/office-event.routes';
+import plannedHolidayRoutes from './routes/planned-holiday.routes';
+import { authMiddleware } from './middleware/auth';
+import * as plannedHolidayController from './controllers/planned-holiday.controller';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -66,6 +69,13 @@ app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/public-holidays', publicHolidayRoutes);
 app.use('/api/office-events', officeEventRoutes);
+app.use('/api/team-members/:id/holidays', plannedHolidayRoutes);
+app.get(
+  '/api/team-members/:id/holiday-allowance',
+  authMiddleware,
+  plannedHolidayController.allowance,
+);
+app.get('/api/planned-holidays', authMiddleware, plannedHolidayController.listAll);
 
 app.listen(PORT, () => {
   console.log(`EHEStudio Ops API running on port ${PORT}`);

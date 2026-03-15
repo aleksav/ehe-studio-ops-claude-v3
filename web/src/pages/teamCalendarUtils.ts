@@ -37,6 +37,13 @@ export interface OfficeEventInfo {
   name: string;
 }
 
+export interface PlannedHolidayEntry {
+  day_type: 'FULL' | 'AM' | 'PM';
+  notes: string | null;
+}
+
+export const COLOR_PLANNED_HOLIDAY = '#42A5F5';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -153,6 +160,7 @@ export function formatCellTooltip(
   entry: DayEntry,
   holidayNameMap: Map<string, string>,
   officeEventDateMap: Map<string, OfficeEventInfo>,
+  plannedHoliday?: PlannedHolidayEntry,
 ): string {
   const dow = getDayOfWeek(entry.year, entry.month, entry.day);
   const datePart = `${DAY_NAMES_FULL[dow]}, ${entry.day} ${MONTH_NAMES[entry.month]} ${entry.year}`;
@@ -171,6 +179,16 @@ export function formatCellTooltip(
     if (ev.event_type !== 'OFFICE_CLOSED') {
       lines.push(ev.allow_time_entry ? 'Time entry: allowed' : 'Time entry: blocked');
     }
+  }
+  if (plannedHoliday) {
+    const dayTypeLabel =
+      plannedHoliday.day_type === 'FULL'
+        ? 'Full day'
+        : plannedHoliday.day_type === 'AM'
+          ? 'Half day (AM)'
+          : 'Half day (PM)';
+    lines.push(`Planned Holiday: ${dayTypeLabel}`);
+    if (plannedHoliday.notes) lines.push(plannedHoliday.notes);
   }
   return lines.join('\n');
 }

@@ -9,6 +9,7 @@ import {
   type PublicHoliday,
   type OfficeEvent,
   type OfficeEventInfo,
+  type PlannedHolidayEntry,
   MONTH_NAMES,
   COLOR_WORKDAY,
   COLOR_WEEKEND,
@@ -16,11 +17,20 @@ import {
   COLOR_OFFICE_CLOSED,
   COLOR_SOCIAL_ALLOWED,
   COLOR_IMPORTANT_ALLOWED,
+  COLOR_PLANNED_HOLIDAY,
   DAY_COL_WIDTH,
   buildMonthRange,
   normaliseYearMonth,
   findMonthStartIndex,
 } from './teamCalendarUtils';
+
+interface PlannedHolidayApi {
+  id: string;
+  team_member_id: string;
+  date: string;
+  day_type: 'FULL' | 'AM' | 'PM';
+  notes: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -40,6 +50,7 @@ export default function TeamCalendarPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
+  const [plannedHolidays, setPlannedHolidays] = useState<PlannedHolidayApi[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Dynamic month range state for infinite scroll
@@ -76,12 +87,17 @@ export default function TeamCalendarPage() {
         api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
       );
       const ePromises = newYears.map((y) => api.get<OfficeEvent[]>(`/api/office-events?year=${y}`));
-      const results = await Promise.all([...hPromises, ...ePromises]);
+      const phPromises = newYears.map((y) =>
+        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
+      );
+      const results = await Promise.all([...hPromises, ...ePromises, ...phPromises]);
       const hArrays = results.slice(0, newYears.length) as PublicHoliday[][];
-      const eArrays = results.slice(newYears.length) as OfficeEvent[][];
+      const eArrays = results.slice(newYears.length, newYears.length * 2) as OfficeEvent[][];
+      const phArrays = results.slice(newYears.length * 2) as PlannedHolidayApi[][];
       newYears.forEach((y) => fetchedYearsRef.current.add(y));
       setHolidays((prev) => [...prev, ...hArrays.flat()]);
       setOfficeEvents((prev) => [...prev, ...eArrays.flat()]);
+      setPlannedHolidays((prev) => [...prev, ...phArrays.flat()]);
     } catch {
       // silently fail
     }
@@ -96,16 +112,22 @@ export default function TeamCalendarPage() {
       const ePromises = yearsToFetch.map((y) =>
         api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
       );
+      const phPromises = yearsToFetch.map((y) =>
+        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
+      );
       const [membersData, ...rest] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
         ...hPromises,
         ...ePromises,
+        ...phPromises,
       ]);
       const hArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
-      const eArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
+      const eArrays = rest.slice(yearsToFetch.length, yearsToFetch.length * 2) as OfficeEvent[][];
+      const phArrays = rest.slice(yearsToFetch.length * 2) as PlannedHolidayApi[][];
       setMembers(membersData);
       setHolidays(hArrays.flat());
       setOfficeEvents(eArrays.flat());
+      setPlannedHolidays(phArrays.flat());
       yearsToFetch.forEach((y) => fetchedYearsRef.current.add(y));
     } catch {
       // silently fail
@@ -167,6 +189,18 @@ export default function TeamCalendarPage() {
     });
     return map;
   }, [officeEvents]);
+
+  const plannedHolidayMap = useMemo(() => {
+    const map = new Map<string, PlannedHolidayEntry>();
+    plannedHolidays.forEach((ph) => {
+      const dateKey = ph.date.substring(0, 10);
+      map.set(`${ph.team_member_id}:${dateKey}`, {
+        day_type: ph.day_type,
+        notes: ph.notes,
+      });
+    });
+    return map;
+  }, [plannedHolidays]);
 
   // --- Wheel -> horizontal scroll ---
   useEffect(() => {
@@ -337,6 +371,7 @@ export default function TeamCalendarPage() {
           { color: COLOR_OFFICE_CLOSED, label: 'Office Closed' },
           { color: COLOR_SOCIAL_ALLOWED, label: 'Team Social' },
           { color: COLOR_IMPORTANT_ALLOWED, label: 'Important Event' },
+          { color: COLOR_PLANNED_HOLIDAY, label: 'Planned Holiday' },
         ].map(({ color, label }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box
@@ -379,6 +414,7 @@ export default function TeamCalendarPage() {
           holidayNameMap={holidayNameMap}
           officeEventDateMap={officeEventDateMap}
           monthSpans={monthSpans}
+          plannedHolidayMap={plannedHolidayMap}
         />
       </Box>
     </Box>

@@ -13,12 +13,14 @@ import {
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api, ApiError } from '../lib/api';
+import HolidayManagementModal from '../components/HolidayManagement';
 
 interface TeamMember {
   id: string;
   full_name: string;
   email: string;
   preferred_task_type: string | null;
+  member_type: string;
   is_active: boolean;
 }
 
@@ -51,6 +53,10 @@ export default function TeamScreen() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Holiday modal state
+  const [holidayModalVisible, setHolidayModalVisible] = useState(false);
+  const [holidayMember, setHolidayMember] = useState<TeamMember | null>(null);
 
   // Password modal state
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -144,6 +150,11 @@ export default function TeamScreen() {
             {item.is_active ? 'Active' : 'Inactive'}
           </Text>
         </View>
+        <View style={styles.chipOutline}>
+          <Text style={styles.chipOutlineText}>
+            {item.member_type === 'CONTRACTOR' ? 'Contractor' : 'Employee'}
+          </Text>
+        </View>
         {item.preferred_task_type && (
           <View style={styles.chipOutline}>
             <Text style={styles.chipOutlineText}>
@@ -152,9 +163,25 @@ export default function TeamScreen() {
           </View>
         )}
       </View>
-      <TouchableOpacity style={styles.passwordButton} onPress={() => handleOpenPasswordModal(item)}>
-        <Text style={styles.passwordButtonText}>Change Password</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonsRow}>
+        {item.member_type === 'EMPLOYEE' && (
+          <TouchableOpacity
+            style={styles.passwordButton}
+            onPress={() => {
+              setHolidayMember(item);
+              setHolidayModalVisible(true);
+            }}
+          >
+            <Text style={styles.passwordButtonText}>Holidays</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.passwordButton}
+          onPress={() => handleOpenPasswordModal(item)}
+        >
+          <Text style={styles.passwordButtonText}>Change Password</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -237,6 +264,19 @@ export default function TeamScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Holiday Management Modal */}
+      {holidayMember && (
+        <HolidayManagementModal
+          teamMemberId={holidayMember.id}
+          memberName={holidayMember.full_name}
+          visible={holidayModalVisible}
+          onClose={() => {
+            setHolidayModalVisible(false);
+            setHolidayMember(null);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -325,8 +365,13 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body2,
     color: '#999',
   },
-  passwordButton: {
+  buttonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     marginTop: spacing.sm,
+  },
+  passwordButton: {
     paddingVertical: 6,
     paddingHorizontal: spacing.sm,
     alignSelf: 'flex-start',

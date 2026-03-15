@@ -26,7 +26,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import PersonIcon from '@mui/icons-material/Person';
+import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import { api, ApiError } from '../lib/api';
+import HolidayManagement from '../components/HolidayManagement';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +39,7 @@ interface TeamMember {
   full_name: string;
   email: string;
   preferred_task_type: string | null;
+  member_type: string;
   is_active: boolean;
 }
 
@@ -44,12 +47,14 @@ interface MemberFormData {
   full_name: string;
   email: string;
   preferred_task_type: string;
+  member_type: string;
 }
 
 const EMPTY_FORM: MemberFormData = {
   full_name: '',
   email: '',
   preferred_task_type: '',
+  member_type: 'EMPLOYEE',
 };
 
 // ---------------------------------------------------------------------------
@@ -106,6 +111,10 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
+  // Holiday dialog state
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
+  const [holidayMember, setHolidayMember] = useState<TeamMember | null>(null);
+
   // Snackbar state
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -148,6 +157,7 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
       full_name: member.full_name,
       email: member.email,
       preferred_task_type: member.preferred_task_type ?? '',
+      member_type: member.member_type ?? 'EMPLOYEE',
     });
     setDialogOpen(true);
   };
@@ -170,6 +180,7 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
       full_name: form.full_name.trim(),
       email: form.email.trim(),
       preferred_task_type: form.preferred_task_type || null,
+      member_type: form.member_type,
     };
 
     try {
@@ -366,6 +377,13 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
                     color={member.is_active ? 'success' : 'default'}
                     sx={{ fontSize: 11, height: 22 }}
                   />
+                  <Chip
+                    label={member.member_type === 'CONTRACTOR' ? 'Contractor' : 'Employee'}
+                    size="small"
+                    variant="outlined"
+                    color={member.member_type === 'CONTRACTOR' ? 'warning' : 'info'}
+                    sx={{ fontSize: 11, height: 22 }}
+                  />
                   {formatTaskType(member.preferred_task_type) && (
                     <Chip
                       label={formatTaskType(member.preferred_task_type)}
@@ -392,6 +410,18 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
                   >
                     Password
                   </Button>
+                  {member.member_type === 'EMPLOYEE' && (
+                    <Button
+                      size="small"
+                      startIcon={<BeachAccessIcon />}
+                      onClick={() => {
+                        setHolidayMember(member);
+                        setHolidayDialogOpen(true);
+                      }}
+                    >
+                      Holidays
+                    </Button>
+                  )}
                   <Button
                     size="small"
                     color={member.is_active ? 'warning' : 'success'}
@@ -437,6 +467,20 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
                 required
                 fullWidth
               />
+              <FormControl fullWidth>
+                <InputLabel id="member-type-label">Member Type</InputLabel>
+                <Select
+                  labelId="member-type-label"
+                  value={form.member_type}
+                  label="Member Type"
+                  onChange={(e: SelectChangeEvent) =>
+                    setForm((f) => ({ ...f, member_type: e.target.value }))
+                  }
+                >
+                  <MenuItem value="EMPLOYEE">Employee</MenuItem>
+                  <MenuItem value="CONTRACTOR">Contractor</MenuItem>
+                </Select>
+              </FormControl>
               <FormControl fullWidth>
                 <InputLabel id="member-task-type-label">Preferred Task Type</InputLabel>
                 <Select
@@ -529,6 +573,36 @@ export default function TeamPage({ embedded = false }: { embedded?: boolean }) {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* Holiday Management Dialog */}
+      <Dialog
+        open={holidayDialogOpen}
+        onClose={() => {
+          setHolidayDialogOpen(false);
+          setHolidayMember(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+          Holidays{holidayMember ? ` — ${holidayMember.full_name}` : ''}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          {holidayMember && <HolidayManagement teamMemberId={holidayMember.id} />}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => {
+              setHolidayDialogOpen(false);
+              setHolidayMember(null);
+            }}
+            color="inherit"
+          >
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Snackbar */}

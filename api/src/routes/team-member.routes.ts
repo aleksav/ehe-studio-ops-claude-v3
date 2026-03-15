@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { AuditAction, TaskType } from '../generated/prisma/client';
+import { AuditAction, MemberType, TaskType } from '../generated/prisma/client';
 import prisma from '../utils/prisma';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import {
@@ -18,6 +18,7 @@ const createTeamMemberSchema = z.object({
   email: z.string().email(),
   role_title: z.string().optional(),
   preferred_task_type: z.nativeEnum(TaskType).optional(),
+  member_type: z.nativeEnum(MemberType).optional(),
 });
 
 const updateTeamMemberSchema = z.object({
@@ -25,6 +26,7 @@ const updateTeamMemberSchema = z.object({
   email: z.string().email().optional(),
   role_title: z.string().nullable().optional(),
   preferred_task_type: z.nativeEnum(TaskType).nullable().optional(),
+  member_type: z.nativeEnum(MemberType).optional(),
   is_active: z.boolean().optional(),
 });
 

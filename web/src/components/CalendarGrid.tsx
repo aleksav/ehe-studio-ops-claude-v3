@@ -3,14 +3,17 @@ import {
   type TeamMember,
   type DayEntry,
   type OfficeEventInfo,
+  type PlannedHolidayEntry,
   DAY_LABELS,
-  MONTH_NAMES,
   NAME_COL_WIDTH,
   DAY_COL_WIDTH,
+  COLOR_PLANNED_HOLIDAY,
   getDayOfWeek,
   formatCellTooltip,
   getCellColor,
   hasEventMarker,
+  isWeekend,
+  COLOR_WORKDAY,
 } from '../pages/teamCalendarUtils';
 
 interface MonthSpan {
@@ -26,6 +29,8 @@ interface CalendarGridProps {
   holidayNameMap: Map<string, string>;
   officeEventDateMap: Map<string, OfficeEventInfo>;
   monthSpans: MonthSpan[];
+  /** Map key: "memberId:dateKey" -> PlannedHolidayEntry */
+  plannedHolidayMap?: Map<string, PlannedHolidayEntry>;
 }
 
 export default function CalendarGrid({
@@ -35,6 +40,7 @@ export default function CalendarGrid({
   holidayNameMap,
   officeEventDateMap,
   monthSpans,
+  plannedHolidayMap,
 }: CalendarGridProps) {
   const totalDays = dayEntries.length;
 
@@ -189,8 +195,39 @@ export default function CalendarGrid({
             </Box>
 
             {dayEntries.map((entry, i) => {
-              const tip = formatCellTooltip(entry, holidayNameMap, officeEventDateMap);
+              const phKey = `${member.id}:${entry.dateKey}`;
+              const ph = plannedHolidayMap?.get(phKey);
+              const tip = formatCellTooltip(entry, holidayNameMap, officeEventDateMap, ph);
               const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
+              const baseColor = getCellColor(entry, holidaySet, officeEventDateMap);
+
+              // Determine cell background based on planned holiday
+              let cellBg: string | undefined;
+              if (
+                ph &&
+                !isWeekend(entry.year, entry.month, entry.day) &&
+                !holidaySet.has(entry.dateKey)
+              ) {
+                if (ph.day_type === 'FULL') {
+                  cellBg = COLOR_PLANNED_HOLIDAY;
+                } else if (ph.day_type === 'AM') {
+                  cellBg = undefined; // use gradient
+                } else {
+                  cellBg = undefined; // use gradient
+                }
+              }
+
+              const useGradient =
+                ph &&
+                (ph.day_type === 'AM' || ph.day_type === 'PM') &&
+                !isWeekend(entry.year, entry.month, entry.day) &&
+                !holidaySet.has(entry.dateKey);
+              const gradientBg = useGradient
+                ? ph!.day_type === 'AM'
+                  ? `linear-gradient(to right, ${COLOR_PLANNED_HOLIDAY} 50%, ${COLOR_WORKDAY} 50%)`
+                  : `linear-gradient(to right, ${COLOR_WORKDAY} 50%, ${COLOR_PLANNED_HOLIDAY} 50%)`
+                : undefined;
+
               return (
                 <Tooltip
                   key={`${member.id}-${entry.dateKey}`}
@@ -204,7 +241,8 @@ export default function CalendarGrid({
                       height: DAY_COL_WIDTH,
                       width: DAY_COL_WIDTH,
                       minWidth: DAY_COL_WIDTH,
-                      bgcolor: getCellColor(entry, holidaySet, officeEventDateMap),
+                      bgcolor: cellBg ?? (gradientBg ? undefined : baseColor),
+                      background: gradientBg,
                       borderBottom: '1px solid',
                       borderRight: '1px solid',
                       borderLeft: isMonthBoundary ? '2px solid' : 'none',

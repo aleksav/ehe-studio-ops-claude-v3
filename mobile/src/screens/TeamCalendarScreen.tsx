@@ -46,6 +46,14 @@ interface DayEntry {
   dateKey: string;
 }
 
+interface PlannedHolidayApi {
+  id: string;
+  team_member_id: string;
+  date: string;
+  day_type: 'FULL' | 'AM' | 'PM';
+  notes: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -133,6 +141,8 @@ const COLOR_SOCIAL_ALLOWED = '#FFF176';
 const COLOR_IMPORTANT_BLOCKED = '#FB8C00';
 const COLOR_IMPORTANT_ALLOWED = '#FFCC80';
 
+const COLOR_PLANNED_HOLIDAY = '#42A5F5';
+
 const NAME_COL_WIDTH = 100;
 const DAY_COL_WIDTH = 28;
 
@@ -154,6 +164,7 @@ export default function TeamCalendarScreen() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
+  const [plannedHolidays, setPlannedHolidays] = useState<PlannedHolidayApi[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Dynamic month range state for infinite scroll
@@ -187,12 +198,17 @@ export default function TeamCalendarScreen() {
         api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
       );
       const ePromises = newYears.map((y) => api.get<OfficeEvent[]>(`/api/office-events?year=${y}`));
-      const results = await Promise.all([...hPromises, ...ePromises]);
+      const phPromises = newYears.map((y) =>
+        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
+      );
+      const results = await Promise.all([...hPromises, ...ePromises, ...phPromises]);
       const hArrays = results.slice(0, newYears.length) as PublicHoliday[][];
-      const eArrays = results.slice(newYears.length) as OfficeEvent[][];
+      const eArrays = results.slice(newYears.length, newYears.length * 2) as OfficeEvent[][];
+      const phArrays = results.slice(newYears.length * 2) as PlannedHolidayApi[][];
       newYears.forEach((y) => fetchedYearsRef.current.add(y));
       setHolidays((prev) => [...prev, ...hArrays.flat()]);
       setOfficeEvents((prev) => [...prev, ...eArrays.flat()]);
+      setPlannedHolidays((prev) => [...prev, ...phArrays.flat()]);
     } catch {
       // silently fail
     }
@@ -207,16 +223,22 @@ export default function TeamCalendarScreen() {
       const ePromises = yearsToFetch.map((y) =>
         api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
       );
+      const phPromises = yearsToFetch.map((y) =>
+        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
+      );
       const [membersData, ...rest] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
         ...hPromises,
         ...ePromises,
+        ...phPromises,
       ]);
       const hArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
-      const eArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
+      const eArrays = rest.slice(yearsToFetch.length, yearsToFetch.length * 2) as OfficeEvent[][];
+      const phArrays = rest.slice(yearsToFetch.length * 2) as PlannedHolidayApi[][];
       setMembers(membersData);
       setHolidays(hArrays.flat());
       setOfficeEvents(eArrays.flat());
+      setPlannedHolidays(phArrays.flat());
       yearsToFetch.forEach((y) => fetchedYearsRef.current.add(y));
     } catch {
       // silently fail
@@ -271,6 +293,15 @@ export default function TeamCalendarScreen() {
     });
     return map;
   }, [officeEvents]);
+
+  const plannedHolidayMap = useMemo(() => {
+    const map = new Map<string, { day_type: 'FULL' | 'AM' | 'PM' }>();
+    plannedHolidays.forEach((ph) => {
+      const dateKey = ph.date.substring(0, 10);
+      map.set(`${ph.team_member_id}:${dateKey}`, { day_type: ph.day_type });
+    });
+    return map;
+  }, [plannedHolidays]);
 
   const monthSpans = useMemo(() => {
     const spans: { label: string; startIndex: number; count: number }[] = [];
@@ -429,6 +460,10 @@ export default function TeamCalendarScreen() {
           <View style={[styles.legendSwatch, { backgroundColor: COLOR_OFFICE_CLOSED }]} />
           <Text style={styles.legendLabel}>Office Closed</Text>
         </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { backgroundColor: COLOR_PLANNED_HOLIDAY }]} />
+          <Text style={styles.legendLabel}>Holiday</Text>
+        </View>
       </View>
 
       {/* Grid */}
@@ -504,12 +539,54 @@ export default function TeamCalendarScreen() {
                 <View key={member.id} style={styles.dataRow}>
                   {dayEntries.map((entry, i) => {
                     const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
+                    const phKey = `${member.id}:${entry.dateKey}`;
+                    const ph = plannedHolidayMap.get(phKey);
+                    const baseColor = getCellColor(entry);
+                    const isWorkday =
+                      !isWeekend(entry.year, entry.month, entry.day) &&
+                      !holidaySet.has(entry.dateKey);
+
+                    // Full day planned holiday
+                    if (ph && ph.day_type === 'FULL' && isWorkday) {
+                      return (
+                        <View
+                          key={`${member.id}-${entry.dateKey}`}
+                          style={[
+                            styles.dayCell,
+                            { backgroundColor: COLOR_PLANNED_HOLIDAY },
+                            isMonthBoundary ? styles.monthBoundaryLeft : null,
+                          ]}
+                        />
+                      );
+                    }
+
+                    // Half day: two side-by-side Views
+                    if (ph && (ph.day_type === 'AM' || ph.day_type === 'PM') && isWorkday) {
+                      const leftColor =
+                        ph.day_type === 'AM' ? COLOR_PLANNED_HOLIDAY : COLOR_WORKDAY;
+                      const rightColor =
+                        ph.day_type === 'PM' ? COLOR_PLANNED_HOLIDAY : COLOR_WORKDAY;
+                      return (
+                        <View
+                          key={`${member.id}-${entry.dateKey}`}
+                          style={[
+                            styles.dayCell,
+                            { flexDirection: 'row', backgroundColor: 'transparent' },
+                            isMonthBoundary ? styles.monthBoundaryLeft : null,
+                          ]}
+                        >
+                          <View style={{ flex: 1, backgroundColor: leftColor }} />
+                          <View style={{ flex: 1, backgroundColor: rightColor }} />
+                        </View>
+                      );
+                    }
+
                     return (
                       <View
                         key={`${member.id}-${entry.dateKey}`}
                         style={[
                           styles.dayCell,
-                          { backgroundColor: getCellColor(entry) },
+                          { backgroundColor: baseColor },
                           isMonthBoundary ? styles.monthBoundaryLeft : null,
                         ]}
                       >
