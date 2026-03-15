@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MoreStackParamList } from '../navigation/types';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://ehestudio-ops-api.onrender.com';
-const FRONTEND_VERSION = '0.0.1';
+const FRONTEND_VERSION = (Constants.expoConfig?.extra?.commitHash as string) ?? 'unknown';
 
 type Props = NativeStackScreenProps<MoreStackParamList, 'MoreMenu'>;
 
