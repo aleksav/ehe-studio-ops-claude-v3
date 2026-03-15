@@ -14,6 +14,7 @@ import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared
 import { api } from '../lib/api';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
 import type { BoardTask, BoardMilestone } from '../components/ProjectTaskBoard';
+import ProjectDashboardTab from '../components/ProjectDashboardTab';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProjectsStackParamList } from '../navigation/types';
 
@@ -40,6 +41,8 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'Completed',
 };
 
+type TabKey = 'tasks' | 'dashboard';
+
 export default function ProjectDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
 
@@ -48,6 +51,7 @@ export default function ProjectDetailScreen({ route, navigation }: Props) {
   const [milestones, setMilestones] = useState<BoardMilestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('tasks');
 
   const fetchData = async () => {
     try {
@@ -120,23 +124,58 @@ export default function ProjectDetailScreen({ route, navigation }: Props) {
         {project.description && <Text style={styles.description}>{project.description}</Text>}
       </View>
 
-      {/* Task Board */}
-      {project.external_board_url ? (
-        <View style={styles.externalBoardCard}>
-          <Text style={styles.externalBoardText}>
-            Tasks for this project are managed externally.
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'tasks' && styles.tabActive]}
+          onPress={() => setActiveTab('tasks')}
+        >
+          <Ionicons
+            name="list-outline"
+            size={16}
+            color={activeTab === 'tasks' ? colors.primary : '#666'}
+          />
+          <Text style={[styles.tabText, activeTab === 'tasks' && styles.tabTextActive]}>Tasks</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'dashboard' && styles.tabActive]}
+          onPress={() => setActiveTab('dashboard')}
+        >
+          <Ionicons
+            name="bar-chart-outline"
+            size={16}
+            color={activeTab === 'dashboard' ? colors.primary : '#666'}
+          />
+          <Text style={[styles.tabText, activeTab === 'dashboard' && styles.tabTextActive]}>
+            Dashboard
           </Text>
-          <TouchableOpacity
-            style={styles.externalBoardButton}
-            onPress={() => Linking.openURL(project.external_board_url!)}
-          >
-            <Ionicons name="open-outline" size={18} color="#fff" />
-            <Text style={styles.externalBoardButtonText}>Open External Task Board</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ProjectTaskBoard tasks={tasks} milestones={milestones} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tasks Tab */}
+      {activeTab === 'tasks' && (
+        <>
+          {project.external_board_url ? (
+            <View style={styles.externalBoardCard}>
+              <Text style={styles.externalBoardText}>
+                Tasks for this project are managed externally.
+              </Text>
+              <TouchableOpacity
+                style={styles.externalBoardButton}
+                onPress={() => Linking.openURL(project.external_board_url!)}
+              >
+                <Ionicons name="open-outline" size={18} color="#fff" />
+                <Text style={styles.externalBoardButtonText}>Open External Task Board</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ProjectTaskBoard tasks={tasks} milestones={milestones} />
+          )}
+        </>
       )}
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && <ProjectDashboardTab projectId={id} />}
     </ScrollView>
   );
 }
@@ -189,6 +228,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.sizes.body2,
     color: '#999',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    marginBottom: spacing.md,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: colors.primary,
+  },
+  tabText: {
+    fontSize: typography.sizes.body2,
+    color: '#666',
+    fontWeight: typography.weights.medium,
+  },
+  tabTextActive: {
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
   },
   externalBoardCard: {
     backgroundColor: '#fff',

@@ -28,11 +28,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { api, ApiError } from '../lib/api';
 import type { Assignment } from '../components/AssigneeAvatars';
 import ProjectTaskBoard from '../components/ProjectTaskBoard';
 import type { BoardTask, BoardMilestone, ViewMode } from '../components/ProjectTaskBoard';
+import ProjectDashboardTab from '../components/ProjectDashboardTab';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -220,7 +222,8 @@ export default function ProjectDetailPage() {
   // Page tab
   const [activeTab, setActiveTab] = useState<number>(() => {
     const stored = localStorage.getItem('project-detail-tab');
-    return stored === '1' ? 1 : 0;
+    const val = Number(stored);
+    return val === 1 || val === 2 ? val : 0;
   });
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -528,6 +531,7 @@ export default function ProjectDetailPage() {
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab icon={<DashboardIcon />} iconPosition="start" label="Overview" />
           <Tab icon={<AssignmentIcon />} iconPosition="start" label="Tasks" />
+          <Tab icon={<BarChartIcon />} iconPosition="start" label="Dashboard" />
         </Tabs>
       </Box>
 
@@ -864,6 +868,9 @@ export default function ProjectDetailPage() {
           )}
         </>
       )}
+
+      {/* ---- Dashboard Tab ---- */}
+      {activeTab === 2 && <ProjectDashboardTab projectId={id!} />}
 
       {/* ---- Add Task Dialog ---- */}
       <Dialog

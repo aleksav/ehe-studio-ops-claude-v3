@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import * as projectController from '../controllers/project.controller';
 import * as budgetController from '../controllers/budget.controller';
+import { getProjectStats } from '../services/project-stats.service';
 import prisma from '../utils/prisma';
 
 const router = Router();
@@ -14,6 +15,28 @@ router.get('/:id', authMiddleware, projectController.get);
 
 // GET /api/projects/:id/budget
 router.get('/:id/budget', authMiddleware, budgetController.getBudget);
+
+// GET /api/projects/:id/stats
+router.get('/:id/stats', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { start_date, end_date } = req.query;
+    const stats = await getProjectStats(
+      req.params.id,
+      typeof start_date === 'string' ? start_date : undefined,
+      typeof end_date === 'string' ? end_date : undefined,
+    );
+
+    if (!stats) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Project stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // GET /api/projects/:id/weekly-hours — hours per team member for the current ISO week
 router.get(
