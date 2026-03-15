@@ -310,11 +310,11 @@ test.describe('Demo Recording', () => {
     await expect(page).toHaveURL(/\/standup/);
     await page.waitForTimeout(800);
 
-    // The carousel auto-loads — wait for counter
-    await expect(page.getByText(/1\//).first()).toBeVisible({ timeout: 10000 });
+    // The carousel starts with the holidays/availability slide
+    await expect(page.getByText(/availability/i).first()).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1500);
 
-    // Advance through projects
+    // Advance past holidays slide to the first project
     await subtitle(page, 'Each project shows its own task board during standup');
     await page.waitForTimeout(600);
 
@@ -322,13 +322,13 @@ test.describe('Demo Recording', () => {
     if (await nextButton.isEnabled()) {
       await nextButton.click();
       await page.waitForTimeout(1000);
-      await expect(page.getByText(/2\//).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText(/1\//).first()).toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(1500);
 
       if (await nextButton.isEnabled()) {
         await nextButton.click();
         await page.waitForTimeout(1000);
-        await expect(page.getByText(/3\//).first()).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText(/2\//).first()).toBeVisible({ timeout: 5000 });
         await page.waitForTimeout(1000);
       }
     }
