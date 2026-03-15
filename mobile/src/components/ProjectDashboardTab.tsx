@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '@ehestudio-ops/shared';
 import { api } from '../lib/api';
 
@@ -29,8 +29,6 @@ interface ByMonth {
 interface ProjectStats {
   total_hours: number;
   total_cost: number;
-  budget_hours: number | null;
-  hourly_rate: number | null;
   currency_code: string;
   by_task_type: ByTaskType[];
   by_team_member: ByTeamMember[];
@@ -101,20 +99,6 @@ export default function ProjectDashboardTab({ projectId }: Props) {
 
   if (!stats) return null;
 
-  const budgetHoursPercent =
-    stats.budget_hours && stats.budget_hours > 0
-      ? Math.min((stats.total_hours / stats.budget_hours) * 100, 100)
-      : null;
-
-  const totalBudget =
-    stats.budget_hours && stats.hourly_rate ? stats.budget_hours * stats.hourly_rate : null;
-
-  const costPercent =
-    totalBudget && totalBudget > 0 ? Math.min((stats.total_cost / totalBudget) * 100, 100) : null;
-
-  const barColorFn = (pct: number) =>
-    pct > 90 ? colors.error : pct > 75 ? colors.warning : colors.primary;
-
   return (
     <View>
       {/* Date Range Filters */}
@@ -126,7 +110,6 @@ export default function ProjectDashboardTab({ projectId }: Props) {
             placeholder="YYYY-MM-DD"
             value={startDate}
             onChangeText={setStartDate}
-            keyboardType={Platform.OS === 'ios' ? 'default' : 'default'}
           />
         </View>
         <View style={styles.dateField}>
@@ -140,75 +123,23 @@ export default function ProjectDashboardTab({ projectId }: Props) {
         </View>
       </View>
 
-      {/* Budget Overview Card */}
+      {/* Overview Card */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Budget Overview</Text>
+        <Text style={styles.cardTitle}>Overview</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Hours Logged</Text>
+            <Text style={styles.statLabel}>Total Hours</Text>
             <Text style={[styles.statValue, { color: colors.primary }]}>
               {stats.total_hours.toFixed(1)}
             </Text>
           </View>
-          {stats.budget_hours !== null && (
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Budget Hours</Text>
-              <Text style={styles.statValue}>{stats.budget_hours.toFixed(1)}</Text>
-            </View>
-          )}
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Cost</Text>
+            <Text style={styles.statLabel}>Total Cost</Text>
             <Text style={[styles.statValue, { color: colors.secondary }]}>
               {formatCurrency(stats.total_cost, stats.currency_code)}
             </Text>
           </View>
-          {totalBudget !== null && (
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Remaining</Text>
-              <Text style={styles.statValue}>
-                {formatCurrency(totalBudget - stats.total_cost, stats.currency_code)}
-              </Text>
-            </View>
-          )}
         </View>
-        {budgetHoursPercent !== null && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.statLabel}>Hours Used</Text>
-              <Text style={styles.statLabel}>{budgetHoursPercent.toFixed(1)}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${budgetHoursPercent}%`,
-                    backgroundColor: barColorFn(budgetHoursPercent),
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        )}
-        {costPercent !== null && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.statLabel}>Cost vs Budget</Text>
-              <Text style={styles.statLabel}>{costPercent.toFixed(1)}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    width: `${costPercent}%`,
-                    backgroundColor: barColorFn(costPercent),
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        )}
       </View>
 
       {/* By Task Type */}
@@ -345,24 +276,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.h3,
     fontWeight: typography.weights.bold,
     color: colors.text,
-  },
-  progressSection: {
-    marginTop: spacing.md,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E5E5',
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
   },
   tableHeader: {
     flexDirection: 'row',

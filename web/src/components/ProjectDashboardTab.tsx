@@ -43,8 +43,6 @@ interface ByMonth {
 interface ProjectStats {
   total_hours: number;
   total_cost: number;
-  budget_hours: number | null;
-  hourly_rate: number | null;
   currency_code: string;
   by_task_type: ByTaskType[];
   by_team_member: ByTeamMember[];
@@ -115,19 +113,6 @@ export default function ProjectDashboardTab({ projectId }: ProjectDashboardTabPr
 
   if (!stats) return null;
 
-  const budgetHoursPercent =
-    stats.budget_hours && stats.budget_hours > 0
-      ? Math.min((stats.total_hours / stats.budget_hours) * 100, 100)
-      : null;
-
-  const totalBudget =
-    stats.budget_hours && stats.hourly_rate ? stats.budget_hours * stats.hourly_rate : null;
-
-  const costPercent =
-    totalBudget && totalBudget > 0 ? Math.min((stats.total_cost / totalBudget) * 100, 100) : null;
-
-  const barColor = (pct: number) => (pct > 90 ? 'error' : pct > 75 ? 'warning' : 'primary');
-
   return (
     <Box>
       {/* Date Range Filter */}
@@ -154,96 +139,39 @@ export default function ProjectDashboardTab({ projectId }: ProjectDashboardTabPr
 
       {loading && <LinearProgress sx={{ mb: 1 }} />}
 
-      {/* Budget Overview */}
+      {/* Totals */}
       <Card
         elevation={0}
         sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
       >
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Typography variant="body1" sx={{ fontWeight: 600, mb: 1.5 }}>
-            Budget Overview
+            Overview
           </Typography>
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' },
+              gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(2, 1fr)' },
               gap: 2,
-              mb: budgetHoursPercent !== null || costPercent !== null ? 2 : 0,
             }}
           >
             <Box>
               <Typography variant="body2" color="text.secondary">
-                Hours Logged
+                Total Hours
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.primary }}>
                 {stats.total_hours.toFixed(1)}
               </Typography>
             </Box>
-            {stats.budget_hours !== null && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Budget Hours
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {stats.budget_hours.toFixed(1)}
-                </Typography>
-              </Box>
-            )}
             <Box>
               <Typography variant="body2" color="text.secondary">
-                Cost
+                Total Cost
               </Typography>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.secondary }}>
                 {formatCurrency(stats.total_cost, stats.currency_code)}
               </Typography>
             </Box>
-            {totalBudget !== null && (
-              <Box>
-                <Typography variant="body2" color="text.secondary">
-                  Remaining
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(totalBudget - stats.total_cost, stats.currency_code)}
-                </Typography>
-              </Box>
-            )}
           </Box>
-          {budgetHoursPercent !== null && (
-            <Box sx={{ mb: costPercent !== null ? 1.5 : 0 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Hours Used
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {budgetHoursPercent.toFixed(1)}%
-                </Typography>
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={budgetHoursPercent}
-                color={barColor(budgetHoursPercent)}
-                sx={{ height: 8, borderRadius: 4 }}
-              />
-            </Box>
-          )}
-          {costPercent !== null && (
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Cost vs Budget
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {costPercent.toFixed(1)}%
-                </Typography>
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={costPercent}
-                color={barColor(costPercent)}
-                sx={{ height: 8, borderRadius: 4 }}
-              />
-            </Box>
-          )}
         </CardContent>
       </Card>
 
