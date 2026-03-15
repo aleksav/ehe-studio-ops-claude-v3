@@ -706,20 +706,6 @@ export default function TimeLoggingPage() {
     setBlockOverrideReason('');
   }, []);
 
-  const interceptBlockedFocus = useCallback(
-    (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
-      const blockReason = isBlockedDate(dateStr, holidayDates, officeEventBlockedDates, leaveDates);
-      if (blockReason && !unblockedDates.has(dateStr)) {
-        e.preventDefault();
-        (e.target as HTMLElement).blur?.();
-        setBlockDialog({ open: true, dateStr, projectId, reason: blockReason });
-        return true;
-      }
-      return false;
-    },
-    [unblockedDates, officeEventBlockedDates],
-  );
-
   useEffect(() => {
     if (!pendingFocusCellKey) return;
     const key = pendingFocusCellKey;
@@ -1132,6 +1118,30 @@ export default function TimeLoggingPage() {
                                 }),
                               }}
                             >
+                              {dateBlocked ? (
+                                <Tooltip title="Click to override and log time" arrow>
+                                  <Box
+                                    onClick={() =>
+                                      setBlockDialog({
+                                        open: true,
+                                        dateStr: ds,
+                                        projectId: pid,
+                                        reason: blockReason!,
+                                      })
+                                    }
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      py: 1.5,
+                                      cursor: 'pointer',
+                                      '&:hover': { opacity: 0.7 },
+                                    }}
+                                  >
+                                    <LockOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                                  </Box>
+                                </Tooltip>
+                              ) : (
                               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                 <TextField
                                   size="small"
@@ -1145,10 +1155,6 @@ export default function TimeLoggingPage() {
                                   value={cell?.hours ?? ''}
                                   onChange={(e) => handleHoursChange(ck, e.target.value)}
                                   onBlur={() => void handleCellBlur(pid, ds)}
-                                  onFocus={(e) => interceptBlockedFocus(ds, pid, e)}
-                                  onClick={(e) => {
-                                    if (dateBlocked) interceptBlockedFocus(ds, pid, e);
-                                  }}
                                   disabled={isDisabled}
                                   sx={{
                                     '& .MuiInputBase-input': {
@@ -1213,6 +1219,7 @@ export default function TimeLoggingPage() {
                                 </Box>
                                 {cell?.saving && <CircularProgress size={12} sx={{ mx: 'auto' }} />}
                               </Box>
+                              )}
                             </TableCell>
                           );
                         })}
