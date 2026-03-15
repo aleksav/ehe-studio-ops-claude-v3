@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, typography } from '@ehestudio-ops/shared';
 import ClientsScreen from './ClientsScreen';
@@ -8,8 +8,9 @@ import AuditLogScreen from './AuditLogScreen';
 import TaskRatesScreen from './TaskRatesScreen';
 import PublicHolidaysScreen from './PublicHolidaysScreen';
 import OfficeEventsScreen from './OfficeEventsScreen';
+import TimeEntriesScreen from './TimeEntriesScreen';
 
-const TABS = ['Clients', 'Team', 'Audit Log', 'Task Rates', 'Holidays', 'Events'] as const;
+const TABS = ['Clients', 'Team', 'Audit Log', 'Task Rates', 'Holidays', 'Events', 'Time'] as const;
 type TabKey = (typeof TABS)[number];
 
 const STORAGE_KEY = 'admin-active-tab';
@@ -33,7 +34,12 @@ export default function AdminScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBar}
+        contentContainerStyle={styles.tabBarContent}
+      >
         {TABS.map((tab, index) => {
           const isActive = activeTab === index;
           return (
@@ -47,7 +53,7 @@ export default function AdminScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
       <View style={styles.content}>
         {activeTab === 0 && <ClientsScreen />}
         {activeTab === 1 && <TeamScreen />}
@@ -55,6 +61,7 @@ export default function AdminScreen() {
         {activeTab === 3 && <TaskRatesScreen />}
         {activeTab === 4 && <PublicHolidaysScreen />}
         {activeTab === 5 && <OfficeEventsScreen />}
+        {activeTab === 6 && <TimeEntriesScreen />}
       </View>
     </View>
   );
@@ -66,14 +73,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   tabBar: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+    flexGrow: 0,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
   },
   tab: {
-    flex: 1,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',

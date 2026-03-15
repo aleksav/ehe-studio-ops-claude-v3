@@ -6,6 +6,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import HistoryIcon from '@mui/icons-material/History';
 import PaidIcon from '@mui/icons-material/Paid';
 import EventIcon from '@mui/icons-material/Event';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CelebrationIcon from '@mui/icons-material/Celebration';
 import ClientsPage from './ClientsPage';
 import TeamPage from './TeamPage';
@@ -13,6 +14,7 @@ import AuditLogPage from './AuditLogPage';
 import TaskRatesPage from './TaskRatesPage';
 import PublicHolidaysPage from './PublicHolidaysPage';
 import OfficeEventsPage from './OfficeEventsPage';
+import TimeEntriesPage from './TimeEntriesPage';
 
 const TAB_KEYS = [
   'clients',
@@ -21,6 +23,7 @@ const TAB_KEYS = [
   'task-rates',
   'public-holidays',
   'office-events',
+  'time-entries',
 ] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
@@ -69,6 +72,7 @@ export default function AdminPage() {
           <Tab icon={<PaidIcon />} iconPosition="start" label="Task Rates" />
           <Tab icon={<EventIcon />} iconPosition="start" label="Public Holidays" />
           <Tab icon={<CelebrationIcon />} iconPosition="start" label="Office Events" />
+          <Tab icon={<AccessTimeIcon />} iconPosition="start" label="Time Entries" />
         </Tabs>
       </Box>
 
@@ -78,6 +82,7 @@ export default function AdminPage() {
       {activeTab === 3 && <TaskRatesPage embedded />}
       {activeTab === 4 && <PublicHolidaysPage embedded />}
       {activeTab === 5 && <OfficeEventsPage embedded />}
+      {activeTab === 6 && <TimeEntriesPage embedded />}
     </Box>
   );
 }
