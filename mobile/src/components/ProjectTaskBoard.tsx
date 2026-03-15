@@ -134,18 +134,9 @@ function PageIndicator({
         // Mini tab bar with labels
         <View style={styles.miniTabBar}>
           {labels.map((label, index) => (
-            <View
-              key={index}
-              style={[
-                styles.miniTab,
-                index === current && styles.miniTabActive,
-              ]}
-            >
+            <View key={index} style={[styles.miniTab, index === current && styles.miniTabActive]}>
               <Text
-                style={[
-                  styles.miniTabText,
-                  index === current && styles.miniTabTextActive,
-                ]}
+                style={[styles.miniTabText, index === current && styles.miniTabTextActive]}
                 numberOfLines={1}
               >
                 {label}
@@ -157,10 +148,7 @@ function PageIndicator({
         // Dot indicators
         <View style={styles.dotsRow}>
           {Array.from({ length: total }).map((_, index) => (
-            <View
-              key={index}
-              style={[styles.dot, index === current && styles.dotActive]}
-            />
+            <View key={index} style={[styles.dot, index === current && styles.dotActive]} />
           ))}
         </View>
       )}
@@ -216,11 +204,7 @@ function SwipeablePages({
 
   return (
     <View>
-      <PageIndicator
-        total={totalPages}
-        current={currentPage}
-        labels={labels}
-      />
+      <PageIndicator total={totalPages} current={currentPage} labels={labels} />
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -259,9 +243,7 @@ function TaskColumn({
 }) {
   return (
     <ScrollView style={styles.pageScroll} nestedScrollEnabled>
-      <View
-        style={[styles.column, { backgroundColor: COLUMN_COLORS[status] }]}
-      >
+      <View style={[styles.column, { backgroundColor: COLUMN_COLORS[status] }]}>
         <View style={styles.columnHeader}>
           <Text style={styles.columnTitle}>
             {status === 'DONE' && doneLabel ? doneLabel : COLUMN_LABELS[status]}
@@ -274,9 +256,7 @@ function TaskColumn({
             title={task.description}
             status={task.status}
             milestoneName={
-              task.milestone_id && milestoneMap
-                ? milestoneMap.get(task.milestone_id)
-                : null
+              task.milestone_id && milestoneMap ? milestoneMap.get(task.milestone_id) : null
             }
             assignments={task.assignments}
           />
@@ -305,8 +285,7 @@ function BoardSwipeable({
   const todoTasks = tasks.filter((t) => t.status === 'TODO');
   const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS');
   const doneTasks = tasks.filter(
-    (t) =>
-      t.status === 'DONE' && (!filterRecentDone || isRecentlyCompleted(t)),
+    (t) => t.status === 'DONE' && (!filterRecentDone || isRecentlyCompleted(t)),
   );
 
   const columns = [
@@ -316,8 +295,7 @@ function BoardSwipeable({
   ];
 
   const labels = columns.map(
-    ({ status, tasks: colTasks }) =>
-      `${COLUMN_LABELS[status]} (${colTasks.length})`,
+    ({ status, tasks: colTasks }) => `${COLUMN_LABELS[status]} (${colTasks.length})`,
   );
 
   return (
@@ -384,9 +362,7 @@ function MilestonePage({
             title={task.description}
             status={task.status}
             milestoneName={
-              task.milestone_id && milestoneMap
-                ? milestoneMap.get(task.milestone_id)
-                : null
+              task.milestone_id && milestoneMap ? milestoneMap.get(task.milestone_id) : null
             }
             assignments={task.assignments}
           />
@@ -417,14 +393,9 @@ function PersonPage({
     <ScrollView style={styles.pageScroll} nestedScrollEnabled>
       <View style={styles.personHeader}>
         <View
-          style={[
-            styles.personAvatar,
-            { backgroundColor: row.memberId ? '#1565C0' : '#757575' },
-          ]}
+          style={[styles.personAvatar, { backgroundColor: row.memberId ? '#1565C0' : '#757575' }]}
         >
-          <Text style={styles.personAvatarText}>
-            {row.memberName.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.personAvatarText}>{row.memberName.charAt(0).toUpperCase()}</Text>
         </View>
         <Text style={styles.personName}>{row.memberName}</Text>
         <View style={styles.countChip}>
@@ -441,9 +412,7 @@ function PersonPage({
             title={task.description}
             status={task.status}
             milestoneName={
-              task.milestone_id && milestoneMap
-                ? milestoneMap.get(task.milestone_id)
-                : null
+              task.milestone_id && milestoneMap ? milestoneMap.get(task.milestone_id) : null
             }
             assignments={task.assignments}
           />
@@ -466,9 +435,7 @@ export default function ProjectTaskBoard({
   onHideEmptyChange,
 }: ProjectTaskBoardProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
-  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(
-    hideEmptyMilestonesProp ?? false,
-  );
+  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(hideEmptyMilestonesProp ?? false);
 
   const handleHideEmptyChange = (checked: boolean) => {
     setHideEmptyMilestones(checked);
@@ -513,9 +480,7 @@ export default function ProjectTaskBoard({
   const filteredSwimlanes = useMemo(() => {
     if (!hideEmptyMilestones) return swimlanes;
     return swimlanes.filter((lane) => {
-      return lane.tasks.some(
-        (t) => t.status === 'IN_PROGRESS' || t.status === 'DONE',
-      );
+      return lane.tasks.some((t) => t.status === 'IN_PROGRESS' || t.status === 'DONE');
     });
   }, [swimlanes, hideEmptyMilestones]);
 
@@ -582,17 +547,8 @@ export default function ProjectTaskBoard({
             style={[styles.tab, viewMode === mode && styles.tabActive]}
             onPress={() => setViewMode(mode)}
           >
-            <Text
-              style={[
-                styles.tabText,
-                viewMode === mode && styles.tabTextActive,
-              ]}
-            >
-              {mode === 'board'
-                ? 'Board'
-                : mode === 'milestones'
-                  ? 'Milestones'
-                  : 'People'}
+            <Text style={[styles.tabText, viewMode === mode && styles.tabTextActive]}>
+              {mode === 'board' ? 'Board' : mode === 'milestones' ? 'Milestones' : 'People'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -621,15 +577,11 @@ export default function ProjectTaskBoard({
               thumbColor={hideEmptyMilestones ? colors.primary : '#f4f3f4'}
             />
             {hiddenMilestoneCount > 0 && (
-              <Text style={styles.hiddenCount}>
-                ({hiddenMilestoneCount} hidden)
-              </Text>
+              <Text style={styles.hiddenCount}>({hiddenMilestoneCount} hidden)</Text>
             )}
           </View>
           {filteredSwimlanes.length === 0 ? (
-            <Text style={styles.noTasks}>
-              No milestones or tasks to display.
-            </Text>
+            <Text style={styles.noTasks}>No milestones or tasks to display.</Text>
           ) : (
             <SwipeablePages
               labels={milestoneLabels.length <= 5 ? milestoneLabels : undefined}

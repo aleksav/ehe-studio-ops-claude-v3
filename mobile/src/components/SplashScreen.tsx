@@ -3,11 +3,9 @@ import { View, Text, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 import { colors } from '@ehestudio-ops/shared';
 
-const commitHash =
-  (Constants.expoConfig?.extra?.commitHash as string) ?? 'dev';
+const commitHash = (Constants.expoConfig?.extra?.commitHash as string) ?? 'dev';
 const buildDate =
-  (Constants.expoConfig?.extra?.buildDate as string) ??
-  new Date().toISOString().split('T')[0];
+  (Constants.expoConfig?.extra?.buildDate as string) ?? new Date().toISOString().split('T')[0];
 
 export default function SplashScreen() {
   return (
