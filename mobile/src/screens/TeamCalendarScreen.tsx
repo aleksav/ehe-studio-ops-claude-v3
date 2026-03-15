@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -167,21 +167,18 @@ export default function TeamCalendarScreen() {
   const [plannedHolidays, setPlannedHolidays] = useState<PlannedHolidayApi[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Dynamic month range state for infinite scroll
-  const [rangeStartYear, rangeStartMonth] = useMemo(
-    () => normaliseYearMonth(centerYear, centerMonth - 6),
+  // Static 21-month range: 3 months before current + current month + 17 months ahead
+  const MONTHS_BEFORE = 3;
+  const TOTAL_MONTHS = 21;
+
+  const [startYear, startMonth] = useMemo(
+    () => normaliseYearMonth(centerYear, centerMonth - MONTHS_BEFORE),
     [centerYear, centerMonth],
   );
-  const [startYear, setStartYear] = useState(rangeStartYear);
-  const [startMonth, setStartMonth] = useState(rangeStartMonth);
-  const [monthCount, setMonthCount] = useState(12);
-
-  const fetchedYearsRef = useRef<Set<number>>(new Set());
-  const isExpandingRef = useRef(false);
 
   const dayEntries = useMemo(
-    () => buildMonthRange(startYear, startMonth, monthCount),
-    [startYear, startMonth, monthCount],
+    () => buildMonthRange(startYear, startMonth, TOTAL_MONTHS),
+    [startYear, startMonth],
   );
 
   const yearsToFetch = useMemo(() => {
@@ -190,66 +187,45 @@ export default function TeamCalendarScreen() {
     return Array.from(s);
   }, [dayEntries]);
 
-  const fetchYearsData = useCallback(async (years: number[]) => {
-    const newYears = years.filter((y) => !fetchedYearsRef.current.has(y));
-    if (newYears.length === 0) return;
-    try {
-      const hPromises = newYears.map((y) =>
-        api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
-      );
-      const ePromises = newYears.map((y) => api.get<OfficeEvent[]>(`/api/office-events?year=${y}`));
-      const phPromises = newYears.map((y) =>
-        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
-      );
-      const results = await Promise.all([...hPromises, ...ePromises, ...phPromises]);
-      const hArrays = results.slice(0, newYears.length) as PublicHoliday[][];
-      const eArrays = results.slice(newYears.length, newYears.length * 2) as OfficeEvent[][];
-      const phArrays = results.slice(newYears.length * 2) as PlannedHolidayApi[][];
-      newYears.forEach((y) => fetchedYearsRef.current.add(y));
-      setHolidays((prev) => [...prev, ...hArrays.flat()]);
-      setOfficeEvents((prev) => [...prev, ...eArrays.flat()]);
-      setPlannedHolidays((prev) => [...prev, ...phArrays.flat()]);
-    } catch {
-      // silently fail
-    }
-  }, []);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const hPromises = yearsToFetch.map((y) =>
-        api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
-      );
-      const ePromises = yearsToFetch.map((y) =>
-        api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
-      );
-      const phPromises = yearsToFetch.map((y) =>
-        api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
-      );
-      const [membersData, ...rest] = await Promise.all([
-        api.get<TeamMember[]>('/api/team-members'),
-        ...hPromises,
-        ...ePromises,
-        ...phPromises,
-      ]);
-      const hArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
-      const eArrays = rest.slice(yearsToFetch.length, yearsToFetch.length * 2) as OfficeEvent[][];
-      const phArrays = rest.slice(yearsToFetch.length * 2) as PlannedHolidayApi[][];
-      setMembers(membersData);
-      setHolidays(hArrays.flat());
-      setOfficeEvents(eArrays.flat());
-      setPlannedHolidays(phArrays.flat());
-      yearsToFetch.forEach((y) => fetchedYearsRef.current.add(y));
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, [yearsToFetch]);
-
   useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const hPromises = yearsToFetch.map((y) =>
+          api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
+        );
+        const ePromises = yearsToFetch.map((y) =>
+          api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
+        );
+        const phPromises = yearsToFetch.map((y) =>
+          api.get<PlannedHolidayApi[]>(`/api/planned-holidays?year=${y}`),
+        );
+        const [membersData, ...rest] = await Promise.all([
+          api.get<TeamMember[]>('/api/team-members'),
+          ...hPromises,
+          ...ePromises,
+          ...phPromises,
+        ]);
+        if (cancelled) return;
+        const hArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
+        const eArrays = rest.slice(yearsToFetch.length, yearsToFetch.length * 2) as OfficeEvent[][];
+        const phArrays = rest.slice(yearsToFetch.length * 2) as PlannedHolidayApi[][];
+        setMembers(membersData);
+        setHolidays(hArrays.flat());
+        setOfficeEvents(eArrays.flat());
+        setPlannedHolidays(phArrays.flat());
+      } catch {
+        // silently fail
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
     fetchData();
-  }, [fetchData]);
+    return () => {
+      cancelled = true;
+    };
+  }, [yearsToFetch]);
 
   // Scroll to current month once data loads
   useEffect(() => {
@@ -327,56 +303,18 @@ export default function TeamCalendarScreen() {
     return spans;
   }, [dayEntries]);
 
-  const handleScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const scrollX = e.nativeEvent.contentOffset.x;
-      const contentWidth = e.nativeEvent.contentSize.width;
-      const layoutWidth = e.nativeEvent.layoutMeasurement.width;
-      const dayIndex = Math.max(
-        0,
-        Math.min(Math.floor(scrollX / DAY_COL_WIDTH), dayEntries.length - 1),
-      );
-      const entry = dayEntries[dayIndex];
-      if (entry) {
-        setVisibleMonth(entry.month);
-        setVisibleYear(entry.year);
-      }
-
-      // Infinite scroll: prepend months when near the start
-      if (scrollX < 200 && !isExpandingRef.current) {
-        isExpandingRef.current = true;
-        const [newStartY, newStartM] = normaliseYearMonth(startYear, startMonth - 6);
-        const prepended = buildMonthRange(newStartY, newStartM, 6);
-        const addedWidth = prepended.length * DAY_COL_WIDTH;
-        setStartYear(newStartY);
-        setStartMonth(newStartM);
-        setMonthCount((prev) => prev + 6);
-        const newYears = new Set<number>();
-        prepended.forEach((de) => newYears.add(de.year));
-        fetchYearsData(Array.from(newYears));
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({ x: scrollX + addedWidth, animated: false });
-          isExpandingRef.current = false;
-        }, 50);
-      }
-
-      // Infinite scroll: append months when near the end
-      const maxScroll = contentWidth - layoutWidth;
-      if (maxScroll - scrollX < 200 && !isExpandingRef.current) {
-        isExpandingRef.current = true;
-        const [endY, endM] = normaliseYearMonth(startYear, startMonth + monthCount);
-        const appended = buildMonthRange(endY, endM, 6);
-        setMonthCount((prev) => prev + 6);
-        const newYears = new Set<number>();
-        appended.forEach((de) => newYears.add(de.year));
-        fetchYearsData(Array.from(newYears));
-        setTimeout(() => {
-          isExpandingRef.current = false;
-        }, 50);
-      }
-    },
-    [dayEntries, startYear, startMonth, monthCount, fetchYearsData],
-  );
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrollX = e.nativeEvent.contentOffset.x;
+    const dayIndex = Math.max(
+      0,
+      Math.min(Math.floor(scrollX / DAY_COL_WIDTH), dayEntries.length - 1),
+    );
+    const entry = dayEntries[dayIndex];
+    if (entry) {
+      setVisibleMonth(entry.month);
+      setVisibleYear(entry.year);
+    }
+  };
 
   const scrollToMonth = (targetYear: number, targetMonth: number) => {
     const idx = findMonthStartIndex(dayEntries, targetYear, targetMonth);
