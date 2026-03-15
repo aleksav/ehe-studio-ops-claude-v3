@@ -1006,7 +1006,12 @@ export default function TimeLoggingPage() {
                     {weekDates.map((d, i) => {
                       const ds = dateKey(d);
                       const dt = computeDailyTotal(ds);
-                      const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates, leaveDates);
+                      const blockReason = isBlockedDate(
+                        ds,
+                        holidayDates,
+                        officeEventBlockedDates,
+                        leaveDates,
+                      );
                       const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                       return (
                         <TableCell
@@ -1138,87 +1143,93 @@ export default function TimeLoggingPage() {
                                       '&:hover': { opacity: 0.7 },
                                     }}
                                   >
-                                    <LockOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                                    <LockOutlinedIcon
+                                      sx={{ fontSize: 18, color: 'text.disabled' }}
+                                    />
                                   </Box>
                                 </Tooltip>
                               ) : (
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  inputProps={{
-                                    min: 0.5,
-                                    max: 24,
-                                    step: 0.5,
-                                    'data-cell-key': ck,
-                                  }}
-                                  value={cell?.hours ?? ''}
-                                  onChange={(e) => handleHoursChange(ck, e.target.value)}
-                                  onBlur={() => void handleCellBlur(pid, ds)}
-                                  disabled={isDisabled}
-                                  sx={{
-                                    '& .MuiInputBase-input': {
-                                      textAlign: 'center',
-                                      py: 0.5,
-                                      px: 0.5,
-                                      fontSize: 14,
-                                    },
-                                    maxWidth: 80,
-                                    mx: 'auto',
-                                  }}
-                                />
-                                <Box
-                                  sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
-                                    gap: '2px',
-                                    maxWidth: 110,
-                                    mx: 'auto',
-                                  }}
-                                >
-                                  {TASK_TYPES.map((t) => {
-                                    const isSelected = (cell?.taskType ?? TASK_TYPES[0]) === t;
-                                    return (
-                                      <Tooltip key={t} title={TASK_TYPE_SHORT_LABELS[t]} arrow>
-                                        <Box
-                                          component="button"
-                                          type="button"
-                                          tabIndex={-1}
-                                          onClick={() => {
-                                            handleTaskTypeChange(ck, pid, t);
-                                            setTimeout(() => void handleCellBlur(pid, ds), 0);
-                                          }}
-                                          sx={{
-                                            border: '1px solid',
-                                            borderColor: isSelected ? 'primary.main' : 'divider',
-                                            borderRadius: 1,
-                                            bgcolor: isSelected ? 'primary.main' : 'transparent',
-                                            color: isSelected
-                                              ? 'primary.contrastText'
-                                              : 'text.secondary',
-                                            fontSize: 10,
-                                            fontWeight: isSelected ? 700 : 400,
-                                            fontFamily: 'inherit',
-                                            lineHeight: 1,
-                                            px: 0.25,
-                                            py: 0.4,
-                                            cursor: 'pointer',
-                                            textAlign: 'center',
-                                            transition: 'all 0.15s ease',
-                                            '&:hover': {
-                                              borderColor: 'primary.main',
-                                              bgcolor: isSelected ? 'primary.dark' : 'action.hover',
-                                            },
-                                          }}
-                                        >
-                                          {TASK_TYPE_ABBR[t]}
-                                        </Box>
-                                      </Tooltip>
-                                    );
-                                  })}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    inputProps={{
+                                      min: 0.5,
+                                      max: 24,
+                                      step: 0.5,
+                                      'data-cell-key': ck,
+                                    }}
+                                    value={cell?.hours ?? ''}
+                                    onChange={(e) => handleHoursChange(ck, e.target.value)}
+                                    onBlur={() => void handleCellBlur(pid, ds)}
+                                    disabled={isDisabled}
+                                    sx={{
+                                      '& .MuiInputBase-input': {
+                                        textAlign: 'center',
+                                        py: 0.5,
+                                        px: 0.5,
+                                        fontSize: 14,
+                                      },
+                                      maxWidth: 80,
+                                      mx: 'auto',
+                                    }}
+                                  />
+                                  <Box
+                                    sx={{
+                                      display: 'grid',
+                                      gridTemplateColumns: '1fr 1fr',
+                                      gap: '2px',
+                                      maxWidth: 110,
+                                      mx: 'auto',
+                                    }}
+                                  >
+                                    {TASK_TYPES.map((t) => {
+                                      const isSelected = (cell?.taskType ?? TASK_TYPES[0]) === t;
+                                      return (
+                                        <Tooltip key={t} title={TASK_TYPE_SHORT_LABELS[t]} arrow>
+                                          <Box
+                                            component="button"
+                                            type="button"
+                                            tabIndex={-1}
+                                            onClick={() => {
+                                              handleTaskTypeChange(ck, pid, t);
+                                              setTimeout(() => void handleCellBlur(pid, ds), 0);
+                                            }}
+                                            sx={{
+                                              border: '1px solid',
+                                              borderColor: isSelected ? 'primary.main' : 'divider',
+                                              borderRadius: 1,
+                                              bgcolor: isSelected ? 'primary.main' : 'transparent',
+                                              color: isSelected
+                                                ? 'primary.contrastText'
+                                                : 'text.secondary',
+                                              fontSize: 10,
+                                              fontWeight: isSelected ? 700 : 400,
+                                              fontFamily: 'inherit',
+                                              lineHeight: 1,
+                                              px: 0.25,
+                                              py: 0.4,
+                                              cursor: 'pointer',
+                                              textAlign: 'center',
+                                              transition: 'all 0.15s ease',
+                                              '&:hover': {
+                                                borderColor: 'primary.main',
+                                                bgcolor: isSelected
+                                                  ? 'primary.dark'
+                                                  : 'action.hover',
+                                              },
+                                            }}
+                                          >
+                                            {TASK_TYPE_ABBR[t]}
+                                          </Box>
+                                        </Tooltip>
+                                      );
+                                    })}
+                                  </Box>
+                                  {cell?.saving && (
+                                    <CircularProgress size={12} sx={{ mx: 'auto' }} />
+                                  )}
                                 </Box>
-                                {cell?.saving && <CircularProgress size={12} sx={{ mx: 'auto' }} />}
-                              </Box>
                               )}
                             </TableCell>
                           );
@@ -1230,11 +1241,7 @@ export default function TimeLoggingPage() {
                           {rowTotal > 0 ? (
                             <Tooltip title="Cannot remove — hours logged this week">
                               <span>
-                                <IconButton
-                                  size="small"
-                                  tabIndex={-1}
-                                  disabled
-                                >
+                                <IconButton size="small" tabIndex={-1} disabled>
                                   <DeleteOutlineIcon fontSize="small" />
                                 </IconButton>
                               </span>
@@ -1331,8 +1338,8 @@ export default function TimeLoggingPage() {
                       : blockDialog.reason === 'office_event'
                         ? 'blocked office event'
                         : 'public holiday'}
-                </strong>.
-                Time entry is normally blocked. Please provide a brief reason to override.
+                </strong>
+                . Time entry is normally blocked. Please provide a brief reason to override.
               </DialogContentText>
               <TextField
                 autoFocus

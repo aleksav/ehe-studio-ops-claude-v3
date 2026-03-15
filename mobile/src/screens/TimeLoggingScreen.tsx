@@ -189,12 +189,14 @@ export default function TimeLoggingScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api.get<{
-          start_date: string;
-          end_date: string;
-          name: string;
-          allow_time_entry: boolean;
-        }[]>('/api/office-events');
+        const data = await api.get<
+          {
+            start_date: string;
+            end_date: string;
+            name: string;
+            allow_time_entry: boolean;
+          }[]
+        >('/api/office-events');
         if (!cancelled) {
           const blocked = new Map<string, string>();
           for (const ev of data) {
@@ -684,7 +686,12 @@ export default function TimeLoggingScreen() {
                   </View>
                   {weekDates.map((d, i) => {
                     const ds = formatDate(d);
-                    const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates, leaveDates);
+                    const blockReason = isBlockedDate(
+                      ds,
+                      holidayDates,
+                      officeEventBlockedDates,
+                      leaveDates,
+                    );
                     const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                     const isOverridden = blockReason !== null && unblockedDates.has(ds);
                     return (
@@ -745,7 +752,12 @@ export default function TimeLoggingScreen() {
                         const ds = formatDate(d);
                         const ck = cellKey(pid, ds);
                         const cell = cells[ck];
-                        const cellBlockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates, leaveDates);
+                        const cellBlockReason = isBlockedDate(
+                          ds,
+                          holidayDates,
+                          officeEventBlockedDates,
+                          leaveDates,
+                        );
                         const cellBlocked = cellBlockReason !== null && !unblockedDates.has(ds);
                         const cellOverridden = cellBlockReason !== null && unblockedDates.has(ds);
 
@@ -759,7 +771,11 @@ export default function TimeLoggingScreen() {
                                   visible: true,
                                   dateStr: ds,
                                   projectId: pid,
-                                  reason: cellBlockReason as 'weekend' | 'holiday' | 'office_event' | 'leave',
+                                  reason: cellBlockReason as
+                                    | 'weekend'
+                                    | 'holiday'
+                                    | 'office_event'
+                                    | 'leave',
                                 })
                               }
                             >
