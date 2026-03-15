@@ -5,9 +5,9 @@ const POLL_INTERVAL = 10_000;
 const FRONTEND_VERSION = __PACKAGE_VERSION__;
 
 /**
- * Wraps the entire app. If the backend is unreachable or its version SHA
- * doesn't match the frontend SHA, a friendly maintenance page is shown
- * with a hamster-wheel animation. Once versions match the app is revealed.
+ * Wraps the entire app. If the backend is unreachable, a friendly maintenance
+ * page is shown with a hamster-wheel animation. Version mismatches are surfaced
+ * in the sidebar footer instead of blocking the app.
  */
 export default function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'maintenance'>('loading');
@@ -27,19 +27,18 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
       }
       const data: { version: string } = await res.json();
       console.log(`[MaintenanceGate] FE: ${FRONTEND_VERSION}, BE: ${data.version}`);
-      if (data.version === FRONTEND_VERSION) {
-        setStatus((prev) => {
-          if (prev === 'maintenance') {
-            window.location.href = '/dashboard';
-          }
-          return 'ok';
-        });
-      } else {
+      if (data.version !== FRONTEND_VERSION) {
         console.warn(
           `[MaintenanceGate] Version mismatch — FE: ${FRONTEND_VERSION}, BE: ${data.version}`,
         );
-        setStatus('maintenance');
       }
+      // API is healthy — let the app render (mismatch shown in sidebar footer)
+      setStatus((prev) => {
+        if (prev === 'maintenance') {
+          window.location.href = '/dashboard';
+        }
+        return 'ok';
+      });
     } catch (err) {
       console.warn('[MaintenanceGate] Backend unreachable', err);
       setStatus('maintenance');

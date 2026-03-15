@@ -54,7 +54,7 @@ export default function MoreScreen({ navigation }: Props) {
           <Ionicons
             name="warning-outline"
             size={14}
-            color="#F59E0B"
+            color="#DC2626"
             style={styles.versionWarningIcon}
           />
         )}
@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   versionMismatch: {
-    color: '#F59E0B',
+    color: '#DC2626',
+    fontWeight: typography.weights.semibold,
   },
 });

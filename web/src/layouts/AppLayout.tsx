@@ -143,12 +143,15 @@ export default function AppLayout() {
         <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {versionMismatch && (
             <Tooltip title="Frontend and backend versions do not match">
-              <WarningAmberIcon sx={{ fontSize: 14, color: 'warning.main' }} />
+              <WarningAmberIcon sx={{ fontSize: 14, color: 'error.main' }} />
             </Tooltip>
           )}
           <Typography
             variant="caption"
-            sx={{ color: versionMismatch ? 'warning.main' : 'text.disabled' }}
+            sx={{
+              color: versionMismatch ? 'error.main' : 'text.disabled',
+              fontWeight: versionMismatch ? 600 : 400,
+            }}
           >
             FE v{FRONTEND_VERSION}
             {backendVersion != null ? ` / BE v${backendVersion}` : ''}
