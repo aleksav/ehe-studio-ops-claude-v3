@@ -6,48 +6,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-mobile-android:
-    name: Build Mobile (Android)
-    runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx expo install --check || true
-        working-directory: mobile
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
-      - name: Build Android (internal distribution)
-        run: eas build --platform android --profile internal --non-interactive --no-wait
-        working-directory: mobile
-        if: env.EXPO_TOKEN != ''
-
-  build-mobile-ios:
-    name: Build Mobile (iOS)
-    runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx expo install --check || true
-        working-directory: mobile
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
-      - name: Build iOS (internal distribution)
-        run: eas build --platform ios --profile internal --non-interactive --no-wait
-        working-directory: mobile
-        if: env.EXPO_TOKEN != ''
-
   deploy-mobile-ota:
     name: Mobile OTA Update (EAS)
     runs-on: ubuntu-latest

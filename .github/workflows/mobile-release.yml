@@ -1,0 +1,58 @@
+name: Mobile Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+jobs:
+  build-android:
+    name: Build Mobile (Android)
+    if: inputs.platform == 'android' || inputs.platform == 'all'
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx expo install --check || true
+        working-directory: mobile
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+      - name: Build Android (internal distribution)
+        run: eas build --platform android --profile internal --non-interactive --no-wait
+        working-directory: mobile
+        if: env.EXPO_TOKEN != ''
+
+  build-ios:
+    name: Build Mobile (iOS)
+    if: inputs.platform == 'ios' || inputs.platform == 'all'
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx expo install --check || true
+        working-directory: mobile
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+      - name: Build iOS (internal distribution)
+        run: eas build --platform ios --profile internal --non-interactive --no-wait
+        working-directory: mobile
+        if: env.EXPO_TOKEN != ''
