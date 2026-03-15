@@ -16,12 +16,27 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
     try {
       const apiBase = import.meta.env.VITE_API_URL ?? '';
       const res = await fetch(`${apiBase}/api/version`, { cache: 'no-store' });
+      if (res.status === 401 || res.status === 403) {
+        // Auth error — backend is up but user is not authenticated
+        window.location.href = '/login';
+        return;
+      }
       if (!res.ok) {
         setStatus('maintenance');
         return;
       }
       const data: { version: string } = await res.json();
-      setStatus(data.version === FRONTEND_VERSION ? 'ok' : 'maintenance');
+      if (data.version === FRONTEND_VERSION) {
+        setStatus((prev) => {
+          if (prev === 'maintenance') {
+            // Was in maintenance, now recovered — redirect to dashboard
+            window.location.href = '/dashboard';
+          }
+          return 'ok';
+        });
+      } else {
+        setStatus('maintenance');
+      }
     } catch {
       setStatus('maintenance');
     }

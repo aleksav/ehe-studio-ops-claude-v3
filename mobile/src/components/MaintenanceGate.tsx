@@ -19,6 +19,11 @@ export default function MaintenanceGate({ children }: Props) {
       const res = await fetch(`${API_BASE_URL}/api/version`, {
         cache: 'no-store',
       });
+      if (res.status === 401 || res.status === 403) {
+        // Auth error — backend is up, let AuthProvider handle login
+        setStatus('ok');
+        return;
+      }
       if (!res.ok) {
         setStatus('maintenance');
         return;
