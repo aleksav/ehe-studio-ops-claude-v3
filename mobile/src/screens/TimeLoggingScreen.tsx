@@ -92,7 +92,9 @@ function isBlockedDate(
   dateStr: string,
   holidayDates: Set<string>,
   officeEventBlockedDates?: Map<string, string>,
-): 'weekend' | 'holiday' | 'office_event' | null {
+  leaveDates?: Set<string>,
+): 'weekend' | 'holiday' | 'office_event' | 'leave' | null {
+  if (leaveDates?.has(dateStr)) return 'leave';
   const d = new Date(dateStr + 'T00:00:00');
   const day = d.getDay();
   if (day === 0 || day === 6) return 'weekend';
@@ -216,13 +218,36 @@ export default function TimeLoggingScreen() {
     };
   }, []);
 
+  // ---- Planned leave (team member holidays) ----
+  const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!teamMemberId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ date: string; day_type: string }[]>(
+          `/api/team-members/${teamMemberId}/holidays`,
+        );
+        if (!cancelled) {
+          setLeaveDates(new Set(data.map((h) => h.date.substring(0, 10))));
+        }
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamMemberId]);
+
   // ---- Break-glass override state ----
   const [unblockedDates, setUnblockedDates] = useState<Set<string>>(new Set());
   const [blockDialog, setBlockDialog] = useState<{
     visible: boolean;
     dateStr: string;
     projectId: string;
-    reason: 'weekend' | 'holiday' | 'office_event';
+    reason: 'weekend' | 'holiday' | 'office_event' | 'leave';
   }>({ visible: false, dateStr: '', projectId: '', reason: 'weekend' });
   const [blockOverrideReason, setBlockOverrideReason] = useState('');
 
@@ -659,7 +684,7 @@ export default function TimeLoggingScreen() {
                   </View>
                   {weekDates.map((d, i) => {
                     const ds = formatDate(d);
-                    const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates);
+                    const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates, leaveDates);
                     const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                     const isOverridden = blockReason !== null && unblockedDates.has(ds);
                     return (
@@ -720,7 +745,7 @@ export default function TimeLoggingScreen() {
                         const ds = formatDate(d);
                         const ck = cellKey(pid, ds);
                         const cell = cells[ck];
-                        const cellBlockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates);
+                        const cellBlockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates, leaveDates);
                         const cellBlocked = cellBlockReason !== null && !unblockedDates.has(ds);
                         const cellOverridden = cellBlockReason !== null && unblockedDates.has(ds);
 
@@ -734,7 +759,7 @@ export default function TimeLoggingScreen() {
                                   visible: true,
                                   dateStr: ds,
                                   projectId: pid,
-                                  reason: cellBlockReason as 'weekend' | 'holiday' | 'office_event',
+                                  reason: cellBlockReason as 'weekend' | 'holiday' | 'office_event' | 'leave',
                                 })
                               }
                             >
@@ -845,9 +870,11 @@ export default function TimeLoggingScreen() {
               <Text style={styles.overrideBold}>
                 {blockDialog.reason === 'weekend'
                   ? 'weekend'
-                  : blockDialog.reason === 'office_event'
-                    ? 'blocked office event'
-                    : 'public holiday'}
+                  : blockDialog.reason === 'leave'
+                    ? 'planned leave day'
+                    : blockDialog.reason === 'office_event'
+                      ? 'blocked office event'
+                      : 'public holiday'}
               </Text>
               . Time entry is normally blocked. Please provide a brief reason to override.
             </Text>
