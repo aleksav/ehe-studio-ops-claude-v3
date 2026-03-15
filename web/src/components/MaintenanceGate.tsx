@@ -26,18 +26,22 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
         return;
       }
       const data: { version: string } = await res.json();
+      console.log(`[MaintenanceGate] FE: ${FRONTEND_VERSION}, BE: ${data.version}`);
       if (data.version === FRONTEND_VERSION) {
         setStatus((prev) => {
           if (prev === 'maintenance') {
-            // Was in maintenance, now recovered — redirect to dashboard
             window.location.href = '/dashboard';
           }
           return 'ok';
         });
       } else {
+        console.warn(
+          `[MaintenanceGate] Version mismatch — FE: ${FRONTEND_VERSION}, BE: ${data.version}`,
+        );
         setStatus('maintenance');
       }
-    } catch {
+    } catch (err) {
+      console.warn('[MaintenanceGate] Backend unreachable', err);
       setStatus('maintenance');
     }
   }, []);

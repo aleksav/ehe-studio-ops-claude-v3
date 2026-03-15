@@ -29,8 +29,17 @@ export default function MaintenanceGate({ children }: Props) {
         return;
       }
       const data: { version: string } = await res.json();
-      setStatus(data.version === FRONTEND_VERSION ? 'ok' : 'maintenance');
-    } catch {
+      console.log(`[MaintenanceGate] FE: ${FRONTEND_VERSION}, BE: ${data.version}`);
+      if (data.version === FRONTEND_VERSION) {
+        setStatus('ok');
+      } else {
+        console.warn(
+          `[MaintenanceGate] Version mismatch — FE: ${FRONTEND_VERSION}, BE: ${data.version}`,
+        );
+        setStatus('maintenance');
+      }
+    } catch (err) {
+      console.warn('[MaintenanceGate] Backend unreachable', err);
       setStatus('maintenance');
     }
   }, []);
