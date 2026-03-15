@@ -116,7 +116,7 @@ test.describe('Weekly Grid', () => {
     const initialText = await weekLabel.textContent();
 
     // Click previous week button (ChevronLeft)
-    await page.locator('button:has(svg)').first().click();
+    await page.locator('button:has(svg[data-testid="ChevronLeftIcon"])').click();
 
     // Week label should change
     await expect(weekLabel).not.toHaveText(initialText!, { timeout: 5000 });

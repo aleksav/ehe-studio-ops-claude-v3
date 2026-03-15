@@ -59,7 +59,7 @@ async function clearSubtitle(page: import('@playwright/test').Page) {
 
 test.describe('Demo Recording', () => {
   test('full app walkthrough with subtitles', async ({ page }) => {
-    test.setTimeout(300_000); // 5 minutes for the full demo walkthrough
+    test.setTimeout(600_000); // 10 minutes for the full demo walkthrough
 
     const timestamp = Date.now();
     const testName = 'Demo User';
@@ -78,21 +78,15 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(500);
 
     await page.getByLabel('Full name').click();
-    await page.getByLabel('Full name').pressSequentially(testName, {
-      delay: 80,
-    });
+    await page.getByLabel('Full name').pressSequentially(testName, { delay: 80 });
     await page.waitForTimeout(400);
 
     await page.getByLabel('Email address').click();
-    await page.getByLabel('Email address').pressSequentially(testEmail, {
-      delay: 60,
-    });
+    await page.getByLabel('Email address').pressSequentially(testEmail, { delay: 60 });
     await page.waitForTimeout(400);
 
     await page.getByLabel('Password').click();
-    await page.getByLabel('Password').pressSequentially(testPassword, {
-      delay: 60,
-    });
+    await page.getByLabel('Password').pressSequentially(testPassword, { delay: 60 });
     await page.waitForTimeout(600);
 
     await page.getByRole('button', { name: /create account/i }).click();
@@ -108,7 +102,6 @@ test.describe('Demo Recording', () => {
     );
     await page.waitForTimeout(800);
 
-    // Wait for summary cards to load
     await expect(page.getByText('Active Projects', { exact: true })).toBeVisible({
       timeout: 10000,
     });
@@ -116,15 +109,10 @@ test.describe('Demo Recording', () => {
     await expect(page.getByText('Open Tasks', { exact: true })).toBeVisible();
     await page.waitForTimeout(1500);
 
-    // Scroll down to show more of the dashboard
     await page.evaluate(() => window.scrollBy(0, 400));
     await page.waitForTimeout(1000);
-
-    // Scroll to daily hours chart
     await page.evaluate(() => window.scrollBy(0, 400));
     await page.waitForTimeout(1000);
-
-    // Scroll back to top
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(800);
 
@@ -139,24 +127,21 @@ test.describe('Demo Recording', () => {
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
     await page.waitForTimeout(1500);
 
-    // Wait for project cards to render
     await expect(page.getByText(/Brand Refresh Campaign/i).first()).toBeVisible({
       timeout: 10000,
     });
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
-    // 4. Project Detail — Board View
+    // 4. Project Detail — Overview & Board View
     // ------------------------------------------------------------------
-    await subtitle(page, 'The Board view shows tasks organized by status columns');
+    await subtitle(page, 'Project overview shows stats, budget, and milestone summary');
     await page.waitForTimeout(600);
 
-    // Click into "Brand Refresh Campaign"
     await page.getByText('Brand Refresh Campaign').first().click();
     await expect(page).toHaveURL(/\/projects\/.+/);
     await page.waitForTimeout(1000);
 
-    // Overview tab shows stats, budget, milestones summary
     await expect(page.getByRole('tab', { name: /overview/i })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1500);
 
@@ -166,10 +151,7 @@ test.describe('Demo Recording', () => {
     await page.getByRole('tab', { name: /tasks/i }).click();
     await page.waitForTimeout(1000);
 
-    // Wait for the board to load
-    await expect(page.getByText('TODO').first()).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText('TODO').first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('In Progress').first()).toBeVisible();
     await expect(page.getByText('Done').first()).toBeVisible();
     await page.waitForTimeout(1500);
@@ -183,7 +165,6 @@ test.describe('Demo Recording', () => {
     );
     await page.waitForTimeout(600);
 
-    // Click the Milestones toggle button
     await page.getByRole('button', { name: /milestones/i }).click();
     await page.waitForTimeout(1500);
 
@@ -193,76 +174,33 @@ test.describe('Demo Recording', () => {
     await subtitle(page, 'People view shows task assignments per team member with weekly hours');
     await page.waitForTimeout(600);
 
-    // Click the People toggle button
     await page.getByRole('button', { name: /people/i }).click();
     await page.waitForTimeout(1500);
 
     // ------------------------------------------------------------------
-    // 7. Admin — Clients
+    // 7. Project Detail — Dashboard Tab
     // ------------------------------------------------------------------
-    await subtitle(page, 'Admin section manages clients, team, and audit log');
+    await subtitle(
+      page,
+      'Dashboard tab shows project analytics \u2014 hours, costs by task type, member, and month',
+    );
     await page.waitForTimeout(600);
 
-    await page.locator('.MuiDrawer-root').getByText('Admin', { exact: true }).click();
-    await expect(page).toHaveURL(/\/admin/);
-    await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible();
-    await page.waitForTimeout(800);
-
-    // Clients tab is the default
-    await expect(page.getByRole('tab', { name: /clients/i })).toBeVisible();
-    await page.waitForTimeout(500);
-
-    // Wait for clients to load
-    await expect(page.getByText(/Acme Corp/i).first()).toBeVisible({
-      timeout: 10000,
-    });
+    await page.getByRole('tab', { name: /dashboard/i }).click();
     await page.waitForTimeout(1000);
 
-    // ------------------------------------------------------------------
-    // 8. Create a Client
-    // ------------------------------------------------------------------
-    await subtitle(page, 'Adding a new client to the system');
-    await page.waitForTimeout(600);
-
-    await page.getByRole('button', { name: /new client/i }).click();
-    await expect(page.getByRole('heading', { name: /new client/i })).toBeVisible();
-    await page.waitForTimeout(600);
-
-    await page.getByLabel('Client Name').click();
-    await page.getByLabel('Client Name').pressSequentially(`Nova Digital ${timestamp}`, {
-      delay: 70,
-    });
-    await page.waitForTimeout(400);
-
-    await page.getByLabel('Contact Name').click();
-    await page.getByLabel('Contact Name').pressSequentially('Sarah Mitchell', { delay: 70 });
-    await page.waitForTimeout(400);
-
-    await page.getByLabel('Contact Email').click();
-    await page.getByLabel('Contact Email').pressSequentially('sarah@novadigital.io', { delay: 50 });
-    await page.waitForTimeout(400);
-
-    await page.getByRole('button', { name: /create client/i }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(800);
-
-    // ------------------------------------------------------------------
-    // 9. Admin — Team
-    // ------------------------------------------------------------------
-    await subtitle(page, 'The team directory shows all members and their roles');
-    await page.waitForTimeout(600);
-
-    await page.getByRole('tab', { name: /team/i }).click();
-    await page.waitForTimeout(1000);
-
-    // Wait for team members to load
-    await expect(page.getByText(/Active/i).first()).toBeVisible({
-      timeout: 10000,
-    });
+    // Wait for stats to load
+    await expect(page.getByText('Overview').first()).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1500);
 
+    // Scroll to see more stats
+    await page.evaluate(() => window.scrollBy(0, 300));
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(800);
+
     // ------------------------------------------------------------------
-    // 10. Time Logging — Weekly Grid (default tab)
+    // 8. Time Logging — Weekly Grid
     // ------------------------------------------------------------------
     await subtitle(page, 'Time Logging opens with the Weekly Grid for batch time entry');
     await page.waitForTimeout(600);
@@ -271,7 +209,6 @@ test.describe('Demo Recording', () => {
     await expect(page).toHaveURL(/\/time-logging/);
     await page.waitForTimeout(1000);
 
-    // Weekly Grid is the default first tab
     await expect(page.getByRole('tab', { name: /weekly grid/i })).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 
@@ -292,7 +229,33 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
-    // 11. Time Logging — Quick Entry
+    // 9. Time Logging — Holidays Button
+    // ------------------------------------------------------------------
+    await subtitle(
+      page,
+      'Team members can manage their holidays directly from the time entry page',
+    );
+    await page.waitForTimeout(600);
+
+    const holidaysButton = page.getByRole('button', { name: /holidays/i });
+    if (await holidaysButton.isVisible()) {
+      await holidaysButton.click();
+      await page.waitForTimeout(1000);
+
+      // Show the holidays modal
+      await expect(page.getByText(/my holidays/i).first()).toBeVisible({ timeout: 5000 });
+      await page.waitForTimeout(1500);
+
+      // Close the modal
+      const closeButton = page.getByRole('button', { name: /close/i });
+      if (await closeButton.isVisible()) {
+        await closeButton.click();
+        await page.waitForTimeout(500);
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 10. Time Logging — Quick Entry
     // ------------------------------------------------------------------
     await subtitle(page, 'Quick Entry lets you log time against project tasks');
     await page.waitForTimeout(600);
@@ -300,7 +263,6 @@ test.describe('Demo Recording', () => {
     await page.getByRole('tab', { name: /quick entry/i }).click();
     await page.waitForTimeout(800);
 
-    // Select a project
     await page.getByRole('combobox', { name: /select project/i }).click();
     await page.waitForTimeout(500);
     await expect(page.getByRole('option', { name: /brand refresh campaign/i })).toBeVisible({
@@ -310,68 +272,59 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
-    // 12. Log Time
+    // 11. Log Time
     // ------------------------------------------------------------------
     await subtitle(page, 'Logging 2 hours of development work on a task');
     await page.waitForTimeout(600);
 
-    // The form should now be visible
     await expect(page.getByLabel('Hours')).toBeVisible({ timeout: 10000 });
 
     await page.getByLabel('Hours').click();
     await page.getByLabel('Hours').fill('2');
     await page.waitForTimeout(400);
 
-    // Select task type
     await page.getByRole('combobox', { name: /task type/i }).click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: /development & testing/i }).click();
     await page.waitForTimeout(400);
 
-    // Add notes
     await page.getByLabel('Notes (optional)').click();
     await page
       .getByLabel('Notes (optional)')
-      .pressSequentially('Working on competitor analysis report', {
-        delay: 50,
-      });
+      .pressSequentially('Working on competitor analysis report', { delay: 50 });
     await page.waitForTimeout(400);
 
-    // Submit
     await page.getByRole('button', { name: /log entry/i }).click();
     await page.waitForTimeout(1500);
 
     // ------------------------------------------------------------------
-    // 13. Standup
+    // 12. Standup — Holidays & Projects
     // ------------------------------------------------------------------
-    await subtitle(page, 'The Standup carousel guides the team through each project one at a time');
+    await subtitle(
+      page,
+      'Standup starts with team availability \u2014 who is off today, this week, and next week',
+    );
     await page.waitForTimeout(600);
 
     await page.locator('.MuiDrawer-root').getByText('Standup', { exact: true }).click();
     await expect(page).toHaveURL(/\/standup/);
     await page.waitForTimeout(800);
 
-    // The carousel auto-loads the first active project — wait for the counter
+    // The carousel auto-loads — wait for counter
     await expect(page.getByText(/1\//).first()).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(1000);
-
-    // Show the kanban board for the first project
-    await expect(page.getByText('TODO').first()).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1500);
 
-    // Click the Next arrow to advance to the next project
+    // Advance through projects
+    await subtitle(page, 'Each project shows its own task board during standup');
+    await page.waitForTimeout(600);
+
     const nextButton = page.locator('button:has([data-testid="ArrowForwardIosIcon"])');
     if (await nextButton.isEnabled()) {
-      await subtitle(page, 'Clicking through projects — each one shows its own task board');
-      await page.waitForTimeout(600);
       await nextButton.click();
       await page.waitForTimeout(1000);
-
-      // Wait for the next project's board to render
       await expect(page.getByText(/2\//).first()).toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(1500);
 
-      // Advance once more if possible
       if (await nextButton.isEnabled()) {
         await nextButton.click();
         await page.waitForTimeout(1000);
@@ -379,31 +332,147 @@ test.describe('Demo Recording', () => {
         await page.waitForTimeout(1000);
       }
     }
-
-    // Check for the "Up next" teaser beside the next arrow
-    const upNext = page.getByText('Up next');
-    if (await upNext.isVisible()) {
-      await page.waitForTimeout(800);
-    }
     await page.waitForTimeout(800);
 
     // ------------------------------------------------------------------
-    // 14. Admin — Audit Log
+    // 13. Team Calendar
     // ------------------------------------------------------------------
-    await subtitle(page, 'The Audit Log tracks every change made in the system');
+    await subtitle(
+      page,
+      'Team Calendar shows holidays, office events, and team availability at a glance',
+    );
+    await page.waitForTimeout(600);
+
+    await page.locator('.MuiDrawer-root').getByText('Team Calendar', { exact: true }).click();
+    await expect(page).toHaveURL(/\/team-calendar/);
+    await page.waitForTimeout(1500);
+
+    // Let the calendar render
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 14. Admin — Clients
+    // ------------------------------------------------------------------
+    await subtitle(page, 'Admin section manages clients, team, rates, holidays, and events');
     await page.waitForTimeout(600);
 
     await page.locator('.MuiDrawer-root').getByText('Admin', { exact: true }).click();
     await expect(page).toHaveURL(/\/admin/);
-    await page.waitForTimeout(500);
-    await page.getByRole('tab', { name: /audit log/i }).click();
+    await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible();
+    await page.waitForTimeout(800);
+
+    await expect(page.getByRole('tab', { name: /clients/i })).toBeVisible();
+    await expect(page.getByText(/Acme Corp/i).first()).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    // ------------------------------------------------------------------
+    // 15. Create a Client
+    // ------------------------------------------------------------------
+    await subtitle(page, 'Adding a new client to the system');
+    await page.waitForTimeout(600);
+
+    await page.getByRole('button', { name: /new client/i }).click();
+    await expect(page.getByRole('heading', { name: /new client/i })).toBeVisible();
+    await page.waitForTimeout(600);
+
+    await page.getByLabel('Client Name').click();
+    await page
+      .getByLabel('Client Name')
+      .pressSequentially(`Nova Digital ${timestamp}`, { delay: 70 });
+    await page.waitForTimeout(400);
+
+    await page.getByLabel('Contact Name').click();
+    await page.getByLabel('Contact Name').pressSequentially('Sarah Mitchell', { delay: 70 });
+    await page.waitForTimeout(400);
+
+    await page.getByLabel('Contact Email').click();
+    await page.getByLabel('Contact Email').pressSequentially('sarah@novadigital.io', { delay: 50 });
+    await page.waitForTimeout(400);
+
+    await page.getByRole('button', { name: /create client/i }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(800);
+
+    // ------------------------------------------------------------------
+    // 16. Admin — Team
+    // ------------------------------------------------------------------
+    await subtitle(page, 'The team directory shows all members and their roles');
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /team/i }).click();
+    await page.waitForTimeout(1000);
+
+    await expect(page.getByText(/Active/i).first()).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 17. Admin — Task Rates
+    // ------------------------------------------------------------------
+    await subtitle(
+      page,
+      'Task Rates define day rates per task type \u2014 used to calculate project costs',
+    );
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /task rates/i }).click();
+    await page.waitForTimeout(1000);
+
+    // Wait for content to load
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 18. Admin — Public Holidays
+    // ------------------------------------------------------------------
+    await subtitle(
+      page,
+      'Public holidays are blocked on time entry and shown in the team calendar',
+    );
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /public holidays/i }).click();
+    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 19. Admin — Office Events
+    // ------------------------------------------------------------------
+    await subtitle(
+      page,
+      'Office events can optionally block time tracking \u2014 like company days or retreats',
+    );
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /office events/i }).click();
+    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 20. Admin — Time Entries
+    // ------------------------------------------------------------------
+    await subtitle(
+      page,
+      'Time Entries tab lets admins review all logged time \u2014 filterable by client, project, member, and date',
+    );
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /time entries/i }).click();
     await page.waitForTimeout(1000);
 
     // Wait for entries to load
+    await page.waitForTimeout(1500);
+
+    // ------------------------------------------------------------------
+    // 21. Admin — Audit Log
+    // ------------------------------------------------------------------
+    await subtitle(page, 'The Audit Log tracks every change made in the system');
+    await page.waitForTimeout(600);
+
+    await page.getByRole('tab', { name: /audit log/i }).click();
+    await page.waitForTimeout(1000);
+
     await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(800);
 
-    // Expand the first row that has changed fields
     const firstExpandButton = page.locator('table tbody tr').first().locator('button').first();
     if ((await firstExpandButton.count()) > 0) {
       await firstExpandButton.click();
@@ -411,12 +480,11 @@ test.describe('Demo Recording', () => {
     }
 
     // ------------------------------------------------------------------
-    // 15. Filter Audit Log
+    // 22. Filter Audit Log
     // ------------------------------------------------------------------
     await subtitle(page, 'Audit entries can be filtered by entity type, action, and date range');
     await page.waitForTimeout(600);
 
-    // Apply entity type filter — MUI Select without labelId needs a DOM-based selector
     const entityTypeSelect = page.locator(
       '.MuiFormControl-root:has(label:text("Entity Type")) .MuiSelect-select',
     );
@@ -425,14 +493,13 @@ test.describe('Demo Recording', () => {
     await page.getByRole('option', { name: 'Project' }).click();
     await page.waitForTimeout(1500);
 
-    // Clear the filter to show all again
     await entityTypeSelect.click();
     await page.waitForTimeout(300);
     await page.getByRole('option', { name: 'All' }).click();
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
-    // 16. Logout
+    // 23. Logout
     // ------------------------------------------------------------------
     await subtitle(page, 'Signing out returns to the login page');
     await page.waitForTimeout(600);
@@ -444,7 +511,7 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(1500);
 
     // ------------------------------------------------------------------
-    // 17. Login
+    // 24. Login
     // ------------------------------------------------------------------
     await subtitle(page, 'Logging back in with existing credentials');
     await page.waitForTimeout(600);
@@ -462,9 +529,9 @@ test.describe('Demo Recording', () => {
     await page.waitForTimeout(1000);
 
     // ------------------------------------------------------------------
-    // 18. Final Dashboard
+    // 25. Final Dashboard
     // ------------------------------------------------------------------
-    await subtitle(page, 'EHE Studio Ops \u2014 Studio operations, simplified.');
+    await subtitle(page, 'EHE Studio Ops v1.0 \u2014 Studio operations, simplified.');
     await page.waitForTimeout(2000);
 
     await clearSubtitle(page);
