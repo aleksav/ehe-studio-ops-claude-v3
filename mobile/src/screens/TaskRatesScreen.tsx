@@ -32,7 +32,7 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 interface TaskRate {
   id: string;
   task_type: string;
-  day_rate: number;
+  day_rate: number | string;
   currency_code: string;
   effective_from: string;
   effective_to: string | null;
@@ -165,7 +165,7 @@ export default function TaskRatesScreen() {
       </View>
       <View style={styles.rateRow}>
         <Text style={styles.rateValue}>
-          {item.currency_code} {item.day_rate.toFixed(2)}
+          {item.currency_code} {Number(item.day_rate).toFixed(2)}
         </Text>
         <Text style={styles.rateLabel}>/ day</Text>
       </View>

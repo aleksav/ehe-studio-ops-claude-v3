@@ -33,7 +33,7 @@ interface TimeEntry {
   project_id: string;
   team_member_id: string;
   date: string;
-  hours_worked: number;
+  hours_worked: number | string;
   task_type: string;
   notes: string | null;
   project: TimeEntryProject;
