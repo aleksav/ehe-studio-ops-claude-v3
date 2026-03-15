@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
@@ -29,6 +28,21 @@ interface HolidayAllowance {
   remaining: number;
 }
 
+interface PublicHoliday {
+  id: string;
+  date: string;
+  name: string;
+}
+
+interface OfficeEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  allow_time_entry: boolean;
+}
+
 const DAY_TYPE_LABELS: Record<string, string> = {
   FULL: 'Full day',
   AM: 'Half day (AM)',
@@ -51,6 +65,98 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function formatDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getBlockedOfficeDays(events: OfficeEvent[]): Set<string> {
+  const blocked = new Set<string>();
+  for (const event of events) {
+    if (!event.allow_time_entry) {
+      const start = new Date(event.start_date.substring(0, 10) + 'T00:00:00');
+      const end = new Date(event.end_date.substring(0, 10) + 'T00:00:00');
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        blocked.add(formatDateKey(d));
+      }
+    }
+  }
+  return blocked;
+}
+
+interface ExclusionSummary {
+  weekends: number;
+  publicHolidays: number;
+  officeBlocked: number;
+  alreadyBooked: number;
+}
+
+function getEligibleDays(
+  startDate: string,
+  endDate: string,
+  publicHolidays: Set<string>,
+  blockedOfficeDays: Set<string>,
+  existingHolidays: Set<string>,
+): { eligible: string[]; exclusions: ExclusionSummary } {
+  const days: string[] = [];
+  const exclusions: ExclusionSummary = {
+    weekends: 0,
+    publicHolidays: 0,
+    officeBlocked: 0,
+    alreadyBooked: 0,
+  };
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) {
+      exclusions.weekends++;
+      continue;
+    }
+    const key = formatDateKey(d);
+    if (publicHolidays.has(key)) {
+      exclusions.publicHolidays++;
+      continue;
+    }
+    if (blockedOfficeDays.has(key)) {
+      exclusions.officeBlocked++;
+      continue;
+    }
+    if (existingHolidays.has(key)) {
+      exclusions.alreadyBooked++;
+      continue;
+    }
+    days.push(key);
+  }
+  return { eligible: days, exclusions };
+}
+
+function buildExclusionText(exclusions: ExclusionSummary): string {
+  const parts: string[] = [];
+  if (exclusions.weekends > 0) {
+    parts.push(`${exclusions.weekends} weekend${exclusions.weekends > 1 ? 's' : ''}`);
+  }
+  if (exclusions.publicHolidays > 0) {
+    parts.push(
+      `${exclusions.publicHolidays} public holiday${exclusions.publicHolidays > 1 ? 's' : ''}`,
+    );
+  }
+  if (exclusions.officeBlocked > 0) {
+    parts.push(
+      `${exclusions.officeBlocked} office closed day${exclusions.officeBlocked > 1 ? 's' : ''}`,
+    );
+  }
+  if (exclusions.alreadyBooked > 0) {
+    parts.push(
+      `${exclusions.alreadyBooked} already booked day${exclusions.alreadyBooked > 1 ? 's' : ''}`,
+    );
+  }
+  if (parts.length === 0) return '';
+  return parts.join(', ') + ' excluded';
+}
+
 interface Props {
   teamMemberId: string;
   memberName: string;
@@ -71,24 +177,33 @@ export default function HolidayManagementModal({
   // Add/Edit form state
   const [formVisible, setFormVisible] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState<PlannedHoliday | null>(null);
-  const [formDate, setFormDate] = useState('');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
   const [formDayType, setFormDayType] = useState('FULL');
   const [formNotes, setFormNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Exclusion data
+  const [publicHolidaysList, setPublicHolidaysList] = useState<PublicHoliday[]>([]);
+  const [officeEventsList, setOfficeEventsList] = useState<OfficeEvent[]>([]);
 
   const year = new Date().getFullYear();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [h, a] = await Promise.all([
+      const [h, a, ph, oe] = await Promise.all([
         api.get<PlannedHoliday[]>(`/api/team-members/${teamMemberId}/holidays?year=${year}`),
         api.get<HolidayAllowance>(
           `/api/team-members/${teamMemberId}/holiday-allowance?year=${year}`,
         ),
+        api.get<PublicHoliday[]>(`/api/public-holidays?year=${year}`),
+        api.get<OfficeEvent[]>(`/api/office-events?year=${year}`),
       ]);
       setHolidays(h);
       setAllowance(a);
+      setPublicHolidaysList(ph);
+      setOfficeEventsList(oe);
     } catch {
       // silently fail
     } finally {
@@ -100,9 +215,47 @@ export default function HolidayManagementModal({
     if (visible) fetchData();
   }, [visible, fetchData]);
 
+  const publicHolidayDates = useMemo(
+    () => new Set(publicHolidaysList.map((ph) => ph.date.substring(0, 10))),
+    [publicHolidaysList],
+  );
+
+  const blockedOfficeDays = useMemo(
+    () => getBlockedOfficeDays(officeEventsList),
+    [officeEventsList],
+  );
+
+  const existingHolidayDates = useMemo(
+    () => new Set(holidays.map((h) => h.date.substring(0, 10))),
+    [holidays],
+  );
+
+  const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+  const rangePreview = useMemo(() => {
+    if (editingHoliday) return null;
+    if (!isValidDate(formStartDate) || !isValidDate(formEndDate)) return null;
+    if (formStartDate > formEndDate) return null;
+    return getEligibleDays(
+      formStartDate,
+      formEndDate,
+      publicHolidayDates,
+      blockedOfficeDays,
+      existingHolidayDates,
+    );
+  }, [
+    formStartDate,
+    formEndDate,
+    editingHoliday,
+    publicHolidayDates,
+    blockedOfficeDays,
+    existingHolidayDates,
+  ]);
+
   const handleOpenCreate = () => {
     setEditingHoliday(null);
-    setFormDate('');
+    setFormStartDate('');
+    setFormEndDate('');
     setFormDayType('FULL');
     setFormNotes('');
     setFormVisible(true);
@@ -110,33 +263,87 @@ export default function HolidayManagementModal({
 
   const handleOpenEdit = (holiday: PlannedHoliday) => {
     setEditingHoliday(holiday);
-    setFormDate(holiday.date.substring(0, 10));
+    setFormStartDate(holiday.date.substring(0, 10));
+    setFormEndDate(holiday.date.substring(0, 10));
     setFormDayType(holiday.day_type);
     setFormNotes(holiday.notes ?? '');
     setFormVisible(true);
   };
 
+  const handleStartDateChange = (value: string) => {
+    setFormStartDate(value);
+    // Default end date to start date
+    if (isValidDate(value) && (!isValidDate(formEndDate) || formEndDate < value)) {
+      setFormEndDate(value);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!formDate || submitting) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(formDate)) {
-      Alert.alert('Error', 'Date must be in YYYY-MM-DD format');
+    if (!formStartDate || submitting) return;
+    if (!isValidDate(formStartDate)) {
+      Alert.alert('Error', 'Start date must be in YYYY-MM-DD format');
       return;
     }
 
     setSubmitting(true);
-    const payload = {
-      date: formDate,
-      day_type: formDayType,
-      notes: formNotes || undefined,
-    };
 
     try {
       if (editingHoliday) {
+        const payload = {
+          date: formStartDate,
+          day_type: formDayType,
+          notes: formNotes || undefined,
+        };
         await api.put(`/api/team-members/${teamMemberId}/holidays/${editingHoliday.id}`, payload);
         Alert.alert('Success', 'Holiday updated.');
       } else {
-        await api.post(`/api/team-members/${teamMemberId}/holidays`, payload);
-        Alert.alert('Success', 'Holiday added.');
+        if (!isValidDate(formEndDate)) {
+          Alert.alert('Error', 'End date must be in YYYY-MM-DD format');
+          setSubmitting(false);
+          return;
+        }
+        if (formStartDate > formEndDate) {
+          Alert.alert('Error', 'End date must be on or after start date');
+          setSubmitting(false);
+          return;
+        }
+
+        const { eligible } = getEligibleDays(
+          formStartDate,
+          formEndDate,
+          publicHolidayDates,
+          blockedOfficeDays,
+          existingHolidayDates,
+        );
+
+        if (eligible.length === 0) {
+          Alert.alert('Error', 'No eligible working days in the selected range.');
+          setSubmitting(false);
+          return;
+        }
+
+        const results = await Promise.allSettled(
+          eligible.map((date) =>
+            api.post(`/api/team-members/${teamMemberId}/holidays`, {
+              date,
+              day_type: formDayType,
+              notes: formNotes || undefined,
+            }),
+          ),
+        );
+
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          Alert.alert(
+            'Partial Success',
+            `${eligible.length - failed} holidays added, ${failed} failed.`,
+          );
+        } else {
+          Alert.alert(
+            'Success',
+            `${eligible.length} holiday${eligible.length > 1 ? 's' : ''} added.`,
+          );
+        }
       }
       setFormVisible(false);
       setEditingHoliday(null);
@@ -167,6 +374,17 @@ export default function HolidayManagementModal({
       },
     ]);
   };
+
+  const isCreateMode = !editingHoliday;
+  const canSubmitCreate =
+    isCreateMode &&
+    isValidDate(formStartDate) &&
+    isValidDate(formEndDate) &&
+    formStartDate <= formEndDate &&
+    rangePreview !== null &&
+    rangePreview.eligible.length > 0;
+  const canSubmitEdit = !isCreateMode && isValidDate(formStartDate);
+  const canSubmit = canSubmitCreate || canSubmitEdit;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -265,14 +483,38 @@ export default function HolidayManagementModal({
             <View style={styles.overlay}>
               <View style={styles.formContent}>
                 <Text style={styles.title}>{editingHoliday ? 'Edit Holiday' : 'Add Holiday'}</Text>
-                <Text style={styles.fieldLabel}>Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formDate}
-                  onChangeText={setFormDate}
-                  placeholder="2026-03-20"
-                  autoFocus
-                />
+
+                {editingHoliday ? (
+                  <>
+                    <Text style={styles.fieldLabel}>Date (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={formStartDate}
+                      onChangeText={setFormStartDate}
+                      placeholder="2026-03-20"
+                      autoFocus
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.fieldLabel}>Start Date (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={formStartDate}
+                      onChangeText={handleStartDateChange}
+                      placeholder="2026-03-20"
+                      autoFocus
+                    />
+                    <Text style={styles.fieldLabel}>End Date (YYYY-MM-DD)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={formEndDate}
+                      onChangeText={setFormEndDate}
+                      placeholder="2026-03-25"
+                    />
+                  </>
+                )}
+
                 <Text style={styles.fieldLabel}>Day Type</Text>
                 <View style={styles.dayTypeRow}>
                   {DAY_TYPE_OPTIONS.map((opt) => (
@@ -295,6 +537,7 @@ export default function HolidayManagementModal({
                     </TouchableOpacity>
                   ))}
                 </View>
+
                 <Text style={styles.fieldLabel}>Notes (optional)</Text>
                 <TextInput
                   style={[styles.input, { height: 60 }]}
@@ -303,6 +546,51 @@ export default function HolidayManagementModal({
                   placeholder="Optional notes"
                   multiline
                 />
+
+                {/* Range preview (create mode only) */}
+                {isCreateMode &&
+                  isValidDate(formStartDate) &&
+                  isValidDate(formEndDate) &&
+                  formStartDate <= formEndDate && (
+                    <View style={styles.previewBox}>
+                      {rangePreview && rangePreview.eligible.length > 0 ? (
+                        <>
+                          <Text style={styles.previewText}>
+                            {rangePreview.eligible.length} working day
+                            {rangePreview.eligible.length > 1 ? 's' : ''} will be booked
+                          </Text>
+                          {buildExclusionText(rangePreview.exclusions) !== '' && (
+                            <Text style={styles.previewExclusion}>
+                              {buildExclusionText(rangePreview.exclusions)}
+                            </Text>
+                          )}
+                        </>
+                      ) : rangePreview && rangePreview.eligible.length === 0 ? (
+                        <>
+                          <Text style={styles.previewWarning}>
+                            No eligible working days in the selected range.
+                          </Text>
+                          {buildExclusionText(rangePreview.exclusions) !== '' && (
+                            <Text style={styles.previewExclusion}>
+                              {buildExclusionText(rangePreview.exclusions)}
+                            </Text>
+                          )}
+                        </>
+                      ) : null}
+                    </View>
+                  )}
+
+                {isCreateMode &&
+                  isValidDate(formStartDate) &&
+                  isValidDate(formEndDate) &&
+                  formStartDate > formEndDate && (
+                    <View style={styles.previewBox}>
+                      <Text style={styles.previewWarning}>
+                        End date must be on or after start date.
+                      </Text>
+                    </View>
+                  )}
+
                 <View style={styles.formActions}>
                   <TouchableOpacity
                     style={styles.cancelButton}
@@ -312,14 +600,20 @@ export default function HolidayManagementModal({
                     <Text style={styles.cancelText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.submitButton, (!formDate || submitting) && { opacity: 0.5 }]}
+                    style={[styles.submitButton, (!canSubmit || submitting) && { opacity: 0.5 }]}
                     onPress={handleSubmit}
-                    disabled={!formDate || submitting}
+                    disabled={!canSubmit || submitting}
                   >
                     {submitting ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text style={styles.submitText}>{editingHoliday ? 'Save' : 'Add'}</Text>
+                      <Text style={styles.submitText}>
+                        {editingHoliday
+                          ? 'Save'
+                          : rangePreview && rangePreview.eligible.length > 1
+                            ? `Add ${rangePreview.eligible.length} Days`
+                            : 'Add'}
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -498,6 +792,27 @@ const styles = StyleSheet.create({
   dayTypeButtonTextActive: {
     color: '#fff',
     fontWeight: typography.weights.semibold,
+  },
+  previewBox: {
+    backgroundColor: '#F0F4FF',
+    borderRadius: 8,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  previewText: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: colors.text,
+  },
+  previewExclusion: {
+    fontSize: typography.sizes.caption,
+    color: '#666',
+    marginTop: 2,
+  },
+  previewWarning: {
+    fontSize: typography.sizes.body2,
+    fontWeight: typography.weights.semibold,
+    color: '#F59E0B',
   },
   formActions: {
     flexDirection: 'row',
