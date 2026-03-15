@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Box,
-  CircularProgress,
-  IconButton,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, IconButton, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { api } from '../lib/api';
@@ -52,8 +47,18 @@ function formatDateKey(year: number, month: number, day: number): string {
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 // Colours
@@ -98,10 +103,7 @@ export default function TeamCalendarPage() {
   }, [fetchData]);
 
   const activeMembers = useMemo(
-    () =>
-      members
-        .filter((m) => m.is_active)
-        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () => members.filter((m) => m.is_active).sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [members],
   );
 
@@ -189,7 +191,15 @@ export default function TeamCalendarPage() {
           { color: COLOR_HOLIDAY, label: 'Public Holiday' },
         ].map(({ color, label }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Box sx={{ width: 14, height: 14, bgcolor: color, borderRadius: 0.5, border: '1px solid rgba(0,0,0,0.12)' }} />
+            <Box
+              sx={{
+                width: 14,
+                height: 14,
+                bgcolor: color,
+                borderRadius: 0.5,
+                border: '1px solid rgba(0,0,0,0.12)',
+              }}
+            />
             <Typography variant="caption">{label}</Typography>
           </Box>
         ))}
@@ -237,7 +247,10 @@ export default function TeamCalendarPage() {
                 pb: 0.5,
               }}
             >
-              <Typography variant="caption" sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{ fontSize: 9, color: 'text.disabled', lineHeight: 1 }}
+              >
                 {DAY_LABELS[getDayOfWeek(year, month, day)]}
               </Typography>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2 }}>

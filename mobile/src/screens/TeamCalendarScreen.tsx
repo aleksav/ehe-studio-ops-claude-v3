@@ -54,8 +54,18 @@ function formatDateKey(year: number, month: number, day: number): string {
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 const COLOR_WORKDAY = '#C8E6C9';
@@ -99,10 +109,7 @@ export default function TeamCalendarScreen() {
   }, [fetchData]);
 
   const activeMembers = useMemo(
-    () =>
-      members
-        .filter((m) => m.is_active)
-        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () => members.filter((m) => m.is_active).sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [members],
   );
 

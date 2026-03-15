@@ -43,7 +43,11 @@ function MoreStackNavigator() {
     <MoreStack.Navigator>
       <MoreStack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More' }} />
       <MoreStack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin' }} />
-      <MoreStack.Screen name="TeamCalendar" component={TeamCalendarScreen} options={{ title: 'Team Calendar' }} />
+      <MoreStack.Screen
+        name="TeamCalendar"
+        component={TeamCalendarScreen}
+        options={{ title: 'Team Calendar' }}
+      />
     </MoreStack.Navigator>
   );
 }

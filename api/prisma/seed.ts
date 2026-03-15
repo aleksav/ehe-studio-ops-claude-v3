@@ -1,4 +1,10 @@
-import { PrismaClient, TaskType, ProjectStatus, BudgetType, TaskStatus } from '../src/generated/prisma/client';
+import {
+  PrismaClient,
+  TaskType,
+  ProjectStatus,
+  BudgetType,
+  TaskStatus,
+} from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
