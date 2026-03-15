@@ -93,6 +93,13 @@ export default function OfficeEventsPage({ embedded = false }: { embedded?: bool
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 
+  // When start date changes, default end date to it if end date is empty or earlier
+  useEffect(() => {
+    if (formStartDate && (!formEndDate || formEndDate < formStartDate)) {
+      setFormEndDate(formStartDate);
+    }
+  }, [formStartDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchEvents = useCallback(async () => {
     try {
       setFetchError(null);

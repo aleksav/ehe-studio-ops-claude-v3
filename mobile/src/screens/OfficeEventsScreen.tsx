@@ -82,6 +82,13 @@ export default function OfficeEventsScreen() {
   const [saving, setSaving] = useState(false);
   const [typePickerVisible, setTypePickerVisible] = useState(false);
 
+  // When start date changes, default end date to it if end date is empty or earlier
+  useEffect(() => {
+    if (formStartDate && (!formEndDate || formEndDate < formStartDate)) {
+      setFormEndDate(formStartDate);
+    }
+  }, [formStartDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchEvents = useCallback(async () => {
     try {
       const data = await api.get<OfficeEvent[]>(`/api/office-events?year=${year}`);

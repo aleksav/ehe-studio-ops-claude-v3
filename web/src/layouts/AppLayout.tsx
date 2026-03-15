@@ -166,7 +166,7 @@ export default function AppLayout() {
       )}
 
       {/* Main content */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <AppBar
           position="sticky"
           elevation={0}
@@ -233,7 +233,7 @@ export default function AppLayout() {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ flex: 1, bgcolor: '#FAFAFA' }}>
+        <Box component="main" sx={{ flex: 1, bgcolor: '#FAFAFA', minWidth: 0 }}>
           <Outlet />
         </Box>
       </Box>

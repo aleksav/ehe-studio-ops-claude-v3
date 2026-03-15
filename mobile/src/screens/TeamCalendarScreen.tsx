@@ -69,30 +69,34 @@ function formatDateKey(year: number, month: number, day: number): string {
   return `${year}-${m}-${d}`;
 }
 
-function nextMonth(year: number, month: number): { year: number; month: number } {
-  return month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 };
+/** Build a continuous array of DayEntry for 12 months: 6 before and 5 after the given month. */
+function buildYearDays(centerYear: number, centerMonth: number): DayEntry[] {
+  const entries: DayEntry[] = [];
+  let startMonth = centerMonth - 6;
+  let startYear = centerYear;
+  while (startMonth < 0) {
+    startMonth += 12;
+    startYear -= 1;
+  }
+
+  let y = startYear;
+  let m = startMonth;
+  for (let i = 0; i < 12; i++) {
+    const days = getDaysInMonth(y, m);
+    for (let d = 1; d <= days; d++) {
+      entries.push({ year: y, month: m, day: d, dateKey: formatDateKey(y, m, d) });
+    }
+    m++;
+    if (m > 11) {
+      m = 0;
+      y++;
+    }
+  }
+  return entries;
 }
 
-function buildTwoMonthDays(year: number, month: number): DayEntry[] {
-  const entries: DayEntry[] = [];
-
-  const days1 = getDaysInMonth(year, month);
-  for (let d = 1; d <= days1; d++) {
-    entries.push({ year, month, day: d, dateKey: formatDateKey(year, month, d) });
-  }
-
-  const nm = nextMonth(year, month);
-  const days2 = getDaysInMonth(nm.year, nm.month);
-  for (let d = 1; d <= days2; d++) {
-    entries.push({
-      year: nm.year,
-      month: nm.month,
-      day: d,
-      dateKey: formatDateKey(nm.year, nm.month, d),
-    });
-  }
-
-  return entries;
+function findMonthStartIndex(entries: DayEntry[], year: number, month: number): number {
+  return entries.findIndex((e) => e.year === year && e.month === month);
 }
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -126,27 +130,30 @@ const DAY_COL_WIDTH = 28;
 
 export default function TeamCalendarScreen() {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const centerYear = today.getFullYear();
+  const centerMonth = today.getMonth();
 
-  // Visible month/year updated as user scrolls
-  const [visibleMonth, setVisibleMonth] = useState(today.getMonth());
-  const [visibleYear, setVisibleYear] = useState(today.getFullYear());
+  const [visibleMonth, setVisibleMonth] = useState(centerMonth);
+  const [visibleYear, setVisibleYear] = useState(centerYear);
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const hasScrolledToToday = useRef(false);
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const nm = nextMonth(year, month);
+  const dayEntries = useMemo(
+    () => buildYearDays(centerYear, centerMonth),
+    [centerYear, centerMonth],
+  );
+
   const yearsToFetch = useMemo(() => {
     const s = new Set<number>();
-    s.add(year);
-    s.add(nm.year);
+    dayEntries.forEach((e) => s.add(e.year));
     return Array.from(s);
-  }, [year, nm.year]);
+  }, [dayEntries]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -177,6 +184,19 @@ export default function TeamCalendarScreen() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Scroll to current month once data loads
+  useEffect(() => {
+    if (!loading && !hasScrolledToToday.current) {
+      hasScrolledToToday.current = true;
+      const idx = findMonthStartIndex(dayEntries, centerYear, centerMonth);
+      if (idx >= 0) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({ x: idx * DAY_COL_WIDTH, animated: false });
+        }, 100);
+      }
+    }
+  }, [loading, dayEntries, centerYear, centerMonth]);
 
   const activeMembers = useMemo(
     () => members.filter((m) => m.is_active).sort((a, b) => a.full_name.localeCompare(b.full_name)),
@@ -225,9 +245,6 @@ export default function TeamCalendarScreen() {
     return set;
   }, [officeEvents]);
 
-  const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
-
-  // Compute month boundary indices for labels
   const monthSpans = useMemo(() => {
     const spans: { label: string; startIndex: number; count: number }[] = [];
     let currentLabel = '';
@@ -252,12 +269,6 @@ export default function TeamCalendarScreen() {
     return spans;
   }, [dayEntries]);
 
-  // Sync visible month when base month/year changes
-  useEffect(() => {
-    setVisibleMonth(month);
-    setVisibleYear(year);
-  }, [month, year]);
-
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const scrollX = e.nativeEvent.contentOffset.x;
@@ -274,24 +285,23 @@ export default function TeamCalendarScreen() {
     [dayEntries],
   );
 
-  const handlePrev = () => {
-    if (month === 0) {
-      setMonth(11);
-      setYear(year - 1);
-    } else {
-      setMonth(month - 1);
+  const scrollToMonth = (targetYear: number, targetMonth: number) => {
+    const idx = findMonthStartIndex(dayEntries, targetYear, targetMonth);
+    if (idx >= 0) {
+      scrollViewRef.current?.scrollTo({ x: idx * DAY_COL_WIDTH, animated: true });
     }
-    scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+  };
+
+  const handlePrev = () => {
+    const prevMonth = visibleMonth === 0 ? 11 : visibleMonth - 1;
+    const prevYear = visibleMonth === 0 ? visibleYear - 1 : visibleYear;
+    scrollToMonth(prevYear, prevMonth);
   };
 
   const handleNext = () => {
-    if (month === 11) {
-      setMonth(0);
-      setYear(year + 1);
-    } else {
-      setMonth(month + 1);
-    }
-    scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+    const nextMonthVal = visibleMonth === 11 ? 0 : visibleMonth + 1;
+    const nextYearVal = visibleMonth === 11 ? visibleYear + 1 : visibleYear;
+    scrollToMonth(nextYearVal, nextMonthVal);
   };
 
   const getCellColor = (entry: DayEntry): string => {
@@ -352,17 +362,14 @@ export default function TeamCalendarScreen() {
         </View>
       </View>
 
-      {/* Grid: sticky name column on left + horizontally scrollable day columns */}
+      {/* Grid */}
       <View style={styles.gridContainer}>
         {/* Sticky name column */}
         <View style={styles.stickyNameColumn}>
-          {/* Empty cell for month label row */}
           <View style={styles.monthLabelPlaceholder} />
-          {/* Empty cell for day header row */}
           <View style={styles.nameHeaderCell}>
             <Text style={styles.headerText}>Name</Text>
           </View>
-          {/* Member name cells */}
           <ScrollView showsVerticalScrollIndicator={false}>
             {activeMembers.map((member) => (
               <View key={member.id} style={styles.nameCell}>
