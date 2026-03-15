@@ -12,6 +12,7 @@ import '@fontsource/source-sans-3/600.css';
 import theme from './theme';
 import { AuthProvider } from './contexts/AuthContext';
 import App from './App';
+import MaintenanceGate from './components/MaintenanceGate';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,9 +28,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <MaintenanceGate>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </MaintenanceGate>
       </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>,
