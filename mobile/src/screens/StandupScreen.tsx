@@ -183,7 +183,7 @@ export default function StandupScreen() {
     {},
   );
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
-  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(false);
+  const [hideEmptyMilestones, setHideEmptyMilestones] = useState(true);
 
   // Leave data
   const [leaveGroups, setLeaveGroups] = useState<{
@@ -195,7 +195,7 @@ export default function StandupScreen() {
   // Load hideEmptyMilestones from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem('standup-hide-empty-milestones').then((val) => {
-      if (val === 'true') setHideEmptyMilestones(true);
+      if (val === 'false') setHideEmptyMilestones(false);
     });
   }, []);
 

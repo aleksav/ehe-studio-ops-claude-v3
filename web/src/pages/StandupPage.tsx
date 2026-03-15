@@ -278,7 +278,7 @@ export default function StandupPage() {
 
   // Hide empty milestones toggle (persisted in localStorage)
   const HIDE_EMPTY_KEY = 'standup-hide-empty-milestones';
-  const initialHideEmpty = localStorage.getItem(HIDE_EMPTY_KEY) === 'true';
+  const initialHideEmpty = localStorage.getItem(HIDE_EMPTY_KEY) !== 'false';
 
   const handleHideEmptyChange = (checked: boolean) => {
     localStorage.setItem(HIDE_EMPTY_KEY, String(checked));
