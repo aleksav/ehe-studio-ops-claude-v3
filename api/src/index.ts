@@ -14,6 +14,7 @@ import clientRoutes from './routes/client.routes';
 import auditLogRoutes from './routes/audit-log.routes';
 import meRoutes from './routes/me.routes';
 import publicHolidayRoutes from './routes/public-holiday.routes';
+import officeEventRoutes from './routes/office-event.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +65,7 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/public-holidays', publicHolidayRoutes);
+app.use('/api/office-events', officeEventRoutes);
 
 app.listen(PORT, () => {
   console.log(`EHEStudio Ops API running on port ${PORT}`);

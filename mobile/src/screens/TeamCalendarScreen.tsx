@@ -24,6 +24,15 @@ interface TeamMember {
   is_active: boolean;
 }
 
+interface OfficeEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  allow_time_entry: boolean;
+}
+
 interface PublicHoliday {
   id: string;
   date: string;
@@ -106,6 +115,7 @@ const MONTH_NAMES = [
 const COLOR_WORKDAY = '#C8E6C9';
 const COLOR_WEEKEND = '#FFCDD2';
 const COLOR_HOLIDAY = '#E53935';
+const COLOR_OFFICE_CLOSED = '#78909C';
 
 const NAME_COL_WIDTH = 100;
 const DAY_COL_WIDTH = 28;
@@ -127,6 +137,7 @@ export default function TeamCalendarScreen() {
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
+  const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const nm = nextMonth(year, month);
@@ -143,12 +154,19 @@ export default function TeamCalendarScreen() {
       const holidayPromises = yearsToFetch.map((y) =>
         api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
       );
-      const [membersData, ...holidayArrays] = await Promise.all([
+      const officeEventPromises = yearsToFetch.map((y) =>
+        api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
+      );
+      const [membersData, ...rest] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
         ...holidayPromises,
+        ...officeEventPromises,
       ]);
+      const holidayArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
+      const officeEventArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
       setMembers(membersData);
       setHolidays(holidayArrays.flat());
+      setOfficeEvents(officeEventArrays.flat());
     } catch {
       // silently fail
     } finally {
@@ -170,6 +188,42 @@ export default function TeamCalendarScreen() {
     holidays.forEach((h) => set.add(h.date));
     return set;
   }, [holidays]);
+
+  const officeClosedDates = useMemo(() => {
+    const set = new Set<string>();
+    officeEvents
+      .filter((ev) => ev.event_type === 'OFFICE_CLOSED')
+      .forEach((ev) => {
+        const start = ev.start_date.substring(0, 10);
+        const end = ev.end_date.substring(0, 10);
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          set.add(`${d.getFullYear()}-${m}-${dd}`);
+        }
+      });
+    return set;
+  }, [officeEvents]);
+
+  const officeEventMarkerDates = useMemo(() => {
+    const set = new Set<string>();
+    officeEvents
+      .filter((ev) => ev.event_type === 'TEAM_SOCIAL' || ev.event_type === 'IMPORTANT_EVENT')
+      .forEach((ev) => {
+        const start = ev.start_date.substring(0, 10);
+        const end = ev.end_date.substring(0, 10);
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          set.add(`${d.getFullYear()}-${m}-${dd}`);
+        }
+      });
+    return set;
+  }, [officeEvents]);
 
   const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
 
@@ -242,6 +296,7 @@ export default function TeamCalendarScreen() {
 
   const getCellColor = (entry: DayEntry): string => {
     if (holidaySet.has(entry.dateKey)) return COLOR_HOLIDAY;
+    if (officeClosedDates.has(entry.dateKey)) return COLOR_OFFICE_CLOSED;
     if (isWeekend(entry.year, entry.month, entry.day)) return COLOR_WEEKEND;
     return COLOR_WORKDAY;
   };
@@ -290,6 +345,10 @@ export default function TeamCalendarScreen() {
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: COLOR_HOLIDAY }]} />
           <Text style={styles.legendLabel}>Holiday</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { backgroundColor: COLOR_OFFICE_CLOSED }]} />
+          <Text style={styles.legendLabel}>Office Closed</Text>
         </View>
       </View>
 
@@ -377,7 +436,11 @@ export default function TeamCalendarScreen() {
                           { backgroundColor: getCellColor(entry) },
                           isMonthBoundary ? styles.monthBoundaryLeft : null,
                         ]}
-                      />
+                      >
+                        {officeEventMarkerDates.has(entry.dateKey) && (
+                          <View style={styles.eventMarker} />
+                        )}
+                      </View>
                     );
                   })}
                 </View>
@@ -533,5 +596,14 @@ const styles = StyleSheet.create({
   monthBoundaryLeft: {
     borderLeftWidth: 2,
     borderLeftColor: colors.divider,
+  },
+  eventMarker: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#1E6FE9',
   },
 });

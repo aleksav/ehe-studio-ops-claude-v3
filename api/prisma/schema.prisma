@@ -34,6 +34,12 @@ enum TaskType {
   BUSINESS_SUPPORT
 }
 
+enum OfficeEventType {
+  OFFICE_CLOSED
+  TEAM_SOCIAL
+  IMPORTANT_EVENT
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -203,6 +209,22 @@ model PublicHoliday {
 
   @@index([date])
   @@map("public_holidays")
+}
+
+model OfficeEvent {
+  id               String          @id @default(uuid())
+  name             String
+  event_type       OfficeEventType
+  start_date       DateTime        @db.Date
+  end_date         DateTime        @db.Date
+  allow_time_entry Boolean         @default(false)
+  notes            String?
+  created_at       DateTime        @default(now())
+
+  @@index([start_date])
+  @@index([end_date])
+  @@index([event_type])
+  @@map("office_events")
 }
 
 model AuditLog {

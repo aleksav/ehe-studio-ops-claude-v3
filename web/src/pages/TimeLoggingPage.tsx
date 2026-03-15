@@ -168,11 +168,25 @@ const LS_KEY_TASK_TYPES = 'weeklyGrid:taskTypes';
 const DAILY_WARN_THRESHOLD = 8;
 const DAILY_BLOCK_THRESHOLD = 12;
 
-function isBlockedDate(dateStr: string, holidayDates: Set<string>): 'weekend' | 'holiday' | null {
+interface OfficeEventInfo {
+  id: string;
+  name: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  allow_time_entry: boolean;
+}
+
+function isBlockedDate(
+  dateStr: string,
+  holidayDates: Set<string>,
+  officeEventBlockedDates?: Map<string, string>,
+): 'weekend' | 'holiday' | 'office_event' | null {
   const d = parseISO(dateStr);
   const day = d.getDay();
   if (day === 0 || day === 6) return 'weekend';
   if (holidayDates.has(dateStr)) return 'holiday';
+  if (officeEventBlockedDates?.has(dateStr)) return 'office_event';
   return null;
 }
 
@@ -322,6 +336,42 @@ export default function TimeLoggingPage() {
     };
   }, []);
 
+  // ---- Office events ----
+  const [officeEventBlockedDates, setOfficeEventBlockedDates] = useState<Map<string, string>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<OfficeEventInfo[]>('/api/office-events');
+        if (!cancelled) {
+          // Build a map of dateStr -> event name for dates where time entry is NOT allowed
+          const blocked = new Map<string, string>();
+          for (const ev of data) {
+            if (!ev.allow_time_entry) {
+              const start = ev.start_date.substring(0, 10);
+              const end = ev.end_date.substring(0, 10);
+              let current = parseISO(start);
+              const endDate = parseISO(end);
+              while (current <= endDate) {
+                blocked.set(format(current, 'yyyy-MM-dd'), ev.name);
+                current = addDays(current, 1);
+              }
+            }
+          }
+          setOfficeEventBlockedDates(blocked);
+        }
+      } catch {
+        // silently fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // =====================================================================
   // WEEKLY GRID STATE
   // =====================================================================
@@ -366,7 +416,7 @@ export default function TimeLoggingPage() {
     open: boolean;
     dateStr: string;
     projectId: string;
-    reason: 'weekend' | 'holiday';
+    reason: 'weekend' | 'holiday' | 'office_event';
   }>({ open: false, dateStr: '', projectId: '', reason: 'weekend' });
   const [pendingFocusCellKey, setPendingFocusCellKey] = useState<string | null>(null);
 
@@ -525,7 +575,7 @@ export default function TimeLoggingPage() {
       const hoursNum = parseFloat(snapped);
       if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
 
-      const blockReason = isBlockedDate(dateStr, holidayDates);
+      const blockReason = isBlockedDate(dateStr, holidayDates, officeEventBlockedDates);
       if (blockReason && !unblockedDates.has(dateStr)) return;
 
       const dailyTotal = computeDailyTotal(dateStr);
@@ -589,8 +639,14 @@ export default function TimeLoggingPage() {
 
   const interceptBlockedFocus = useCallback(
     (dateStr: string, projectId: string, e: React.FocusEvent | React.MouseEvent): boolean => {
-      const blockReason = isBlockedDate(dateStr, holidayDates);
+      const blockReason = isBlockedDate(dateStr, holidayDates, officeEventBlockedDates);
       if (blockReason && !unblockedDates.has(dateStr)) {
+        // Office events with allow_time_entry=false cannot be overridden
+        if (blockReason === 'office_event') {
+          e.preventDefault();
+          (e.target as HTMLElement).blur?.();
+          return true;
+        }
         e.preventDefault();
         (e.target as HTMLElement).blur?.();
         setBlockDialog({ open: true, dateStr, projectId, reason: blockReason });
@@ -598,7 +654,7 @@ export default function TimeLoggingPage() {
       }
       return false;
     },
-    [unblockedDates],
+    [unblockedDates, officeEventBlockedDates],
   );
 
   useEffect(() => {
@@ -901,7 +957,7 @@ export default function TimeLoggingPage() {
                     {weekDates.map((d, i) => {
                       const ds = dateKey(d);
                       const dt = computeDailyTotal(ds);
-                      const blockReason = isBlockedDate(ds, holidayDates);
+                      const blockReason = isBlockedDate(ds, holidayDates, officeEventBlockedDates);
                       const isDateBlocked = blockReason !== null && !unblockedDates.has(ds);
                       return (
                         <TableCell
@@ -924,7 +980,11 @@ export default function TimeLoggingPage() {
                               display="block"
                               sx={{ fontSize: 9, color: 'text.disabled' }}
                             >
-                              {blockReason === 'weekend' ? '(Weekend)' : '(Holiday)'}
+                              {blockReason === 'weekend'
+                                ? '(Weekend)'
+                                : blockReason === 'office_event'
+                                  ? `(${officeEventBlockedDates.get(ds) ?? 'Office Event'})`
+                                  : '(Holiday)'}
                             </Typography>
                           )}
                         </TableCell>
@@ -964,7 +1024,11 @@ export default function TimeLoggingPage() {
                           const cell = cells[ck];
                           const dt = computeDailyTotal(ds);
                           const dailyBlocked = dt >= DAILY_BLOCK_THRESHOLD;
-                          const blockReason = isBlockedDate(ds, holidayDates);
+                          const blockReason = isBlockedDate(
+                            ds,
+                            holidayDates,
+                            officeEventBlockedDates,
+                          );
                           const dateBlocked = blockReason !== null && !unblockedDates.has(ds);
                           const hasValue = parseFloat(cell?.hours ?? '0') > 0;
                           const isDisabled = !hasValue && (dateBlocked || dailyBlocked);
@@ -1096,7 +1160,11 @@ export default function TimeLoggingPage() {
                     {weekDates.map((d) => {
                       const ds = dateKey(d);
                       const dt = computeDailyTotal(ds);
-                      const footerBlockReason = isBlockedDate(ds, holidayDates);
+                      const footerBlockReason = isBlockedDate(
+                        ds,
+                        holidayDates,
+                        officeEventBlockedDates,
+                      );
                       const footerDateBlocked =
                         footerBlockReason !== null && !unblockedDates.has(ds);
                       return (
