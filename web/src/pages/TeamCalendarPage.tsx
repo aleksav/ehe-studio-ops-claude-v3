@@ -21,6 +21,15 @@ interface PublicHoliday {
   name: string;
 }
 
+interface OfficeEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  allow_time_entry: boolean;
+}
+
 interface DayEntry {
   year: number;
   month: number; // 0-based
@@ -102,6 +111,7 @@ const MONTH_NAMES = [
 const COLOR_WORKDAY = '#C8E6C9'; // light green
 const COLOR_WEEKEND = '#FFCDD2'; // light red
 const COLOR_HOLIDAY = '#E53935'; // darker red
+const COLOR_OFFICE_CLOSED = '#78909C'; // dark grey for office closures
 
 const NAME_COL_WIDTH = 150;
 const DAY_COL_WIDTH = 32;
@@ -123,6 +133,7 @@ export default function TeamCalendarPage() {
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
+  const [officeEvents, setOfficeEvents] = useState<OfficeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   // The second month may be in a different year, so fetch holidays for both.
@@ -140,12 +151,19 @@ export default function TeamCalendarPage() {
       const holidayPromises = yearsToFetch.map((y) =>
         api.get<PublicHoliday[]>(`/api/public-holidays?year=${y}`),
       );
-      const [membersData, ...holidayArrays] = await Promise.all([
+      const officeEventPromises = yearsToFetch.map((y) =>
+        api.get<OfficeEvent[]>(`/api/office-events?year=${y}`),
+      );
+      const [membersData, ...rest] = await Promise.all([
         api.get<TeamMember[]>('/api/team-members'),
         ...holidayPromises,
+        ...officeEventPromises,
       ]);
+      const holidayArrays = rest.slice(0, yearsToFetch.length) as PublicHoliday[][];
+      const officeEventArrays = rest.slice(yearsToFetch.length) as OfficeEvent[][];
       setMembers(membersData);
       setHolidays(holidayArrays.flat());
+      setOfficeEvents(officeEventArrays.flat());
     } catch {
       // silently fail
     } finally {
@@ -173,6 +191,59 @@ export default function TeamCalendarPage() {
     holidays.forEach((h) => map.set(h.date, h.name));
     return map;
   }, [holidays]);
+
+  // Build office event date maps: closedDates (OFFICE_CLOSED) and markerDates (TEAM_SOCIAL/IMPORTANT_EVENT)
+  const officeClosedDates = useMemo(() => {
+    const set = new Set<string>();
+    officeEvents
+      .filter((ev) => ev.event_type === 'OFFICE_CLOSED')
+      .forEach((ev) => {
+        const start = ev.start_date.substring(0, 10);
+        const end = ev.end_date.substring(0, 10);
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          set.add(`${d.getFullYear()}-${m}-${dd}`);
+        }
+      });
+    return set;
+  }, [officeEvents]);
+
+  const officeEventNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    officeEvents.forEach((ev) => {
+      const start = ev.start_date.substring(0, 10);
+      const end = ev.end_date.substring(0, 10);
+      const startDate = new Date(start + 'T00:00:00');
+      const endDate = new Date(end + 'T00:00:00');
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        map.set(`${d.getFullYear()}-${m}-${dd}`, ev.name);
+      }
+    });
+    return map;
+  }, [officeEvents]);
+
+  const officeEventMarkerDates = useMemo(() => {
+    const set = new Set<string>();
+    officeEvents
+      .filter((ev) => ev.event_type === 'TEAM_SOCIAL' || ev.event_type === 'IMPORTANT_EVENT')
+      .forEach((ev) => {
+        const start = ev.start_date.substring(0, 10);
+        const end = ev.end_date.substring(0, 10);
+        const startDate = new Date(start + 'T00:00:00');
+        const endDate = new Date(end + 'T00:00:00');
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          set.add(`${d.getFullYear()}-${m}-${dd}`);
+        }
+      });
+    return set;
+  }, [officeEvents]);
 
   // Build the continuous 2-month strip
   const dayEntries = useMemo(() => buildTwoMonthDays(year, month), [year, month]);
@@ -253,12 +324,17 @@ export default function TeamCalendarPage() {
 
   const getCellColor = (entry: DayEntry): string => {
     if (holidaySet.has(entry.dateKey)) return COLOR_HOLIDAY;
+    if (officeClosedDates.has(entry.dateKey)) return COLOR_OFFICE_CLOSED;
     if (isWeekend(entry.year, entry.month, entry.day)) return COLOR_WEEKEND;
     return COLOR_WORKDAY;
   };
 
   const getCellTooltip = (entry: DayEntry): string | undefined => {
-    return holidayNameMap.get(entry.dateKey);
+    return holidayNameMap.get(entry.dateKey) ?? officeEventNameMap.get(entry.dateKey);
+  };
+
+  const hasEventMarker = (entry: DayEntry): boolean => {
+    return officeEventMarkerDates.has(entry.dateKey);
   };
 
   // Compute month label spans for the top header row
@@ -323,6 +399,7 @@ export default function TeamCalendarPage() {
           { color: COLOR_WORKDAY, label: 'Workday' },
           { color: COLOR_WEEKEND, label: 'Weekend' },
           { color: COLOR_HOLIDAY, label: 'Public Holiday' },
+          { color: COLOR_OFFICE_CLOSED, label: 'Office Closed' },
         ].map(({ color, label }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box
@@ -337,15 +414,41 @@ export default function TeamCalendarPage() {
             <Typography variant="caption">{label}</Typography>
           </Box>
         ))}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              bgcolor: '#1E6FE9',
+            }}
+          />
+          <Typography variant="caption">Event</Typography>
+        </Box>
       </Box>
 
       {/* Grid */}
-      <Box ref={scrollContainerRef} sx={{ overflowX: 'auto', position: 'relative' }}>
+      <Box
+        ref={scrollContainerRef}
+        sx={{
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          position: 'relative',
+          maxWidth: '100%',
+          cursor: 'ew-resize',
+          '&::-webkit-scrollbar': { height: 8 },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'rgba(0,0,0,0.2)',
+            borderRadius: 4,
+          },
+        }}
+      >
         <Box
           component="table"
           sx={{
             borderCollapse: 'collapse',
-            minWidth: NAME_COL_WIDTH + totalDays * DAY_COL_WIDTH,
+            width: NAME_COL_WIDTH + totalDays * DAY_COL_WIDTH,
+            tableLayout: 'fixed',
           }}
         >
           {/* Month label row */}
@@ -503,8 +606,23 @@ export default function TeamCalendarPage() {
                         borderColor: 'rgba(0,0,0,0.08)',
                         cursor: tooltip ? 'help' : 'default',
                         p: 0,
+                        position: 'relative',
                       }}
-                    />
+                    >
+                      {hasEventMarker(entry) && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            bgcolor: '#1E6FE9',
+                          }}
+                        />
+                      )}
+                    </Box>
                   );
                 })}
               </Box>
