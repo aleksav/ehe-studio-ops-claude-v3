@@ -167,11 +167,31 @@ export default function WeeklyGridScreen() {
     setSelectedProjectIds((prev) => prev.filter((id) => id !== projectId));
   };
 
+  const snapToHalf = (value: string): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return '';
+    const snapped = Math.max(0.5, Math.round(num * 2) / 2);
+    return String(snapped);
+  };
+
   const handleHoursChange = (ck: string, value: string) => {
     setCells((prev) => ({
       ...prev,
       [ck]: { ...prev[ck], hours: value },
     }));
+  };
+
+  const handleHoursStep = (ck: string, delta: number) => {
+    setCells((prev) => {
+      const cell = prev[ck];
+      if (!cell) return prev;
+      const current = parseFloat(cell.hours) || 0;
+      const next = Math.max(0.5, Math.round((current + delta) * 2) / 2);
+      return {
+        ...prev,
+        [ck]: { ...prev[ck], hours: String(next) },
+      };
+    });
   };
 
   const handleCellBlur = async (projectId: string, dateStr: string) => {
@@ -180,8 +200,17 @@ export default function WeeklyGridScreen() {
     const cell = cells[ck];
     if (!cell) return;
 
-    const hoursNum = parseFloat(cell.hours);
-    if (!cell.hours || isNaN(hoursNum) || hoursNum <= 0) return;
+    // Snap to nearest 0.5
+    const snapped = snapToHalf(cell.hours);
+    if (snapped !== cell.hours) {
+      setCells((prev) => ({
+        ...prev,
+        [ck]: { ...prev[ck], hours: snapped },
+      }));
+    }
+
+    const hoursNum = parseFloat(snapped);
+    if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
 
     setCells((prev) => ({
       ...prev,
@@ -365,15 +394,37 @@ export default function WeeklyGridScreen() {
                     const cell = cells[ck];
                     return (
                       <View key={ds} style={styles.inputCell}>
-                        <TextInput
-                          style={styles.hourInput}
-                          value={cell?.hours ?? ''}
-                          onChangeText={(v) => handleHoursChange(ck, v)}
-                          onBlur={() => void handleCellBlur(pid, ds)}
-                          keyboardType="decimal-pad"
-                          placeholder="-"
-                          placeholderTextColor="#ccc"
-                        />
+                        <View style={styles.stepperRow}>
+                          <TouchableOpacity
+                            style={styles.stepperButton}
+                            onPress={() => {
+                              handleHoursStep(ck, -0.5);
+                              void handleCellBlur(pid, ds);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="remove" size={14} color={colors.text} />
+                          </TouchableOpacity>
+                          <TextInput
+                            style={styles.hourInput}
+                            value={cell?.hours ?? ''}
+                            onChangeText={(v) => handleHoursChange(ck, v)}
+                            onBlur={() => void handleCellBlur(pid, ds)}
+                            keyboardType="decimal-pad"
+                            placeholder="-"
+                            placeholderTextColor="#ccc"
+                          />
+                          <TouchableOpacity
+                            style={styles.stepperButton}
+                            onPress={() => {
+                              handleHoursStep(ck, 0.5);
+                              void handleCellBlur(pid, ds);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="add" size={14} color={colors.text} />
+                          </TouchableOpacity>
+                        </View>
                         {cell?.saving && (
                           <ActivityIndicator
                             size="small"
@@ -510,7 +561,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   dayCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     paddingVertical: spacing.sm,
   },
@@ -524,13 +575,28 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   inputCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xs,
   },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  stepperButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
   hourInput: {
-    width: 56,
+    width: 40,
     borderWidth: 1,
     borderColor: colors.divider,
     borderRadius: 4,
@@ -544,7 +610,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   totalCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,

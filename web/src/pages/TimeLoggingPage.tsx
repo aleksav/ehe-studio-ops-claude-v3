@@ -457,6 +457,13 @@ export default function TimeLoggingPage() {
     [selectedProjectIds],
   );
 
+  const snapToHalf = useCallback((value: string): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return '';
+    const snapped = Math.max(0.5, Math.round(num * 2) / 2);
+    return String(snapped);
+  }, []);
+
   const handleHoursChange = useCallback((ck: string, value: string) => {
     setCells((prev) => ({
       ...prev,
@@ -506,8 +513,17 @@ export default function TimeLoggingPage() {
       const cell = cells[ck];
       if (!cell) return;
 
-      const hoursNum = parseFloat(cell.hours);
-      if (!cell.hours || isNaN(hoursNum) || hoursNum <= 0) return;
+      // Snap to nearest 0.5
+      const snapped = snapToHalf(cell.hours);
+      if (snapped !== cell.hours) {
+        setCells((prev) => ({
+          ...prev,
+          [ck]: { ...prev[ck], hours: snapped },
+        }));
+      }
+
+      const hoursNum = parseFloat(snapped);
+      if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
 
       const blockReason = isBlockedDate(dateStr, holidayDates);
       if (blockReason && !unblockedDates.has(dateStr)) return;
@@ -551,7 +567,7 @@ export default function TimeLoggingPage() {
         setGridErrorMsg('Failed to save entry. Please try again.');
       }
     },
-    [teamMemberId, cells, unblockedDates, computeDailyTotal],
+    [teamMemberId, cells, unblockedDates, computeDailyTotal, snapToHalf],
   );
 
   const handleBlockDialogConfirm = useCallback(() => {
@@ -967,9 +983,9 @@ export default function TimeLoggingPage() {
                                   size="small"
                                   type="number"
                                   inputProps={{
-                                    min: 0,
+                                    min: 0.5,
                                     max: 24,
-                                    step: 0.25,
+                                    step: 0.5,
                                     'data-cell-key': ck,
                                   }}
                                   value={cell?.hours ?? ''}
@@ -1236,7 +1252,11 @@ export default function TimeLoggingPage() {
                       type="number"
                       value={hours}
                       onChange={(e) => setHours(e.target.value)}
-                      inputProps={{ min: 0.25, step: 0.25 }}
+                      onBlur={() => {
+                        const snapped = snapToHalf(hours);
+                        if (snapped !== hours) setHours(snapped);
+                      }}
+                      inputProps={{ min: 0.5, step: 0.5 }}
                       placeholder="e.g. 2.5"
                       required
                       fullWidth

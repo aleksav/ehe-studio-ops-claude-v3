@@ -207,11 +207,31 @@ export default function TimeLoggingScreen() {
     setSelectedProjectIds((prev) => prev.filter((id) => id !== projectId));
   };
 
+  const snapToHalf = (value: string): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return '';
+    const snapped = Math.max(0.5, Math.round(num * 2) / 2);
+    return String(snapped);
+  };
+
   const handleHoursChange = (ck: string, value: string) => {
     setCells((prev) => ({
       ...prev,
       [ck]: { ...prev[ck], hours: value },
     }));
+  };
+
+  const handleHoursStep = (ck: string, delta: number) => {
+    setCells((prev) => {
+      const cell = prev[ck];
+      if (!cell) return prev;
+      const current = parseFloat(cell.hours) || 0;
+      const next = Math.max(0.5, Math.round((current + delta) * 2) / 2);
+      return {
+        ...prev,
+        [ck]: { ...prev[ck], hours: String(next) },
+      };
+    });
   };
 
   const handleCellBlur = async (projectId: string, dateStr: string) => {
@@ -220,8 +240,17 @@ export default function TimeLoggingScreen() {
     const cell = cells[ck];
     if (!cell) return;
 
-    const hoursNum = parseFloat(cell.hours);
-    if (!cell.hours || isNaN(hoursNum) || hoursNum <= 0) return;
+    // Snap to nearest 0.5
+    const snapped = snapToHalf(cell.hours);
+    if (snapped !== cell.hours) {
+      setCells((prev) => ({
+        ...prev,
+        [ck]: { ...prev[ck], hours: snapped },
+      }));
+    }
+
+    const hoursNum = parseFloat(snapped);
+    if (!snapped || isNaN(hoursNum) || hoursNum <= 0) return;
 
     setCells((prev) => ({
       ...prev,
@@ -547,15 +576,37 @@ export default function TimeLoggingScreen() {
                         const cell = cells[ck];
                         return (
                           <View key={ds} style={styles.inputCell}>
-                            <TextInput
-                              style={styles.hourInput}
-                              value={cell?.hours ?? ''}
-                              onChangeText={(v) => handleHoursChange(ck, v)}
-                              onBlur={() => void handleCellBlur(pid, ds)}
-                              keyboardType="decimal-pad"
-                              placeholder="-"
-                              placeholderTextColor="#ccc"
-                            />
+                            <View style={styles.stepperRow}>
+                              <TouchableOpacity
+                                style={styles.stepperButton}
+                                onPress={() => {
+                                  handleHoursStep(ck, -0.5);
+                                  void handleCellBlur(pid, ds);
+                                }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Ionicons name="remove" size={14} color={colors.text} />
+                              </TouchableOpacity>
+                              <TextInput
+                                style={styles.hourInput}
+                                value={cell?.hours ?? ''}
+                                onChangeText={(v) => handleHoursChange(ck, v)}
+                                onBlur={() => void handleCellBlur(pid, ds)}
+                                keyboardType="decimal-pad"
+                                placeholder="-"
+                                placeholderTextColor="#ccc"
+                              />
+                              <TouchableOpacity
+                                style={styles.stepperButton}
+                                onPress={() => {
+                                  handleHoursStep(ck, 0.5);
+                                  void handleCellBlur(pid, ds);
+                                }}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Ionicons name="add" size={14} color={colors.text} />
+                              </TouchableOpacity>
+                            </View>
                             {cell?.saving && (
                               <ActivityIndicator
                                 size="small"
@@ -675,14 +726,40 @@ export default function TimeLoggingScreen() {
               />
 
               <Text style={styles.fieldLabel}>Hours</Text>
-              <TextInput
-                style={styles.input}
-                value={hours}
-                onChangeText={setHours}
-                placeholder="e.g. 2.5"
-                placeholderTextColor="#999"
-                keyboardType="decimal-pad"
-              />
+              <View style={styles.quickHoursStepper}>
+                <TouchableOpacity
+                  style={styles.quickStepperButton}
+                  onPress={() => {
+                    const current = parseFloat(hours) || 0;
+                    const next = Math.max(0.5, Math.round((current - 0.5) * 2) / 2);
+                    setHours(String(next));
+                  }}
+                >
+                  <Ionicons name="remove" size={20} color={colors.text} />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.quickHoursInput}
+                  value={hours}
+                  onChangeText={setHours}
+                  onBlur={() => {
+                    const snapped = snapToHalf(hours);
+                    if (snapped !== hours) setHours(snapped);
+                  }}
+                  placeholder="e.g. 2.5"
+                  placeholderTextColor="#999"
+                  keyboardType="decimal-pad"
+                />
+                <TouchableOpacity
+                  style={styles.quickStepperButton}
+                  onPress={() => {
+                    const current = parseFloat(hours) || 0;
+                    const next = Math.max(0.5, Math.round((current + 0.5) * 2) / 2);
+                    setHours(String(next));
+                  }}
+                >
+                  <Ionicons name="add" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
 
               <Text style={styles.fieldLabel}>Task Type</Text>
               <View style={styles.taskTypeRow}>
@@ -895,7 +972,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   dayCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     paddingVertical: spacing.sm,
   },
@@ -909,13 +986,28 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   inputCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xs,
   },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  stepperButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
   hourInput: {
-    width: 56,
+    width: 40,
     borderWidth: 1,
     borderColor: colors.divider,
     borderRadius: 4,
@@ -929,7 +1021,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   totalCell: {
-    width: 70,
+    width: 90,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.sm,
@@ -1003,6 +1095,33 @@ const styles = StyleSheet.create({
   multilineInput: {
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  quickHoursStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  quickStepperButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  quickHoursInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    borderRadius: borderRadius.input,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    fontSize: typography.sizes.body1,
+    color: colors.text,
+    textAlign: 'center',
   },
   taskTypeRow: {
     flexDirection: 'row',
