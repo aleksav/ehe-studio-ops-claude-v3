@@ -12,7 +12,6 @@ import {
   formatCellTooltip,
   getCellColor,
   hasEventMarker,
-  isWeekend,
   COLOR_WORKDAY,
 } from '../pages/teamCalendarUtils';
 
@@ -201,27 +200,13 @@ export default function CalendarGrid({
               const isMonthBoundary = i > 0 && dayEntries[i - 1].month !== entry.month;
               const baseColor = getCellColor(entry, holidaySet, officeEventDateMap);
 
-              // Determine cell background based on planned holiday
+              // Personal holidays take highest priority (per team member)
               let cellBg: string | undefined;
-              if (
-                ph &&
-                !isWeekend(entry.year, entry.month, entry.day) &&
-                !holidaySet.has(entry.dateKey)
-              ) {
-                if (ph.day_type === 'FULL') {
-                  cellBg = COLOR_PLANNED_HOLIDAY;
-                } else if (ph.day_type === 'AM') {
-                  cellBg = undefined; // use gradient
-                } else {
-                  cellBg = undefined; // use gradient
-                }
+              if (ph && ph.day_type === 'FULL') {
+                cellBg = COLOR_PLANNED_HOLIDAY;
               }
 
-              const useGradient =
-                ph &&
-                (ph.day_type === 'AM' || ph.day_type === 'PM') &&
-                !isWeekend(entry.year, entry.month, entry.day) &&
-                !holidaySet.has(entry.dateKey);
+              const useGradient = ph && (ph.day_type === 'AM' || ph.day_type === 'PM');
               const gradientBg = useGradient
                 ? ph!.day_type === 'AM'
                   ? `linear-gradient(to right, ${COLOR_PLANNED_HOLIDAY} 50%, ${COLOR_WORKDAY} 50%)`

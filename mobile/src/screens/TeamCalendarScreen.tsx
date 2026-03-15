@@ -480,12 +480,9 @@ export default function TeamCalendarScreen() {
                     const phKey = `${member.id}:${entry.dateKey}`;
                     const ph = plannedHolidayMap.get(phKey);
                     const baseColor = getCellColor(entry);
-                    const isWorkday =
-                      !isWeekend(entry.year, entry.month, entry.day) &&
-                      !holidaySet.has(entry.dateKey);
 
-                    // Full day planned holiday
-                    if (ph && ph.day_type === 'FULL' && isWorkday) {
+                    // Personal holidays take highest priority (per team member)
+                    if (ph && ph.day_type === 'FULL') {
                       return (
                         <View
                           key={`${member.id}-${entry.dateKey}`}
@@ -499,7 +496,7 @@ export default function TeamCalendarScreen() {
                     }
 
                     // Half day: two side-by-side Views
-                    if (ph && (ph.day_type === 'AM' || ph.day_type === 'PM') && isWorkday) {
+                    if (ph && (ph.day_type === 'AM' || ph.day_type === 'PM')) {
                       const leftColor =
                         ph.day_type === 'AM' ? COLOR_PLANNED_HOLIDAY : COLOR_WORKDAY;
                       const rightColor =
